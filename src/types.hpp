@@ -134,7 +134,8 @@ enum class TopologyOptMethod
   rapidBS,
   nniRound,
   simplified,
-  adafast
+  adafast,
+  ultraFast,
 };
 
 enum class StoppingRule

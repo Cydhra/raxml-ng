@@ -3639,7 +3639,7 @@ void thread_main(RaxmlInstance& instance, CheckpointManager& cm)
 
   if ((opts.command == Command::search || opts.command == Command::all ||
       opts.command == Command::evaluate || opts.command == Command::sitelh ||
-      opts.command == Command::ancestral) &&
+      opts.command == Command::ancestral || opts.command == Command::treeset) &&
       !instance.start_trees.empty())
   {
     thread_infer_ml(instance, cm);
@@ -3996,6 +3996,7 @@ int internal_main(int argc, char** argv, void* comm)
       case Command::all:
       case Command::ancestral:
       case Command::modeltest:
+      case Command::treeset:
       {
         master_main(instance, cm);
         break;
