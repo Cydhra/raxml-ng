@@ -3840,6 +3840,7 @@ int internal_main(int argc, char** argv, void* comm)
     case Command::consense:
     case Command::sitelh:
     case Command::ancestral:
+    case Command::treeset:
       if (!opts.redo_mode && opts.result_files_exist())
       {
         LOG_ERROR << endl << "ERROR: Result files for the run with prefix `" <<

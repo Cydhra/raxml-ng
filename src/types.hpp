@@ -42,7 +42,8 @@ enum class Command
   ancestral,
   sitelh,
   pythia,
-  modeltest
+  modeltest,
+  treeset
 };
 
 enum class FileFormat

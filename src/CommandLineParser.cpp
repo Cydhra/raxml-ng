@@ -95,6 +95,7 @@ static struct option long_options[] =
   {"ebg",                no_argument,       0, 0 },  /*  70 */
   {"fast",               no_argument,       0, 0 },  /*  71 */
   {"modeltest",          no_argument,       0, 0 },  /*  72 */
+  {"treeset",            no_argument,       0, 0 },  /*  73 */
 
   { 0, 0, 0, 0 }
 };
@@ -114,7 +115,8 @@ void CommandLineParser::check_options(Options &opts)
       opts.command == Command::bootstrap || opts.command == Command::all ||
       opts.command == Command::terrace || opts.command == Command::check ||
       opts.command == Command::parse || opts.command == Command::start ||
-      opts.command == Command::ancestral || opts.command == Command::modeltest)
+      opts.command == Command::ancestral || opts.command == Command::modeltest ||
+      opts.command == Command::treeset)
   {
     if (opts.msa_file.empty())
       throw OptionException("You must specify a multiple alignment file with --msa switch");
@@ -123,7 +125,7 @@ void CommandLineParser::check_options(Options &opts)
   if (opts.command == Command::evaluate || opts.command == Command::support ||
       opts.command == Command::terrace || opts.command == Command::rfdist ||
       opts.command == Command::sitelh || opts.command == Command::ancestral ||
-      opts.command == Command::consense)
+      opts.command == Command::consense || opts.command == Command::treeset)
   {
     if (opts.tree_file.empty() && (opts.start_trees.count(StartingTree::user) || opts.start_trees.empty()))
       throw OptionException("Please provide a valid Newick file as an argument of --tree option.");
@@ -260,7 +262,7 @@ void CommandLineParser::compute_num_searches(Options &opts)
   if (opts.command == Command::search || opts.command == Command::all ||
       opts.command == Command::evaluate || opts.command == Command::start ||
       opts.command == Command::ancestral || opts.command == Command::sitelh ||
-      opts.command == Command::modeltest)
+      opts.command == Command::modeltest || opts.command == Command::treeset)
   {
     assert(!opts.start_trees.empty());
 
@@ -1365,6 +1367,10 @@ void CommandLineParser::parse_options(int argc, char** argv, Options &opts)
           optarg_tree = "pars{1}";
         num_commands++;
         break;
+      case 73: /* treeset */
+        opts.command = Command::treeset;
+        num_commands++;
+        break;
       default:
         throw  OptionException("Internal error in option parsing");
     }
@@ -1459,6 +1465,7 @@ void CommandLineParser::print_help()
             "  --sitelh                                   print per-site log-likelihood values\n"
             "  --pythia                                   compute and print Pythia MSA difficulty score\n"
             "  --modeltest                                select best-fit model of sequence evolution\n"
+            "  --treeset                                  compute a plausible tree set\n"
             "\n"
             "Command shortcuts (mutually exclusive):\n"
             "  --search1                                  Alias for: --search --tree pars{1}\n"
