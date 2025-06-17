@@ -4282,6 +4282,7 @@ int internal_main(int argc, char** argv, void* comm)
       case Command::ancestral:
       case Command::mutmap:
       case Command::modeltest:
+      case Command::treeset:
         if (!opts.redo_mode && opts.result_files_exist())
         {
           LOG_ERROR << endl << "ERROR: Result files for the run with prefix `" <<

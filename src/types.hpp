@@ -59,7 +59,8 @@ enum class Command
   pythia,
   modeltest,
   mutmap,
-  au_test
+  au_test,
+  treeset
 };
 
 const std::string CommandNames[] = {"none", "help", "version", "evaluate", "search", "bootstrap",
