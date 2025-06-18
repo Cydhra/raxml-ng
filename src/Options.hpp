@@ -143,6 +143,7 @@ public:
   /* SH-like test */
   unsigned int num_sh_reps;
   double sh_epsilon;
+  unsigned int spr_rounds;
 
   bool coarse() const { return num_workers > 1; };
 

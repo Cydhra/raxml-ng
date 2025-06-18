@@ -39,6 +39,9 @@ private:
   int _spr_ntopol_keep;
   corax_random_state * _rstate;
 
+  // spr cutoff for treeset command
+  unsigned int _spr_rounds;
+
   // nni params
   double _nni_epsilon;
   double _nni_tolerance;

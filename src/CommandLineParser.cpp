@@ -96,6 +96,7 @@ static struct option long_options[] =
   {"fast",               no_argument,       0, 0 },  /*  71 */
   {"modeltest",          no_argument,       0, 0 },  /*  72 */
   {"treeset",            no_argument,       0, 0 },  /*  73 */
+  {"spr-rounds",         required_argument, 0, 0 },  /*  74 */
 
   { 0, 0, 0, 0 }
 };
@@ -254,6 +255,12 @@ void CommandLineParser::check_options(Options &opts)
   {
     if (opts.num_ranks > 1)
       throw OptionException("Model testing currently does not support MPI, sorry.");
+  }
+
+  if (opts.command == Command::treeset) {
+    if (opts.spr_rounds == 0) {
+      throw OptionException("You must specify the number of spr rounds for the treeset command!");
+    }
   }
 }
 
@@ -1371,6 +1378,9 @@ void CommandLineParser::parse_options(int argc, char** argv, Options &opts)
         opts.command = Command::treeset;
         opts.topology_opt_method = TopologyOptMethod::ultraFast;
         num_commands++;
+        break;
+      case 74: /* spr rounds */
+        sscanf(optarg, "%d", &opts.spr_rounds);
         break;
       default:
         throw  OptionException("Internal error in option parsing");

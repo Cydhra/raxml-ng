@@ -9,7 +9,7 @@ Optimizer::Optimizer (const Options &opts, bool rapid_bs /* = false */) :
     _lh_epsilon(opts.lh_epsilon), _lh_epsilon_brlen_triplet(opts.lh_epsilon_brlen_triplet), 
     _spr_radius(opts.spr_radius), _spr_cutoff(opts.spr_cutoff), _rstate(nullptr),
     _nni_epsilon(opts.nni_epsilon), _nni_tolerance(opts.nni_tolerance), 
-    _stopping_rule(opts.stopping_rule)
+    _stopping_rule(opts.stopping_rule), _spr_rounds(opts.spr_rounds)
 {
   _spr_ntopol_keep = rapid_bs ? 5 : 20;
   if (rapid_bs)
@@ -641,7 +641,7 @@ double Optimizer::optimize_topology_adaptive(TreeInfo& treeinfo, CheckpointManag
 
 double Optimizer::optimize_topology_ultra_fast(TreeInfo& treeinfo, CheckpointManager& cm){
   const double fast_modopt_eps = 10.;
-  const double interim_modopt_eps = 3.;
+  // const double interim_modopt_eps = 3.;
   const double final_modopt_eps = 0.1;
 
   SearchState local_search_state = cm.search_state();
@@ -652,7 +652,7 @@ double Optimizer::optimize_topology_ultra_fast(TreeInfo& treeinfo, CheckpointMan
   double &loglh = search_state.loglh;
   int& iter = search_state.iteration;
   int& fast_spr_radius = search_state.fast_spr_radius;
-  int& slow_spr_radius = search_state.slow_spr_radius;
+  // int& slow_spr_radius = search_state.slow_spr_radius;
 
   // spr round - basics
   spr_round_params& spr_params = search_state.spr_params;
@@ -824,7 +824,6 @@ double Optimizer::optimize_topology_ultra_fast(TreeInfo& treeinfo, CheckpointMan
 
   // if (do_step(CheckpointStep::fastSPR))
   // {
-    const uint32_t FORCED_STEPS = 1;
     uint32_t steps = 0;
     do
     {
@@ -858,7 +857,7 @@ double Optimizer::optimize_topology_ultra_fast(TreeInfo& treeinfo, CheckpointMan
                         use_kh_test, persite_lnl_new, spr_params.increasing_moves);
       steps += 1;
     }
-    while (steps < FORCED_STEPS);
+    while (steps < _spr_rounds);
   // }
 
  /******
