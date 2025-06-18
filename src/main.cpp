@@ -2708,7 +2708,7 @@ void print_final_output(const RaxmlInstance& instance, const CheckpointFile& che
   }
 
   if (opts.command == Command::search || opts.command == Command::all ||
-      opts.command == Command::evaluate || opts.command == Command::sitelh)
+      opts.command == Command::evaluate || opts.command == Command::sitelh || opts.command == Command::treeset)
   {
     auto best_loglh = instance.ml_tree.loglh;
 
