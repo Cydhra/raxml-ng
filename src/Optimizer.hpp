@@ -10,7 +10,7 @@
 class Optimizer
 {
 public:
-  Optimizer (const Options& opts, bool rapid_bs = false);
+  Optimizer (const Options& opts, bool rapid_bs/* = false*/, shared_ptr<ParsimonyMSA> instance, IDVector tip_msa_idmap);
   virtual
   ~Optimizer ();
 
@@ -41,6 +41,9 @@ private:
 
   // spr cutoff for treeset command
   unsigned int _spr_rounds;
+  shared_ptr<ParsimonyMSA> _instance;
+  IDVector _tip_msa_idmap;
+  long _seed;
 
   // nni params
   double _nni_epsilon;

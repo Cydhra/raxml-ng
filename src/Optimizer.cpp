@@ -1,15 +1,17 @@
 #include "Optimizer.hpp"
+
+#include <utility>
 #include "topology/RFDistCalculator.hpp"
 #include "adaptive/StoppingCriterion.hpp"
 
 using namespace std;
 
-Optimizer::Optimizer (const Options &opts, bool rapid_bs /* = false */) :
+Optimizer::Optimizer (const Options &opts, bool rapid_bs /* = false */, shared_ptr<ParsimonyMSA> instance, IDVector tip_msa_idmap) :
     _topology_opt_method(opts.topology_opt_method),
     _lh_epsilon(opts.lh_epsilon), _lh_epsilon_brlen_triplet(opts.lh_epsilon_brlen_triplet), 
     _spr_radius(opts.spr_radius), _spr_cutoff(opts.spr_cutoff), _rstate(nullptr),
     _nni_epsilon(opts.nni_epsilon), _nni_tolerance(opts.nni_tolerance), 
-    _stopping_rule(opts.stopping_rule), _spr_rounds(opts.spr_rounds)
+    _stopping_rule(opts.stopping_rule), _spr_rounds(opts.spr_rounds), _instance(std::move(instance)), _tip_msa_idmap(tip_msa_idmap), _seed(opts.random_seed)
 {
   _spr_ntopol_keep = rapid_bs ? 5 : 20;
   if (rapid_bs)
@@ -821,6 +823,32 @@ double Optimizer::optimize_topology_ultra_fast(TreeInfo& treeinfo, CheckpointMan
    * Force doing the fast SPR, but don't use improvement epsilon as the stopping criterion, but force a defined number of
    * rounds to create a rounds versus set size analysis
    ******/
+  auto partitions = _instance.get()->pll_partitions();
+  auto num_partitions = partitions.size();
+
+  corax_parsimony_t ** parsimony =
+    (corax_parsimony_t **) calloc(num_partitions, sizeof(corax_parsimony_t *));
+  if (!parsimony)
+  {
+    corax_errno = CORAX_ERROR_MEM_ALLOC;
+    snprintf(corax_errmsg, 200, "Unable to allocate enough memory.");
+    return NULL;
+  }
+
+  for (int i = 0; i < partitions.size(); i++) {
+    parsimony[i] = corax_fastparsimony_init(partitions[i]);
+    if (!parsimony[i])
+    {
+      assert(corax_errno);
+      return NULL;
+    }
+
+  }
+
+  // parsimony cost variable, we don't use it but the function wants it.
+  unsigned int cost = -1;
+
+  auto mock_clv_vec = std::vector<unsigned int>(treeinfo.tree().num_nodes(), -1);
 
   // if (do_step(CheckpointStep::fastSPR))
   // {
@@ -845,20 +873,55 @@ double Optimizer::optimize_topology_ultra_fast(TreeInfo& treeinfo, CheckpointMan
       LOG_PROGRESS(old_loglh) << (spr_params.thorough ? "SLOW" : "FAST") <<
           " spr round " << iter << " (radius: " << spr_params.radius_max << ")" << endl;
 
-      loglh = treeinfo.spr_round(spr_params);
+      /******
+       * Instead of doing SPR, we do Parsimoney SPR
+       ******/
+      // loglh = treeinfo.spr_round(spr_params);
+
+      if (!treeinfo.pll_treeinfo().tree) {
+        LOG_ERROR << "treeinfo broken." << endl;
+        return NULL;
+      }
+
+      // if (!_tip_msa_idmap.data()) {
+        // LOG_ERROR << "tip msa map broken." << endl;
+        // return NULL;
+      // }
+
+      if (!mock_clv_vec.data()) {
+        LOG_ERROR << "mock msa map broken" << endl;
+        return NULL;
+      }
+
+      LOG_PROGRESS(old_loglh) << "Before: " << cost << endl;
+
+      corax_fastparsimony_stepwise_spr_round(
+        treeinfo.pll_treeinfo().tree,
+        parsimony,
+        num_partitions,
+        nullptr,
+        _seed + steps,
+        nullptr,
+        &cost);
+
+      LOG_PROGRESS(old_loglh) << "Cost: " << cost << endl;
 
       /* optimize ALL branches */
-      loglh = treeinfo.optimize_branches(br_len_epsilon, 1);
+      // loglh = treeinfo.optimize_branches(br_len_epsilon, 1);
 
       /******
        * We don't use the improvement as a stopping criterion here
        ******/
-      impr = check_impr(treeinfo, loglh, old_loglh, old_loglh,
-                        use_kh_test, persite_lnl_new, spr_params.increasing_moves);
+      // impr = check_impr(treeinfo, loglh, old_loglh, old_loglh,
+                        // use_kh_test, persite_lnl_new, spr_params.increasing_moves);
       steps += 1;
     }
     while (steps < _spr_rounds);
   // }
+
+  // reset branch lengths to default values because parsimony SPR destroys them
+  corax_utree_set_length_recursive(treeinfo.pll_treeinfo().tree, 1.0, 0);
+  loglh = treeinfo.optimize_branches(br_len_epsilon, 1);
 
  /******
   * Intermediate model optimization, commented out because the slow SPR rounds are commented out

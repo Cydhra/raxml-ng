@@ -79,7 +79,7 @@ struct RaxmlInstance
 {
   Options opts;
   shared_ptr<PartitionedMSA> parted_msa;
-  unique_ptr<ParsimonyMSA> parted_msa_parsimony;
+  shared_ptr<ParsimonyMSA> parted_msa_parsimony;
   map<BranchSupportMetric, shared_ptr<SupportTree> > support_trees;
   shared_ptr<ConsensusTree> consens_tree;
 
@@ -3206,7 +3206,8 @@ void thread_infer_ml(RaxmlInstance& instance, CheckpointManager& cm)
     treeinfo->set_topology_constraint(instance.constraint_tree);
 
     auto log_level = instance.start_trees.size() > 1 ? LogLevel::result : LogLevel::info;
-    Optimizer optimizer(opts);
+    LOG_INFO_TS << "MSA Pars addr: " << instance.parted_msa_parsimony.get() << endl;
+    Optimizer optimizer(opts, false, instance.parted_msa_parsimony, instance.tip_msa_idmap);
     
     if (instance.stop_criterion)
     {
@@ -3288,7 +3289,7 @@ void thread_infer_sh(RaxmlInstance& instance, CheckpointManager& cm)
 
   unique_ptr<TreeInfo> treeinfo;
 
-  Optimizer optimizer(opts);
+  Optimizer optimizer(opts, false, instance.parted_msa_parsimony, instance.tip_msa_idmap);
 
   ParallelContext::global_thread_barrier();
 
@@ -3438,7 +3439,7 @@ void thread_infer_bootstrap(RaxmlInstance& instance, CheckpointManager& cm)
 
   auto ckp_tree_index = instance.run_phase == RaxmlRunPhase::bootstrap ? checkp.tree_index : 0;
 
-  Optimizer optimizer(opts, rapidbs);
+  Optimizer optimizer(opts, rapidbs, instance.parted_msa_parsimony, instance.tip_msa_idmap);
 
   ParallelContext::global_thread_barrier();
 
@@ -3548,7 +3549,7 @@ void thread_infer_model(RaxmlInstance& instance, CheckpointManager& cm)
     // part_assign currently not used, since partitions assigned to threads dynamically in ModelTest
     auto const &part_assign = instance.proc_part_assign.at(ParallelContext::local_proc_id());
 
-    ModelTest modeltest(instance.opts, master_msa, tree, instance.tip_msa_idmap, part_assign);
+    ModelTest modeltest(instance.opts, master_msa, instance.parted_msa_parsimony, tree, instance.tip_msa_idmap, part_assign);
 
     const auto optimal_models = modeltest.optimize_model();
 

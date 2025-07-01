@@ -15,9 +15,9 @@ Options modify_options(const Options &other) {
     return options;
 }
 
-ModelTest::ModelTest(const Options &original_options, const PartitionedMSA &msa, const Tree &tree, const IDVector &tip_msa_idmap,
+ModelTest::ModelTest(const Options &original_options, const PartitionedMSA &msa, shared_ptr<ParsimonyMSA> pars, const Tree &tree, const IDVector &tip_msa_idmap,
                      const PartitionAssignment &part_assign)
-    : options(modify_options(original_options)), optimizer(options), msa(msa), tree(tree),
+    : options(modify_options(original_options)), optimizer(options, false, pars, tip_msa_idmap), msa(msa), tree(tree),
                                             tip_msa_idmap(tip_msa_idmap), part_assign(part_assign) { }
 
 

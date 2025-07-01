@@ -18,7 +18,7 @@ struct PartitionModelEvaluation {
 
 class ModelTest {
 public:
-    ModelTest(const Options &options, const PartitionedMSA &msa, const Tree &tree, const IDVector &tip_msa_idmap,
+    ModelTest(const Options &options, const PartitionedMSA &msa, shared_ptr<ParsimonyMSA> pars, const Tree &tree, const IDVector &tip_msa_idmap,
               const PartitionAssignment &part_assign);
 
     vector<candidate_model_t> generate_candidate_model_names(const DataType &dt) const;
