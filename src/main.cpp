@@ -3684,6 +3684,11 @@ void master_main(RaxmlInstance& instance, CheckpointManager& cm)
     }
   }
 
+  // initialize parsimony if necessary
+  if (opts.command == Command::treeset) {
+    build_parsimony_msa(instance);
+  }
+
   autotune_threads(instance);
 
   check_options_perf(instance);
