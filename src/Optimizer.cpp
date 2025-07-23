@@ -825,39 +825,38 @@ double Optimizer::optimize_topology_ultra_fast(TreeInfo& treeinfo, CheckpointMan
   // if (do_step(CheckpointStep::fastSPR))
   // {
     uint32_t steps = 0;
-    do
-    {
-      cm.update_and_write(treeinfo);
-      ++iter;
+  while (steps < _spr_rounds) {
+    cm.update_and_write(treeinfo);
+    ++iter;
 
-      // if(use_kh_test)
-      // {
-      //   _stop_criterion->compute_loglh(treeinfo, persite_lnl, true);
-      //
-      //   if(spr_params.increasing_moves)
-      //   {
-      //     *(spr_params.increasing_moves) = 0;
-      //     *(spr_params.total_moves) = 0;
-      //   }
-      // }
+    // if(use_kh_test)
+    // {
+    //   _stop_criterion->compute_loglh(treeinfo, persite_lnl, true);
+    //
+    //   if(spr_params.increasing_moves)
+    //   {
+    //     *(spr_params.increasing_moves) = 0;
+    //     *(spr_params.total_moves) = 0;
+    //   }
+    // }
 
-      old_loglh = loglh;
-      LOG_PROGRESS(old_loglh) << (spr_params.thorough ? "SLOW" : "FAST") <<
-          " spr round " << iter << " (radius: " << spr_params.radius_max << ")" << endl;
+    old_loglh = loglh;
+    LOG_PROGRESS(old_loglh) << (spr_params.thorough ? "SLOW" : "FAST") <<
+        " spr round " << iter << " (radius: " << spr_params.radius_max << ")" << endl;
 
-      loglh = treeinfo.spr_round(spr_params);
+    loglh = treeinfo.spr_round(spr_params);
 
-      /* optimize ALL branches */
-      loglh = treeinfo.optimize_branches(br_len_epsilon, 1);
+    /* optimize ALL branches */
+    loglh = treeinfo.optimize_branches(br_len_epsilon, 1);
 
-      /******
-       * We don't use the improvement as a stopping criterion here
-       ******/
-      impr = check_impr(treeinfo, loglh, old_loglh, old_loglh,
-                        use_kh_test, persite_lnl_new, spr_params.increasing_moves);
-      steps += 1;
-    }
-    while (steps < _spr_rounds);
+    /******
+     * We don't use the improvement as a stopping criterion here
+     ******/
+    impr = check_impr(treeinfo, loglh, old_loglh, old_loglh,
+                      use_kh_test, persite_lnl_new, spr_params.increasing_moves);
+    steps += 1;
+  }
+
   // }
 
  /******
