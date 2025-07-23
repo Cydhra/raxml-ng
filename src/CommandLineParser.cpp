@@ -258,9 +258,9 @@ void CommandLineParser::check_options(Options &opts)
   }
 
   if (opts.command == Command::treeset) {
-    if (opts.spr_rounds == 0) {
-      throw OptionException("You must specify the number of spr rounds for the treeset command!");
-    }
+    // if (opts.spr_rounds == 0) {
+    //   throw OptionException("You must specify the number of spr rounds for the treeset command!");
+    // }
   }
 }
 
