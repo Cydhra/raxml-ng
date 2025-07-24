@@ -753,11 +753,13 @@ double Optimizer::optimize_topology_ultra_fast(TreeInfo& treeinfo, CheckpointMan
   }
 
   /* Initial fast model optimization */
+  /** WE DON'T DO THAT, main::thread_infer_ml will set a pre-optimized model for us **/
+
   if (do_step(CheckpointStep::modOpt1))
   {
-    cm.update_and_write(treeinfo);
-    LOG_PROGRESS(loglh) << "Model parameter optimization (eps = " << fast_modopt_eps << ")" << endl;
-    loglh = optimize_model(treeinfo, fast_modopt_eps);
+    // cm.update_and_write(treeinfo);
+    // LOG_PROGRESS(loglh) << "Model parameter optimization (eps = " << fast_modopt_eps << ")" << endl;
+    // loglh = optimize_model(treeinfo, fast_modopt_eps);
 
     /* fixed user-specified SPR radius */
     if(_spr_radius > 0)
@@ -853,8 +855,8 @@ double Optimizer::optimize_topology_ultra_fast(TreeInfo& treeinfo, CheckpointMan
       /******
        * We don't use the improvement as a stopping criterion here
        ******/
-      impr = check_impr(treeinfo, loglh, old_loglh, old_loglh,
-                        use_kh_test, persite_lnl_new, spr_params.increasing_moves);
+      // impr = check_impr(treeinfo, loglh, old_loglh, old_loglh,
+                        // use_kh_test, persite_lnl_new, spr_params.increasing_moves);
       steps += 1;
     }
     while (steps < _spr_rounds);

@@ -3184,6 +3184,7 @@ void thread_infer_ml(RaxmlInstance& instance, CheckpointManager& cm)
 
   auto ckp_tree_index = instance.run_phase == RaxmlRunPhase::mlsearch ? checkp.tree_index : 0;
   ParallelContext::thread_barrier();
+  int processed_trees = 0;
   for (auto start_tree_num: worker.start_trees)
   {
     const auto& tree = instance.start_trees.at(start_tree_num-1);
@@ -3245,7 +3246,22 @@ void thread_infer_ml(RaxmlInstance& instance, CheckpointManager& cm)
     }
     else
     {
+      if (opts.command == Command::treeset) {
+        if (processed_trees == 0) {
+          double initial_eps = 10.;
+          double loglh = treeinfo->loglh();
+          LOG_PROGRESS(loglh) << "First tree branch length optimization" << endl;
+          loglh = treeinfo->optimize_branches(initial_eps, 1);
+
+          LOG_PROGRESS(loglh) << "Initial model parameter optimization (eps = " << initial_eps << ")" << endl;
+          optimizer.optimize_model(*treeinfo, initial_eps);
+        } else {
+          assign_models(*treeinfo, checkp);
+        }
+      }
+
       optimizer.optimize_topology(*treeinfo, cm);
+      processed_trees++;
 
       LOG_PROGR << endl;
       LOG_WORKER_TS(log_level) << "ML tree search #" << start_tree_num <<
