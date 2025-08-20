@@ -19,7 +19,7 @@ public:
   double optimize_topology(TreeInfo& treeinfo, CheckpointManager& cm);
   double optimize_topology_standard(TreeInfo& treeinfo, CheckpointManager& cm);
   double optimize_topology_adaptive(TreeInfo& treeinfo, CheckpointManager& cm);
-  double optimize_topology_ultra_fast(TreeInfo& treeinfo, CheckpointManager& cm);
+  double optimize_topology_rapid_plausible(TreeInfo& treeinfo, CheckpointManager& cm);
 
   double optimize_topology_rbs(TreeInfo& treeinfo, CheckpointManager& cm);
   double optimize_topology_nni(TreeInfo& treeinfo, CheckpointManager& cm);

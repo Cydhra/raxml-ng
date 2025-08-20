@@ -74,8 +74,8 @@ double Optimizer::optimize_topology(TreeInfo& treeinfo, CheckpointManager& cm)
 {
   switch(_topology_opt_method)
   {
-    case TopologyOptMethod::ultraFast:
-      return optimize_topology_ultra_fast(treeinfo, cm);
+    case TopologyOptMethod::rapidPlausible:
+      return optimize_topology_rapid_plausible(treeinfo, cm);
       break;
     case TopologyOptMethod::classic:
       return optimize_topology_standard(treeinfo, cm);
@@ -644,7 +644,7 @@ double Optimizer::optimize_topology_adaptive(TreeInfo& treeinfo, CheckpointManag
   return loglh;
 }
 
-double Optimizer::optimize_topology_ultra_fast(TreeInfo& treeinfo, CheckpointManager& cm){
+double Optimizer::optimize_topology_rapid_plausible(TreeInfo& treeinfo, CheckpointManager& cm){
   return 0.0;
 }
 
