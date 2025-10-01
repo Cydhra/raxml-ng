@@ -268,7 +268,8 @@ void CommandLineParser::compute_num_searches(Options &opts)
   if (opts.command == Command::search || opts.command == Command::all ||
       opts.command == Command::evaluate || opts.command == Command::start ||
       opts.command == Command::ancestral || opts.command == Command::sitelh ||
-      opts.command == Command::modeltest || opts.command == Command::mutmap)
+      opts.command == Command::modeltest || opts.command == Command::mutmap ||
+      opts.command == Command::au_test)
   {
     assert(!opts.start_trees.empty());
 

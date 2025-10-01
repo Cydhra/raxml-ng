@@ -2239,7 +2239,7 @@ void init_ancestral(RaxmlInstance& instance)
 
 void init_persite_loglh(RaxmlInstance& instance)
 {
-  if (instance.opts.command == Command::sitelh)
+  if (instance.opts.command == Command::sitelh || instance.opts.command == Command::au_test)
   {
     const auto& parted_msa = *instance.parted_msa;
 
@@ -2846,25 +2846,11 @@ void command_au_test(RaxmlInstance& instance)
 {
   const auto& opts = instance.opts;
 
-  // check where to get trees from
-  if (opts.start_trees.count(StartingTree::random) +
-      opts.start_trees.count(StartingTree::parsimony) > 0)
-  {
-    /* generate random/parsimony trees -> we need an MSA for this */
-    assert(!opts.msa_file.empty());
-    load_parted_msa(instance);
-    build_start_trees(instance);
-  }
-  else
-  {
-    /* load trees from Newick file(s) */
-    read_multiple_tree_files(instance, false, false);
-  }
-
   if (instance.start_trees.size() < 2)
     throw runtime_error("Cannot perform AU test on fewer than 2 trees!");
 
   LOG_INFO << "AU Test requested" << endl;
+  LOG_INFO << "Per-Site Likelihoods: " << instance.persite_loglh.size() << endl;
 }
 
 void check_terrace(const RaxmlInstance& instance, const Tree& tree)
@@ -3553,7 +3539,8 @@ void thread_infer_ml(RaxmlInstance& instance, CheckpointManager& cm)
       optimizer.disable_stopping_rule();
 
     if (opts.command == Command::evaluate || opts.command == Command::sitelh ||
-        opts.command == Command::ancestral || opts.command == Command::mutmap)
+        opts.command == Command::ancestral || opts.command == Command::mutmap ||
+        opts.command == Command::au_test)
     { 
       // check if we have anything to optimize
       if (opts.optimize_brlen || opts.optimize_model)
@@ -3910,8 +3897,8 @@ void thread_main(RaxmlInstance& instance, CheckpointManager& cm)
 
   if ((opts.command == Command::search || opts.command == Command::all ||
       opts.command == Command::evaluate || opts.command == Command::sitelh ||
-      opts.command == Command::ancestral || opts.command == Command::mutmap) &&
-      !instance.start_trees.empty())
+      opts.command == Command::ancestral || opts.command == Command::mutmap ||
+      opts.command == Command::au_test) && !instance.start_trees.empty())
   {
     thread_infer_ml(instance, cm);
     ParallelContext::global_barrier();
@@ -4380,6 +4367,8 @@ int internal_main(int argc, char** argv, void* comm)
       }
       case Command::au_test:
       {
+        cm.disable();
+        master_main(instance, cm);
         command_au_test(instance);
         break;
       }
