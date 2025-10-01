@@ -2868,6 +2868,31 @@ void command_bsmsa(RaxmlInstance& instance, const CheckpointFile& checkp)
   generate_bootstraps(instance, checkp);
 }
 
+void command_au_test(RaxmlInstance& instance)
+{
+  const auto& opts = instance.opts;
+
+  // check where to get trees from
+  if (opts.start_trees.count(StartingTree::random) +
+      opts.start_trees.count(StartingTree::parsimony) > 0)
+  {
+    /* generate random/parsimony trees -> we need an MSA for this */
+    assert(!opts.msa_file.empty());
+    load_parted_msa(instance);
+    build_start_trees(instance);
+  }
+  else
+  {
+    /* load trees from Newick file(s) */
+    read_multiple_tree_files(instance, false, false);
+  }
+
+  if (instance.start_trees.size() < 2)
+    throw runtime_error("Cannot perform AU test on fewer than 2 trees!");
+
+  LOG_INFO << "AU Test requested" << endl;
+}
+
 void check_terrace(const RaxmlInstance& instance, const Tree& tree)
 {
 #ifdef _RAXML_TERRAPHAST
@@ -4392,6 +4417,11 @@ int internal_main(int argc, char** argv, void* comm)
         case Command::consense:
         {
           command_consense(instance);
+          break;
+        }
+        case Command::au_test:
+        {
+          command_au_test(instance);
           break;
         }
         case Command::none:

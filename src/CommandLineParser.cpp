@@ -109,6 +109,7 @@ static struct option long_options[] =
   {"moose",              optional_argument, 0, 0 },  /*  76 */
   {"moose-options",      required_argument, 0, 0 },  /*  77 */
   {"mutmap",             optional_argument, 0, 0 },  /*  78 */
+  {"au-test",            no_argument,       0, 0 },  /*  79 */
 
   { 0, 0, 0, 0 }
 };
@@ -128,7 +129,8 @@ void CommandLineParser::check_options(Options &opts)
       opts.command == Command::bootstrap || opts.command == Command::all ||
       opts.command == Command::terrace || opts.command == Command::check ||
       opts.command == Command::parse || opts.command == Command::start ||
-      opts.command == Command::ancestral || opts.command == Command::modeltest)
+      opts.command == Command::ancestral || opts.command == Command::modeltest ||
+      opts.command == Command::au_test)
   {
     if (opts.msa_file.empty())
       throw OptionException("You must specify a multiple alignment file with --msa switch");
@@ -137,7 +139,7 @@ void CommandLineParser::check_options(Options &opts)
   if (opts.command == Command::evaluate || opts.command == Command::support ||
       opts.command == Command::terrace || opts.command == Command::rfdist ||
       opts.command == Command::sitelh || opts.command == Command::ancestral ||
-      opts.command == Command::consense)
+      opts.command == Command::consense || opts.command == Command::au_test)
   {
     if (opts.tree_file.empty() && (opts.start_trees.count(StartingTree::user) || opts.start_trees.empty()))
       throw OptionException("Please provide a valid Newick file as an argument of --tree option.");
@@ -1602,6 +1604,11 @@ void CommandLineParser::parse_options(int argc, char** argv, Options &opts)
         opts.use_pattern_compression = false;
         opts.use_repeats = false;
         opts.use_tip_inner = true;
+        num_commands++;
+        break;
+      case 79: /* au test */
+        opts.command = Command::au_test;
+        optarg_tree_required = true;
         num_commands++;
         break;
       default:
