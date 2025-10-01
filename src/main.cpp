@@ -2842,6 +2842,31 @@ void command_bsmsa(RaxmlInstance& instance, const CheckpointFile& checkp)
   generate_bootstraps(instance, checkp);
 }
 
+void command_au_test(RaxmlInstance& instance)
+{
+  const auto& opts = instance.opts;
+
+  // check where to get trees from
+  if (opts.start_trees.count(StartingTree::random) +
+      opts.start_trees.count(StartingTree::parsimony) > 0)
+  {
+    /* generate random/parsimony trees -> we need an MSA for this */
+    assert(!opts.msa_file.empty());
+    load_parted_msa(instance);
+    build_start_trees(instance);
+  }
+  else
+  {
+    /* load trees from Newick file(s) */
+    read_multiple_tree_files(instance, false, false);
+  }
+
+  if (instance.start_trees.size() < 2)
+    throw runtime_error("Cannot perform AU test on fewer than 2 trees!");
+
+  LOG_INFO << "AU Test requested" << endl;
+}
+
 void check_terrace(const RaxmlInstance& instance, const Tree& tree)
 {
 #ifdef _RAXML_TERRAPHAST
@@ -4315,49 +4340,54 @@ int internal_main(int argc, char** argv, void* comm)
           if (ParallelContext::num_nodes() > 1)
             LOG_WARN  << "WARNING: Running --parse on multiple nodes is wasting resources!" << endl << endl;
 
-          break;
-        }
-        case Command::pythia:
-        {
-          load_parted_msa(instance);
-          break;
-        }
-        case Command::start:
-        {
-          load_parted_msa(instance);
-          load_constraint(instance);
-          build_start_trees(instance);
-          if (!opts.start_tree_file().empty())
-          {
-            LOG_INFO << "\nAll starting trees saved to: " <<
-                sysutil_realpath(opts.start_tree_file()) << endl << endl;
-          }
-          else
-          {
-            LOG_INFO << "\nStarting trees have been successfully generated." << endl << endl;
-          }
-          break;
-        }
-        case Command::bsmsa:
-        {
-          command_bsmsa(instance, cm.checkp_file());
-          break;
-        }
-        case Command::rfdist:
-        {
-          command_rfdist(instance);
-          break;
-        }
-        case Command::consense:
-        {
-          command_consense(instance);
-          break;
-        }
-        case Command::none:
-        default:
-          LOG_ERROR << "Unknown command!" << endl;
-          retval = EXIT_FAILURE;
+        break;
       }
+      case Command::pythia:
+      {
+        load_parted_msa(instance);
+        break;
+      }
+      case Command::start:
+      {
+        load_parted_msa(instance);
+        load_constraint(instance);
+        build_start_trees(instance);
+        if (!opts.start_tree_file().empty())
+        {
+          LOG_INFO << "\nAll starting trees saved to: " <<
+              sysutil_realpath(opts.start_tree_file()) << endl << endl;
+        }
+        else
+        {
+          LOG_INFO << "\nStarting trees have been successfully generated." << endl << endl;
+        }
+        break;
+      }
+      case Command::bsmsa:
+      {
+        command_bsmsa(instance, cm.checkp_file());
+        break;
+      }
+      case Command::rfdist:
+      {
+        command_rfdist(instance);
+        break;
+      }
+      case Command::consense:
+      {
+        command_consense(instance);
+        break;
+      }
+      case Command::au_test:
+      {
+        command_au_test(instance);
+        break;
+      }
+      case Command::none:
+      default:
+        LOG_ERROR << "Unknown command!" << endl;
+        retval = EXIT_FAILURE;
+    }
 
       /* finalize */
       finalize_energy(instance, cm.checkp_file());
