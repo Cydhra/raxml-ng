@@ -58,6 +58,7 @@
 #include "util/EnergyMonitor.hpp"
 #include "adaptive/DifficultyPredictor.hpp"
 #include "adaptive/StoppingCriterion.hpp"
+#include "au/AuTest.hpp"
 #include "modeltest/ModelTest.hpp"
 
 #ifdef _RAXML_TERRAPHAST
@@ -2877,6 +2878,12 @@ void command_au_test(RaxmlInstance& instance)
 
   LOG_INFO << "AU Test requested" << endl;
   LOG_INFO << "Per-Site Likelihoods: " << instance.persite_loglh.size() << endl;
+
+  const doubleVector scales = {0.5, 0.6, 0.7, 1.0};
+  const uintVector num_replicates = { 10000, 10000, 10000, 10000 };
+
+  AuTest tester { instance.parted_msa, instance.persite_loglh, scales, num_replicates, opts.random_seed };
+  tester.estimate_parameters();
 }
 
 void check_terrace(const RaxmlInstance& instance, const Tree& tree)
