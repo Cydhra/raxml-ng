@@ -47,7 +47,7 @@ void AuTest::estimate_parameters() {
                                     per_site_lnl_matrix.data(),
                                     part_msa.weights().data(),
                                     part_msa.num_sites(),
-                                    part_msa.length(),
+                                    part_msa.num_patterns(),
                                     num_trees,
                                     num_replicates.data(),
                                     scales.data(),
