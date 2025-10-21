@@ -38,10 +38,9 @@ void AuTest::estimate_parameters() {
     LOG_INFO << "Run Bootstrapping..." << std::endl;
     LOG_INFO << "There are " << msa->part_count() << " partitions in the MSA with " << msa->taxon_count() << " taxa." << std::endl;
 
-
-
     for (unsigned int part_id = 0; part_id < msa->part_count(); part_id++) {
         const MSA& part_msa = msa.get()->part_msa(part_id);
+
         corax_RELL_multiscale_bootstrap(rstate,
                                     &test_statistics,
                                     per_site_lnl_matrix.data(),
@@ -52,7 +51,13 @@ void AuTest::estimate_parameters() {
                                     num_replicates.data(),
                                     scales.data(),
                                     scales.size());
+
+        // TODO we should do this after we combined replicates from all workers
+        for (unsigned int id_scale = 0; id_scale < scales.size(); id_scale++) {
+            corax_normalize_lnl_bootstrap(test_statistics[id_scale], num_replicates[id_scale], num_trees);
+        }
     }
+
     // TODO handle fine-grained parallelization: after all workers have generated their bootstrap replicates, we need
     //  to collect them on a master-worker of all worker groups and add them there, and the master will do the AU test
 }
