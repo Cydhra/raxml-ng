@@ -1,6 +1,7 @@
 #include "AuTest.hpp"
 
 #include "../log.hpp"
+#include "corax/statistics/au.h"
 #include "corax/statistics/bootstrap.h"
 
 AuTest::AuTest(const std::shared_ptr<PartitionedMSA> &msa,
@@ -34,6 +35,9 @@ void AuTest::estimate_parameters() {
         per_site_lnl_matrix.push_back(tree_parts[0].data());
     }
 
+    // TODO according to the sitelh command, persite-lnl is already multiplied with site weights. This has to be undone
+    //  for proper resampling
+
     // some debug information
     LOG_INFO << "Run Bootstrapping..." << std::endl;
     LOG_INFO << "There are " << msa->part_count() << " partitions in the MSA with " << msa->taxon_count() << " taxa." << std::endl;
@@ -60,4 +64,33 @@ void AuTest::estimate_parameters() {
 
     // TODO handle fine-grained parallelization: after all workers have generated their bootstrap replicates, we need
     //  to collect them on a master-worker of all worker groups and add them there, and the master will do the AU test
+
+    // find the scale closest to 1.0
+    int best_index = 0;
+    double best_score = fabs(1.0 - scales[best_index]);
+    for (size_t scale_index = 0; scale_index < scales.size(); scale_index++) {
+        if (best_score > fabs(1.0 - scales[scale_index])) {
+            best_score = fabs(1.0 - scales[scale_index]);
+            best_index = scale_index;
+        }
+    }
+
+    for (unsigned int tree = 0; tree < 10; tree++) {
+        double d, c;
+        double p_value = 0.0;
+        corax_au_p_value(test_statistics,
+                         tree,
+                         scales.data(),
+                         num_replicates.data(),
+                         scales.size(),
+                         corax_bootstrap_expectation(test_statistics[best_index], num_replicates[best_index], tree),
+                         &d,
+                         &c,
+                         &p_value);
+
+        LOG_INFO << "p-value for " << tree << ". tree: " << p_value << std::endl;
+    }
+
+    // clean up
+    corax_random_destroy(rstate);
 }
