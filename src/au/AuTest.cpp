@@ -23,8 +23,8 @@ void AuTest::estimate_parameters() {
     const auto rstate = corax_random_create(seed);
 
     // create a row of pointers for the per-site likelihoods
-    std::vector<double *> per_site_lnl_matrix;
-    for (auto tree_parts: persite_loglh) {
+    std::vector<const double *> per_site_lnl_matrix;
+    for (auto& tree_parts: persite_loglh) {
         if (tree_parts.size() > 1) {
             // TODO handle multiple partitions: we need to pass all of them into the bootstrapping at once to avoid
             //  having to iterate through all replicates and add them together.
