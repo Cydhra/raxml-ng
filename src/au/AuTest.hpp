@@ -25,13 +25,14 @@ public:
     };
 
     /**
-     * Estimate the signed distance and curvature parameters, which can be used to estimate the AU p-value, among other
-     * p-values.
+     * Run the RELL bootstrapping on the per-site log-likelihood vectors assigned to this instance.
+     * Since the test assumes that no fine-grained parallelization happens across MPI ranks, the vectors are all
+     * complete.
      */
-    void estimate_parameters();
+    void run_bootstrap();
 
     /**
-     * Calculate the p-values from the previously estimated parameters.
+     * Calculate the p-values from the previously generated bootstrap replicates.
      */
     void calculate_p_values();
 
