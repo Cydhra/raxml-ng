@@ -31,9 +31,6 @@ void AuTest::run_bootstrap() {
         per_site_lnl_matrix.push_back(tree_parts[0].data());
     }
 
-    // TODO according to the sitelh command, persite-lnl is already multiplied with site weights. This has to be undone
-    //  for proper resampling
-
     // some debug information
     LOG_INFO << "Run Bootstrapping..." << std::endl;
     LOG_INFO << "There are " << msa->part_count() << " partitions in the MSA with " << msa->taxon_count() << " taxa." << std::endl;
@@ -52,7 +49,6 @@ void AuTest::run_bootstrap() {
                                     scales.data(),
                                     scales.size());
 
-        // TODO we should do this after we combined replicates from all workers
         for (unsigned int id_scale = 0; id_scale < scales.size(); id_scale++) {
             corax_normalize_lnl_bootstrap(test_statistics[id_scale], num_replicates[id_scale], num_trees);
         }
