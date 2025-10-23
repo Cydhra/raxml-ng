@@ -19,39 +19,36 @@ void AuTest::run_bootstrap() {
     // reset random state to ensure reproducibility independent of previous events
     const auto rstate = corax_random_create(seed);
 
-    // create a row of pointers for the per-site likelihoods
-    std::vector<const double *> per_site_lnl_matrix;
-    for (auto& tree_parts: persite_loglh) {
-        if (tree_parts.size() > 1) {
-            // TODO handle multiple partitions: we need to pass all of them into the bootstrapping at once to avoid
-            //  having to iterate through all replicates and add them together.
-            LOG_ERROR << "AU test cannot handle multiple partitions yet" << std::endl;
-            exit(-1);
-        }
-        per_site_lnl_matrix.push_back(tree_parts[0].data());
-    }
-
     // some debug information
     LOG_INFO << "Run Bootstrapping..." << std::endl;
-    LOG_INFO << "There are " << msa->part_count() << " partitions in the MSA with " << msa->taxon_count() << " taxa." << std::endl;
+    LOG_INFO << "There are " << msa->part_count() << " partitions in the MSA with " << msa->taxon_count() << " taxa." <<
+            std::endl;
 
     for (unsigned int part_id = 0; part_id < msa->part_count(); part_id++) {
-        const MSA& part_msa = msa.get()->part_msa(part_id);
+        const MSA &part_msa = msa.get()->part_msa(part_id);
 
-        corax_RELL_multiscale_bootstrap(rstate,
-                                    &test_statistics,
-                                    per_site_lnl_matrix.data(),
-                                    part_msa.weights().data(),
-                                    part_msa.num_sites(),
-                                    part_msa.num_patterns(),
-                                    num_trees,
-                                    num_replicates.data(),
-                                    scales.data(),
-                                    scales.size());
-
-        for (unsigned int id_scale = 0; id_scale < scales.size(); id_scale++) {
-            corax_normalize_lnl_bootstrap(test_statistics[id_scale], num_replicates[id_scale], num_trees);
+        // create a row of pointers for the per-site likelihoods
+        std::vector<const double *> per_site_lnl_matrix;
+        for (auto &tree_parts: persite_loglh) {
+            per_site_lnl_matrix.push_back(tree_parts[part_id].data());
         }
+
+        // add up the partial replcicates of this partition into test_statistics
+        corax_RELL_multiscale_bootstrap(rstate,
+                                        &test_statistics,
+                                        per_site_lnl_matrix.data(),
+                                        part_msa.weights().data(),
+                                        part_msa.num_sites(),
+                                        part_msa.num_patterns(),
+                                        num_trees,
+                                        num_replicates.data(),
+                                        scales.data(),
+                                        scales.size());
+    }
+
+    // normalize all test matrices after all partitions have been added up
+    for (unsigned int id_scale = 0; id_scale < scales.size(); id_scale++) {
+        corax_normalize_lnl_bootstrap(test_statistics[id_scale], num_replicates[id_scale], num_trees);
     }
 
     // clean up
