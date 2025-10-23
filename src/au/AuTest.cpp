@@ -15,11 +15,7 @@ AuTest::AuTest(const std::shared_ptr<PartitionedMSA> &msa,
                                                                     num_trees(persite_loglh.size()), seed(seed) {
 }
 
-
-void AuTest::calculate_p_values() {
-}
-
-void AuTest::estimate_parameters() {
+void AuTest::run_bootstrap() {
     // reset random state to ensure reproducibility independent of previous events
     const auto rstate = corax_random_create(seed);
 
@@ -62,6 +58,12 @@ void AuTest::estimate_parameters() {
         }
     }
 
+    // clean up
+    corax_random_destroy(rstate);
+}
+
+
+void AuTest::calculate_p_values() {
     // TODO handle fine-grained parallelization: after all workers have generated their bootstrap replicates, we need
     //  to collect them on a master-worker of all worker groups and add them there, and the master will do the AU test
 
@@ -75,7 +77,7 @@ void AuTest::estimate_parameters() {
         }
     }
 
-    for (unsigned int tree = 0; tree < 10; tree++) {
+    for (unsigned int tree = 0; tree < 100; tree++) {
         double d, c;
         double p_value = 0.0;
         corax_au_p_value(test_statistics,
@@ -90,7 +92,4 @@ void AuTest::estimate_parameters() {
 
         LOG_INFO << "p-value for " << tree << ". tree: " << p_value << std::endl;
     }
-
-    // clean up
-    corax_random_destroy(rstate);
 }
