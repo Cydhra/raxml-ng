@@ -16,6 +16,17 @@ AuTest::AuTest(const std::shared_ptr<PartitionedMSA> &msa,
 }
 
 void AuTest::run_bootstrap() {
+void AuTest::allocate_test_statistics() {
+    if (!corax_RELL_allocate_multiscale_matrices(&test_statistics,
+                                                 num_trees,
+                                                 num_replicates.data(),
+                                                 num_replicates.size())) {
+        // TODO handle properly
+        exit(-1);
+    }
+}
+
+
     // reset random state to ensure reproducibility independent of previous events
     const auto rstate = corax_random_create(seed);
 

@@ -25,6 +25,11 @@ public:
     };
 
     /**
+     *  Allocate the test statistic arrays for bootstrap replicates for all trees.
+     */
+    void allocate_test_statistics();
+
+    /**
      * Run the RELL bootstrapping on the per-site log-likelihood vectors assigned to this instance.
      * Since the test assumes that no fine-grained parallelization happens across MPI ranks, the vectors are all
      * complete.
