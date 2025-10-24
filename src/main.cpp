@@ -2858,7 +2858,9 @@ void command_au_test(RaxmlInstance& instance)
 
   AuTest tester { instance.parted_msa, instance.persite_loglh, scales, num_replicates, opts.random_seed };
   tester.allocate_test_statistics();
+  tester.run_bootstrap(instance.persite_loglh.size() - 50);
   tester.run_bootstrap(instance.persite_loglh.size() - 50, 50);
+  tester.finalize_test_statistics();
   tester.calculate_p_values();
 }
 

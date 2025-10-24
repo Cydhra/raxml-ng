@@ -42,6 +42,12 @@ public:
     void run_bootstrap(size_t num_rows, size_t offset = 0);
 
     /**
+     * Run the normalization step. This can only be done on the entire replicate matrix, it cannot be called on partial
+     * matrices, so before this is called (on the master thread), all other threads need to be done.
+     */
+    void finalize_test_statistics();
+
+    /**
      * Calculate the p-values from the previously generated bootstrap replicates.
      */
     void calculate_p_values();
