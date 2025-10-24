@@ -33,8 +33,13 @@ public:
      * Run the RELL bootstrapping on the per-site log-likelihood vectors assigned to this instance.
      * Since the test assumes that no fine-grained parallelization happens across MPI ranks, the vectors are all
      * complete.
+     *
+     * @param num_rows how many trees to run bootstrap for. This should match `num_trees` given to the constructor,
+     *                  except if the method is called with `offset` to run partial bootstraps in parallel
+     * @param offset    offset in the tree array. The function will run bootstrap for all trees in the range
+     *                  `offset..offset + num_trees` (exclusive).
      */
-    void run_bootstrap();
+    void run_bootstrap(size_t num_rows, size_t offset = 0);
 
     /**
      * Calculate the p-values from the previously generated bootstrap replicates.
