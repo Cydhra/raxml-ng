@@ -47,8 +47,8 @@ void AuTest::run_bootstrap(const size_t num_rows, const size_t offset) {
 
         // create a row of pointers for the per-site likelihoods
         std::vector<const double *> per_site_lnl_matrix;
-        for (auto &tree_parts: persite_loglh) {
-            per_site_lnl_matrix.push_back(tree_parts[part_id].data());
+        for (size_t i = offset; i < offset + num_rows; ++i) {
+            per_site_lnl_matrix.push_back(persite_loglh[i][part_id].data());
         }
 
         // add up the partial replicates of this partition into test_statistics
@@ -64,13 +64,15 @@ void AuTest::run_bootstrap(const size_t num_rows, const size_t offset) {
                                         scales.size());
     }
 
-    // normalize all test matrices after all partitions have been added up
-    for (unsigned int id_scale = 0; id_scale < scales.size(); id_scale++) {
-        corax_normalize_lnl_bootstrap(test_statistics[id_scale], num_replicates[id_scale], num_rows);
-    }
-
     // clean up
     corax_random_destroy(rstate);
+}
+
+void AuTest::finalize_test_statistics() {
+    // normalize all test matrices after all partitions have been added up
+    for (unsigned int id_scale = 0; id_scale < scales.size(); id_scale++) {
+        corax_normalize_lnl_bootstrap(test_statistics[id_scale], num_replicates[id_scale], num_trees);
+    }
 }
 
 
