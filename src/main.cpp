@@ -2853,11 +2853,13 @@ void command_au_test(RaxmlInstance& instance)
   LOG_INFO << "AU Test requested" << endl;
   LOG_INFO << "Per-Site Likelihoods: " << instance.persite_loglh.size() << endl;
 
-  const doubleVector scales = {0.5, 0.6, 0.7, 1.0};
-  const uintVector num_replicates = { 10000, 10000, 10000, 10000 };
+  const doubleVector scales = {0.5, 0.6, 0.7, 0.8, 0.9, 1.0, 1.1, 1.2, 1.3, 1.4};
+  const uintVector num_replicates = { 10000, 10000, 10000, 10000, 10000, 10000, 10000, 10000, 10000, 10000 };
 
   AuTest tester { instance.parted_msa, instance.persite_loglh, scales, num_replicates, opts.random_seed };
-  tester.estimate_parameters();
+  tester.allocate_test_statistics();
+  tester.run_bootstrap(instance.persite_loglh.size() - 50, 50);
+  tester.calculate_p_values();
 }
 
 void check_terrace(const RaxmlInstance& instance, const Tree& tree)
