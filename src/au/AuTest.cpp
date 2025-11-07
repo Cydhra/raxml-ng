@@ -36,10 +36,12 @@ void AuTest::run_bootstrap(const size_t num_rows, const size_t offset) {
             std::endl;
 
     // prepare matrix array with offset matrices
-    std::vector<double**> test_statistics_views;
+    std::vector<double*> test_statistics_views(scales.size(), nullptr);
+    std::vector<double**> test_statistics_pointers(scales.size(), nullptr);
 
     for (unsigned int scale_id = 0; scale_id < scales.size(); scale_id++) {
-        test_statistics_views.push_back(corax_RELL_submatrix(test_statistics + scale_id, offset, num_replicates[scale_id]));
+        test_statistics_views[scale_id] = corax_RELL_submatrix(test_statistics[scale_id], offset, num_replicates[scale_id]);
+        test_statistics_pointers[scale_id] = &test_statistics_views[scale_id];
     }
 
     for (unsigned int part_id = 0; part_id < msa->part_count(); part_id++) {
@@ -53,7 +55,7 @@ void AuTest::run_bootstrap(const size_t num_rows, const size_t offset) {
 
         // add up the partial replicates of this partition into test_statistics
         corax_RELL_multiscale_bootstrap(rstate,
-                                        test_statistics_views.data(),
+                                        test_statistics_pointers.data(),
                                         per_site_lnl_matrix.data(),
                                         part_msa.weights().data(),
                                         part_msa.num_sites(),
