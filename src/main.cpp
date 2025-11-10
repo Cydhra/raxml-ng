@@ -2869,6 +2869,20 @@ void command_bsmsa(RaxmlInstance& instance, const CheckpointFile& checkp)
   generate_bootstraps(instance, checkp);
 }
 
+void au_test_thread_main(RaxmlInstance& instance, AuTest& tester) {
+  const auto& worker = instance.get_worker();
+
+  /* get partitions assigned to the current thread */
+  // TODO: if the partition assignment is weird, we need to communicate that to the AU test instance
+  // auto const& part_assign = instance.proc_part_assign.at(ParallelContext::local_proc_id());
+
+  /* get first tree of the contiguous tree assignment */
+  const auto slice_start = *worker.start_trees.begin();
+
+  tester.run_bootstrap(worker.start_trees.size(), slice_start);
+  ParallelContext::global_barrier();
+}
+
 void command_au_test(RaxmlInstance& instance)
 {
   const auto& opts = instance.opts;
@@ -2876,17 +2890,37 @@ void command_au_test(RaxmlInstance& instance)
   if (instance.start_trees.size() < 2)
     throw runtime_error("Cannot perform AU test on fewer than 2 trees!");
 
-  LOG_INFO << "AU Test requested" << endl;
-  LOG_INFO << "Per-Site Likelihoods: " << instance.persite_loglh.size() << endl;
+  // create a new custom assignment of trees to threads with a load balancer that
+  // creates contiguous slices (which is advantageous for the AU test)
+  autotune_threads(instance);
+  ContiguousCoarseLoadBalancer au_test_balancer;
+  CoarseAssignment tree_ids(instance.start_trees.size());
+  std::iota(tree_ids.begin(), tree_ids.end(), 0);
+  const CoarseAssignmentList assignment = au_test_balancer.get_all_assignments(tree_ids, opts.num_workers);
+
+  // tell the workers about the new assignment
+  for (auto &wrk : instance.workers) {
+    wrk.start_trees = assignment.at(wrk.worker_id);
+  }
+
+  LOG_INFO << "Running AU test with " << opts.num_workers << " workers" << endl;
 
   const doubleVector scales = {0.5, 0.6, 0.7, 0.8, 0.9, 1.0, 1.1, 1.2, 1.3, 1.4};
   const uintVector num_replicates = { 10000, 10000, 10000, 10000, 10000, 10000, 10000, 10000, 10000, 10000 };
-
   AuTest tester { instance.parted_msa, instance.persite_loglh, scales, num_replicates, opts.random_seed };
   tester.allocate_test_statistics();
-  tester.run_bootstrap(instance.persite_loglh.size());
+
+  // start workers
+  ParallelContext::init_pthreads(opts, std::bind(au_test_thread_main,
+                                                 std::ref(instance),
+                                                 std::ref(tester)));
+  au_test_thread_main(instance, tester);
+
+  // master computes AU values
   tester.finalize_test_statistics();
   tester.calculate_p_values();
+
+  LOG_INFO << "AU Test finished" << endl;
 }
 
 void check_terrace(const RaxmlInstance& instance, const Tree& tree)
@@ -4419,7 +4453,10 @@ int internal_main(int argc, char** argv, void* comm)
       case Command::au_test:
       {
         cm.disable();
+
         master_main(instance, cm);
+        ParallelContext::finalize_threads();
+
         command_au_test(instance);
         break;
       }
