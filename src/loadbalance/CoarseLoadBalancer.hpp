@@ -32,5 +32,14 @@ protected:
                                                    size_t num_workers);
 };
 
+/* Simple load balancer that assigns contiguous tree slices */
+class ContiguousCoarseLoadBalancer : public CoarseLoadBalancer
+{
+protected:
+    virtual CoarseAssignmentList compute_assignments(const CoarseAssignment& search_ids,
+                                                     size_t num_workers);
+};
+
+
 
 #endif /* RAXML_COARSELOADBALANCER_HPP_ */

@@ -54,3 +54,27 @@ CoarseAssignmentList SimpleCoarseLoadBalancer::compute_assignments(const CoarseA
   return search_assign;
 }
 
+CoarseAssignmentList ContiguousCoarseLoadBalancer::compute_assignments(const CoarseAssignment& search_ids,
+                                                 size_t num_workers)
+{
+  CoarseAssignmentList search_assign(num_workers);
+
+  auto per_worker = search_ids.size() / num_workers;
+  auto remainder = search_ids.size() % num_workers;
+  auto idx = 0;
+
+  for (size_t worker_id = 0; worker_id < num_workers; worker_id++)
+  {
+    for (size_t i = 0; i < per_worker; i++) {
+      search_assign.at(worker_id).push_back(search_ids[idx]);
+      idx++;
+    }
+    if (worker_id < remainder) {
+      search_assign.at(worker_id).push_back(search_ids[idx]);
+      idx++;
+    }
+  }
+
+  return search_assign;
+}
+
