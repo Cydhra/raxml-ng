@@ -36,6 +36,8 @@ void AuTest::run_bootstrap(const size_t num_rows, const size_t offset) {
             std::endl;
 
     // prepare matrix array with offset matrices
+    // we collect subarray pointers in `test_statistics_views` and since corax expects double pointers,
+    // we create another pointer array onto the subarrays in `test_statistics_pointers`
     std::vector<double*> test_statistics_views(scales.size(), nullptr);
     std::vector<double**> test_statistics_pointers(scales.size(), nullptr);
 
@@ -54,6 +56,8 @@ void AuTest::run_bootstrap(const size_t num_rows, const size_t offset) {
         }
 
         // add up the partial replicates of this partition into test_statistics
+        // calling the method like this automatically adds partition replicates together, since the test_statistics
+        // array is never cleared by the bootstrap method
         corax_RELL_multiscale_bootstrap(rstate,
                                         test_statistics_pointers.data(),
                                         per_site_lnl_matrix.data(),
@@ -71,7 +75,6 @@ void AuTest::run_bootstrap(const size_t num_rows, const size_t offset) {
 }
 
 void AuTest::finalize_test_statistics() {
-    // normalize all test matrices after all partitions have been added up
     for (unsigned int id_scale = 0; id_scale < scales.size(); id_scale++) {
         corax_normalize_lnl_bootstrap(test_statistics[id_scale], num_replicates[id_scale], num_trees);
     }
