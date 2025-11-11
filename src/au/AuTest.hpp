@@ -5,6 +5,9 @@
 #include "../types.hpp"
 #include "../PartitionedMSA.hpp"
 
+extern const doubleVector AU_DEFAULT_SCALES;
+extern const uintVector AU_DEFAULT_REPS;
+
 class AuTest {
 public:
     AuTest(const std::shared_ptr<PartitionedMSA> &msa,

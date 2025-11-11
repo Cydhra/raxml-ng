@@ -2905,9 +2905,7 @@ void command_au_test(RaxmlInstance& instance)
 
   LOG_INFO << "Running AU test with " << opts.num_workers << " workers" << endl;
 
-  const doubleVector scales = {0.5, 0.6, 0.7, 0.8, 0.9, 1.0, 1.1, 1.2, 1.3, 1.4};
-  const uintVector num_replicates = { 10000, 10000, 10000, 10000, 10000, 10000, 10000, 10000, 10000, 10000 };
-  AuTest tester { instance.parted_msa, instance.persite_loglh, scales, num_replicates, opts.random_seed };
+  AuTest tester { instance.parted_msa, instance.persite_loglh, AU_DEFAULT_SCALES, AU_DEFAULT_REPS, opts.random_seed };
   tester.allocate_test_statistics();
 
   // start workers
