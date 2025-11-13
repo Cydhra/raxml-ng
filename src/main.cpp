@@ -115,6 +115,9 @@ struct RaxmlInstance
   RaxmlRunPhase run_phase;
   double used_wh;
 
+  // au test instance
+  shared_ptr<AuTest> au_test;
+
   // mapping taxon name -> tip_id/clv_id in the tree
   NameIdMap tip_id_map;
 
@@ -2905,18 +2908,17 @@ void command_au_test(RaxmlInstance& instance)
 
   LOG_INFO_TS << "Performing AU test on " << instance.start_trees.size() << " trees" << endl;
 
-  AuTest tester { instance.parted_msa, instance.persite_loglh, AU_DEFAULT_SCALES, AU_DEFAULT_REPS, opts.random_seed };
-  tester.allocate_test_statistics();
+  instance.au_test->allocate_test_statistics();
 
   // start workers
   ParallelContext::init_pthreads(opts, std::bind(au_test_thread_main,
                                                  std::ref(instance),
-                                                 std::ref(tester)));
-  au_test_thread_main(instance, tester);
+                                                 std::ref(*instance.au_test)));
+  au_test_thread_main(instance, *instance.au_test);
 
   // master computes AU values
-  tester.finalize_test_statistics();
-  tester.calculate_p_values();
+  instance.au_test->finalize_test_statistics();
+  instance.au_test->calculate_p_values();
 
   LOG_INFO_TS << "AU Test finished" << endl;
 }
@@ -4455,6 +4457,7 @@ int internal_main(int argc, char** argv, void* comm)
         master_main(instance, cm);
         ParallelContext::finalize_threads();
 
+        instance.au_test = std::make_shared<AuTest>(instance.parted_msa, instance.persite_loglh, AU_DEFAULT_SCALES, AU_DEFAULT_REPS, opts.random_seed);
         command_au_test(instance);
         break;
       }
