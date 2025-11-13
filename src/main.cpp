@@ -2877,7 +2877,7 @@ void command_au_test(RaxmlInstance& instance)
     wrk.start_trees = assignment.at(wrk.worker_id);
   }
 
-  LOG_INFO << "Running AU test with " << opts.num_workers << " workers" << endl;
+  LOG_INFO_TS << "Performing AU test on " << instance.start_trees.size() << " trees" << endl;
 
   AuTest tester { instance.parted_msa, instance.persite_loglh, AU_DEFAULT_SCALES, AU_DEFAULT_REPS, opts.random_seed };
   tester.allocate_test_statistics();
@@ -2892,7 +2892,7 @@ void command_au_test(RaxmlInstance& instance)
   tester.finalize_test_statistics();
   tester.calculate_p_values();
 
-  LOG_INFO << "AU Test finished" << endl;
+  LOG_INFO_TS << "AU Test finished" << endl;
 }
 
 void check_terrace(const RaxmlInstance& instance, const Tree& tree)
