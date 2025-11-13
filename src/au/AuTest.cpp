@@ -5,7 +5,7 @@
 #include "corax/statistics/bootstrap.h"
 
 const doubleVector AU_DEFAULT_SCALES = {0.5, 0.6, 0.7, 0.8, 0.9, 1.0, 1.1, 1.2, 1.3, 1.4};
-const uintVector AU_DEFAULT_REPS = { 10000, 10000, 10000, 10000, 10000, 10000, 10000, 10000, 10000, 10000 };
+const uintVector AU_DEFAULT_REPS = {10000, 10000, 10000, 10000, 10000, 10000, 10000, 10000, 10000, 10000};
 
 AuTest::AuTest(const std::shared_ptr<PartitionedMSA> &msa,
                const std::vector<std::vector<doubleVector> > &persite_loglh,
@@ -13,9 +13,12 @@ AuTest::AuTest(const std::shared_ptr<PartitionedMSA> &msa,
                const uintVector &num_replicates, const long seed) : msa(msa),
                                                                     persite_loglh(persite_loglh),
                                                                     test_statistics(nullptr),
+                                                                    p_values(doubleVector(persite_loglh.size())),
+                                                                    finished(false),
                                                                     scales(scales),
                                                                     num_replicates(num_replicates),
-                                                                    num_trees(persite_loglh.size()), seed(seed) {
+                                                                    num_trees(persite_loglh.size()),
+                                                                    seed(seed) {
 }
 
 void AuTest::allocate_test_statistics() {
@@ -33,17 +36,21 @@ void AuTest::run_bootstrap(const size_t num_rows, const size_t offset) {
     // reset random state to ensure reproducibility independent of previous events
     const auto rstate = corax_random_create(seed);
 
+    // mark p values as dirty
+    finished = false;
+
     // some debug information
     LOG_INFO_TS << "Run Bootstrapping..." << std::endl;
 
     // prepare matrix array with offset matrices
     // we collect subarray pointers in `test_statistics_views` and since corax expects double pointers,
     // we create another pointer array onto the subarrays in `test_statistics_pointers`
-    std::vector<double*> test_statistics_views(AU_DEFAULT_SCALES.size(), nullptr);
-    std::vector<double**> test_statistics_pointers(AU_DEFAULT_SCALES.size(), nullptr);
+    std::vector<double *> test_statistics_views(AU_DEFAULT_SCALES.size(), nullptr);
+    std::vector<double **> test_statistics_pointers(AU_DEFAULT_SCALES.size(), nullptr);
 
     for (unsigned int scale_id = 0; scale_id < AU_DEFAULT_SCALES.size(); scale_id++) {
-        test_statistics_views[scale_id] = corax_RELL_submatrix(test_statistics[scale_id], offset, num_replicates[scale_id]);
+        test_statistics_views[scale_id] = corax_RELL_submatrix(test_statistics[scale_id], offset,
+                                                               num_replicates[scale_id]);
         test_statistics_pointers[scale_id] = &test_statistics_views[scale_id];
     }
 
@@ -80,6 +87,9 @@ void AuTest::finalize_test_statistics() {
     for (unsigned int id_scale = 0; id_scale < AU_DEFAULT_SCALES.size(); id_scale++) {
         corax_normalize_lnl_bootstrap(test_statistics[id_scale], num_replicates[id_scale], num_trees);
     }
+
+    // mark p values as dirty
+    finished = false;
 }
 
 
@@ -98,7 +108,7 @@ void AuTest::calculate_p_values() {
         }
     }
 
-    for (unsigned int tree = 0; tree < 100; tree++) {
+    for (unsigned int tree = 0; tree < num_trees; tree++) {
         double d, c;
         double p_value = 0.0;
         corax_au_p_value(test_statistics,
@@ -111,6 +121,20 @@ void AuTest::calculate_p_values() {
                          &c,
                          &p_value);
 
+        p_values[tree] = p_value;
+
         LOG_DEBUG_TS << "p-value for " << tree << ". tree: " << p_value << std::endl;
     }
+
+    // mark p values as finished
+    finished = true;
+}
+
+doubleVector &AuTest::get_p_values() {
+    if (!finished) {
+        LOG_ERROR << "please call calculate_p_values before calling get_p_values" << std::endl;
+        exit(-1);
+    }
+
+    return p_values;
 }
