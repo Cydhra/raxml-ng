@@ -1408,17 +1408,7 @@ void CommandLineParser::parse_options(int argc, char** argv, Options &opts)
           optarg_tree = optarg;
         num_commands++;
         break;
-      case 73: /* gcf: compute gene concordance factors */
-        opts.command = Command::support;
-        opts.bs_metrics.clear();
-        opts.bs_metrics.insert(BranchSupportMetric::gcf);
-        opts.use_pythia = false;
-        optarg_tree_required = true;
-        if (optarg)
-          optarg_tree = optarg;
-        num_commands++;
-        break;
-      case 74: /* au test */
+       case 74: /* au test */
         opts.command = Command::au_test;
         optarg_tree_required = true;
         num_commands++;
