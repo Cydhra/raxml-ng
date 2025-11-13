@@ -2895,6 +2895,7 @@ void command_au_test(RaxmlInstance& instance)
   instance.au_test->calculate_p_values();
 
   LOG_INFO_TS << "AU Test finished" << endl;
+  ParallelContext::finalize_threads();
 }
 
 void check_terrace(const RaxmlInstance& instance, const Tree& tree)
