@@ -11,6 +11,8 @@
 #include <unordered_set>
 #include <random>
 
+// corax attributes
+#include "corax/core/partition.h"
 
 enum class StartingTree
 {
@@ -43,6 +45,7 @@ enum class Command
   sitelh,
   pythia,
   modeltest,
+  au_test,
   treeset
 };
 

@@ -58,6 +58,7 @@
 #include "util/EnergyMonitor.hpp"
 #include "adaptive/DifficultyPredictor.hpp"
 #include "adaptive/StoppingCriterion.hpp"
+#include "au/AuTest.hpp"
 #include "modeltest/ModelTest.hpp"
 
 #ifdef _RAXML_TERRAPHAST
@@ -108,6 +109,9 @@ struct RaxmlInstance
   bool bs_converged;
   RaxmlRunPhase run_phase;
   double used_wh;
+
+  // au test instance
+  shared_ptr<AuTest> au_test;
 
   // mapping taxon name -> tip_id/clv_id in the tree
   NameIdMap tip_id_map;
@@ -1766,6 +1770,7 @@ void build_start_trees(RaxmlInstance& instance, unsigned int num_threads = 0)
           {
             st_tree_count++;
             opts.num_searches++;
+            seeds.emplace_back(rand());
           }
         }
 
@@ -2063,7 +2068,7 @@ void init_ancestral(RaxmlInstance& instance)
 
 void init_persite_loglh(RaxmlInstance& instance)
 {
-  if (instance.opts.command == Command::sitelh)
+  if (instance.opts.command == Command::sitelh || instance.opts.command == Command::au_test)
   {
     const auto& parted_msa = *instance.parted_msa;
 
@@ -2638,6 +2643,58 @@ void command_bsmsa(RaxmlInstance& instance, const CheckpointFile& checkp)
   generate_bootstraps(instance, checkp);
 }
 
+void au_test_thread_main(RaxmlInstance& instance, AuTest& tester) {
+  const auto& worker = instance.get_worker();
+
+  /* get partitions assigned to the current thread */
+  // TODO: if the partition assignment is weird, we need to communicate that to the AU test instance
+  // auto const& part_assign = instance.proc_part_assign.at(ParallelContext::local_proc_id());
+
+  /* get first tree of the contiguous tree assignment */
+  const auto slice_start = *worker.start_trees.begin();
+
+  tester.run_bootstrap(worker.start_trees.size(), slice_start);
+  ParallelContext::global_barrier();
+}
+
+void command_au_test(RaxmlInstance& instance)
+{
+  const auto& opts = instance.opts;
+
+  if (instance.start_trees.size() < 2)
+    throw runtime_error("Cannot perform AU test on fewer than 2 trees!");
+
+  // create a new custom assignment of trees to threads with a load balancer that
+  // creates contiguous slices (which is advantageous for the AU test)
+  autotune_threads(instance);
+  ContiguousCoarseLoadBalancer au_test_balancer;
+  CoarseAssignment tree_ids(instance.start_trees.size());
+  std::iota(tree_ids.begin(), tree_ids.end(), 0);
+  const CoarseAssignmentList assignment = au_test_balancer.get_all_assignments(tree_ids, opts.num_workers);
+
+  // tell the workers about the new assignment
+  for (auto &wrk : instance.workers) {
+    wrk.start_trees = assignment.at(wrk.worker_id);
+  }
+
+  LOG_INFO_TS << "Performing AU test on " << instance.start_trees.size() << " trees" << endl;
+
+  instance.au_test->allocate_test_statistics();
+
+  // start workers
+  ParallelContext::init_pthreads(opts, std::bind(au_test_thread_main,
+                                                 std::ref(instance),
+                                                 std::ref(*instance.au_test)));
+  au_test_thread_main(instance, *instance.au_test);
+
+  // master computes AU values
+  instance.au_test->finalize_test_statistics();
+  instance.au_test->calculate_p_values();
+
+  LOG_INFO_TS << "AU Test finished" << endl;
+  ParallelContext::finalize_threads();
+}
+
 void check_terrace(const RaxmlInstance& instance, const Tree& tree)
 {
 #ifdef _RAXML_TERRAPHAST
@@ -3023,6 +3080,24 @@ void print_final_output(const RaxmlInstance& instance, const CheckpointFile& che
     }
   }
 
+  if (opts.command == Command::au_test)
+  {
+    assert(instance.au_test->is_finished());
+
+    if (!opts.stat_tests_file().empty()) {
+      fstream fs(opts.stat_tests_file(), ios::out);
+
+      auto p_values = instance.au_test->get_p_values();
+
+      for (unsigned int tree_num = 0; tree_num < instance.start_trees.size(); tree_num++) {
+        const auto delim = "\t";
+        fs << tree_num << delim << p_values[tree_num] << endl;
+      }
+
+      LOG_INFO << "\nAU p-values saved to: " << sysutil_realpath(opts.stat_tests_file()) << endl;
+    }
+  }
+
   if (opts.command == Command::ancestral)
   {
     assert(instance.ancestral_states);
@@ -3278,7 +3353,7 @@ void thread_infer_ml(RaxmlInstance& instance, CheckpointManager& cm)
       optimizer.disable_stopping_rule();
 
     if (opts.command == Command::evaluate || opts.command == Command::sitelh ||
-        opts.command == Command::ancestral)
+        opts.command == Command::ancestral || opts.command == Command::au_test)
     { 
       // check if we have anything to optimize
       if (opts.optimize_brlen || opts.optimize_model)
@@ -3639,7 +3714,8 @@ void thread_main(RaxmlInstance& instance, CheckpointManager& cm)
 
   if ((opts.command == Command::search || opts.command == Command::all ||
       opts.command == Command::evaluate || opts.command == Command::sitelh ||
-      opts.command == Command::ancestral || opts.command == Command::treeset) &&
+      opts.command == Command::ancestral || opts.command == Command::au_test ||
+      opts.command == Command::treeset) &&
       !instance.start_trees.empty())
   {
     thread_infer_ml(instance, cm);
@@ -4086,6 +4162,17 @@ int internal_main(int argc, char** argv, void* comm)
       case Command::consense:
       {
         command_consense(instance);
+        break;
+      }
+      case Command::au_test:
+      {
+        cm.disable();
+
+        master_main(instance, cm);
+        ParallelContext::finalize_threads();
+
+        instance.au_test = std::make_shared<AuTest>(instance.parted_msa, instance.persite_loglh, AU_DEFAULT_SCALES, AU_DEFAULT_REPS, opts.random_seed);
+        command_au_test(instance);
         break;
       }
       case Command::none:

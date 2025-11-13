@@ -96,6 +96,7 @@ static struct option long_options[] =
   {"fast",               no_argument,       0, 0 },  /*  71 */
   {"modeltest",          no_argument,       0, 0 },  /*  72 */
   {"gcf",                optional_argument, 0, 0 },  /*  73 */
+  {"au-test",            no_argument,       0, 0 },  /*  74 */
   {"treeset",            no_argument,       0, 0 },  /*  75 */
 
   { 0, 0, 0, 0 }
@@ -117,7 +118,7 @@ void CommandLineParser::check_options(Options &opts)
       opts.command == Command::terrace || opts.command == Command::check ||
       opts.command == Command::parse || opts.command == Command::start ||
       opts.command == Command::ancestral || opts.command == Command::modeltest ||
-      opts.command == Command::treeset)
+      opts.command == Command::au_test || opts.command == Command::treeset)
   {
     if (opts.msa_file.empty())
       throw OptionException("You must specify a multiple alignment file with --msa switch");
@@ -126,7 +127,8 @@ void CommandLineParser::check_options(Options &opts)
   if (opts.command == Command::evaluate || opts.command == Command::support ||
       opts.command == Command::terrace || opts.command == Command::rfdist ||
       opts.command == Command::sitelh || opts.command == Command::ancestral ||
-      opts.command == Command::consense || opts.command == Command::treeset)
+      opts.command == Command::consense || opts.command == Command::au_test ||
+      opts.command == Command::treeset)
   {
     if (opts.tree_file.empty() && (opts.start_trees.count(StartingTree::user) || opts.start_trees.empty()))
       throw OptionException("Please provide a valid Newick file as an argument of --tree option.");
@@ -268,7 +270,8 @@ void CommandLineParser::compute_num_searches(Options &opts)
   if (opts.command == Command::search || opts.command == Command::all ||
       opts.command == Command::evaluate || opts.command == Command::start ||
       opts.command == Command::ancestral || opts.command == Command::sitelh ||
-      opts.command == Command::modeltest || opts.command == Command::treeset)
+      opts.command == Command::modeltest || opts.command == Command::au_test ||
+      opts.command == Command::treeset)
   {
     assert(!opts.start_trees.empty());
 
@@ -1405,7 +1408,22 @@ void CommandLineParser::parse_options(int argc, char** argv, Options &opts)
           optarg_tree = optarg;
         num_commands++;
         break;
-      case 73: /* treeset */
+      case 73: /* gcf: compute gene concordance factors */
+        opts.command = Command::support;
+        opts.bs_metrics.clear();
+        opts.bs_metrics.insert(BranchSupportMetric::gcf);
+        opts.use_pythia = false;
+        optarg_tree_required = true;
+        if (optarg)
+          optarg_tree = optarg;
+        num_commands++;
+        break;
+      case 74: /* au test */
+        opts.command = Command::au_test;
+        optarg_tree_required = true;
+        num_commands++;
+        break;
+      case 75: /* treeset */
         opts.command = Command::treeset;
         opts.topology_opt_method = TopologyOptMethod::rapidPlausible;
         num_commands++;
