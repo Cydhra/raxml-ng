@@ -3324,6 +3324,8 @@ void print_final_output(const RaxmlInstance& instance, const CheckpointFile& che
         const auto delim = "\t";
         fs << tree_num << delim << p_values[tree_num] << endl;
       }
+
+      LOG_INFO << "\nAU p-values saved to: " << sysutil_realpath(opts.stat_tests_file()) << endl;
     }
   }
 
