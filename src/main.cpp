@@ -3379,7 +3379,12 @@ void thread_infer_ml(RaxmlInstance& instance, CheckpointManager& cm)
     }
     else
     {
-      optimizer.optimize_topology(*treeinfo, cm);
+      if (opts.command == Command::treeset) {
+        // we call rapid plausible optimizer directly, since it needs previous tree states for auto-adaption
+        optimizer.optimize_topology_rapid_plausible(*treeinfo, cm);
+      } else {
+        optimizer.optimize_topology(*treeinfo, cm);
+      }
 
       LOG_PROGR << endl;
       LOG_WORKER_TS(log_level) << "ML tree search #" << start_tree_num <<

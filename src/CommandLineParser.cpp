@@ -1415,7 +1415,6 @@ void CommandLineParser::parse_options(int argc, char** argv, Options &opts)
         break;
       case 75: /* treeset */
         opts.command = Command::treeset;
-        opts.topology_opt_method = TopologyOptMethod::rapidPlausible;
         num_commands++;
         break;
       default:

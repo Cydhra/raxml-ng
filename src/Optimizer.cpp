@@ -74,9 +74,6 @@ double Optimizer::optimize_topology(TreeInfo& treeinfo, CheckpointManager& cm)
 {
   switch(_topology_opt_method)
   {
-    case TopologyOptMethod::rapidPlausible:
-      return optimize_topology_rapid_plausible(treeinfo, cm);
-      break;
     case TopologyOptMethod::classic:
       return optimize_topology_standard(treeinfo, cm);
       break;
