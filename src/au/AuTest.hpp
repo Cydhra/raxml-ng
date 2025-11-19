@@ -76,6 +76,11 @@ public:
      */
     doubleVector &get_p_values();
 
+    /**
+     * @return true, if the p-values have been calculated
+     */
+    bool is_finished() const;
+
 private:
     const std::shared_ptr<PartitionedMSA> msa;
     const std::vector<std::vector<doubleVector> > &persite_loglh;
