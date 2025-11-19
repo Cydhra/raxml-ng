@@ -138,3 +138,7 @@ doubleVector &AuTest::get_p_values() {
 
     return p_values;
 }
+
+bool AuTest::is_finished() const {
+    return finished;
+}
