@@ -3284,6 +3284,22 @@ void print_final_output(const RaxmlInstance& instance, const CheckpointFile& che
     }
   }
 
+  if (opts.command == Command::au_test)
+  {
+    assert(instance.au_test->is_finished());
+
+    if (!opts.stat_tests_file().empty()) {
+      fstream fs(opts.stat_tests_file(), ios::out);
+
+      auto p_values = instance.au_test->get_p_values();
+
+      for (unsigned int tree_num = 0; tree_num < instance.start_trees.size(); tree_num++) {
+        const auto delim = "\t";
+        fs << tree_num << delim << p_values[tree_num] << endl;
+      }
+    }
+  }
+
   if (opts.command == Command::ancestral)
   {
     assert(instance.ancestral_states);
