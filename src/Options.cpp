@@ -136,6 +136,7 @@ void Options::set_default_outfiles()
   set_default_outfile(outfile_names.mut_map_tree, "mutationMapTree");
   set_default_outfile(outfile_names.mut_map_list, "mutationMapList");
   set_default_outfile(outfile_names.site_loglh, "siteLH");
+  set_default_outfile(outfile_names.stat_tests, "treeTests");
   set_default_outfile(outfile_names.modeltest_best_model, "moose.bestModel");
   if (modeltest_json_output)
     set_default_outfile(outfile_names.modeltest_json, "moose.json");
