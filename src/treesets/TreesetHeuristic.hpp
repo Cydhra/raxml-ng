@@ -1,6 +1,8 @@
 #ifndef RAXML_TREESETHEURISTIC_HPP_
 #define RAXML_TREESETHEURISTIC_HPP_
 
+#include "../Checkpoint.hpp"
+
 /**
  * An aggressive stateful local search heuristic for treeset-search. This differs substantially from other topological
  * heuristics because those are stateless (i.e., they do not depend on previous results of the same raxml search).
@@ -14,12 +16,20 @@
  */
 class TreesetHeuristic {
 public:
-	/**
-	 * @param num_spr the number of SPR rounds used by the standard heuristic as a starting point of auto-tuning.
-	 */
-	explicit TreesetHeuristic(const unsigned int num_spr) : light_spr(false), skip_model(false), num_spr(num_spr) {}
+	explicit TreesetHeuristic() : tuning_phase(true), light_spr(false), skip_model(false), num_spr(0) {}
 
+	/**
+	 * Main function for the treeset command. it is different from the thread_main function because it has to
+	 * dynamically adjust load balancing and thread auto-tuning. It is called by master_main instead of starting
+	 * pthreads in `thread_main` if the treeset command is called.
+	 */
+	void infer_treeset(Options &opts, CheckpointManager& cm);
 private:
+	/**
+	 * If true, the heuristic is still tuning parameters,
+	 */
+	bool tuning_phase;
+
 	/**
 	 * If true, replace fast SPR rounds with light SPR rounds that do even less BLOs.
 	 */
@@ -34,6 +44,16 @@ private:
 	 * How many SPR rounds to perform for each tree search
 	 */
 	unsigned int num_spr;
+
+	/**
+	 * @return the recommended number of threads for workers
+	 */
+	int recommended_thread_count();
+
+	/**
+	 * @return the recommended number of workers per rank
+	 */
+	int recommended_worker_count();
 };
 
 /**
