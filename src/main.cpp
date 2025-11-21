@@ -60,6 +60,7 @@
 #include "adaptive/StoppingCriterion.hpp"
 #include "au/AuTest.hpp"
 #include "modeltest/ModelTest.hpp"
+#include "treesets/TreesetHeuristic.hpp"
 
 #ifdef _RAXML_TERRAPHAST
 #include "terraces/TerraceWrapper.hpp"
@@ -151,6 +152,9 @@ struct RaxmlInstance
   /* ModelTest */
   unique_ptr<ModelTest> model_test;
   unsigned int num_threads_modeltest;
+
+  /* Treesets */
+  unique_ptr<TreesetHeuristic> treeset_optimizer;
 
   vector<RaxmlWorker> workers;
   RaxmlWorker& get_worker() { return workers.at(ParallelContext::local_group_id()); }
@@ -2408,6 +2412,14 @@ void autoselect_models(RaxmlInstance& instance, CheckpointManager &cm)
   write_binary_msa_file(instance, true);
 }
 
+void init_treeset_optimizer(RaxmlInstance& instance, CheckpointManager& cm) {
+  const auto& opts = instance.opts;
+  if (opts.command != Command::treeset)
+    return;
+
+  instance.treeset_optimizer.reset(new TreesetHeuristic);
+}
+
 unsigned int read_newick_trees_custom(SplitsTree& ref_tree, const std::string& fname,
                                       const std::string& tree_kind, bool extract_splits,
                                       bool require_binary, bool require_complete,
@@ -4135,6 +4147,9 @@ void master_main(RaxmlInstance& instance, CheckpointManager& cm)
   auto threads_per_worker = opts.num_threads * opts.num_ranks / opts.num_workers;
   LOG_INFO << "Parallelization scheme: " << opts.num_workers << " worker(s) x "
            << threads_per_worker << " thread(s)" << endl << endl;
+
+  /* initialize treeset optimizer */
+  init_treeset_optimizer(instance, cm);
 
   ParallelContext::init_pthreads(opts, std::bind(thread_main,
                                                 std::ref(instance),
