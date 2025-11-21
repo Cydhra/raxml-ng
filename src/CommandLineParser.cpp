@@ -140,8 +140,7 @@ void CommandLineParser::check_options(Options &opts)
   if (opts.command == Command::evaluate || opts.command == Command::support ||
       opts.command == Command::terrace || opts.command == Command::rfdist ||
       opts.command == Command::sitelh || opts.command == Command::ancestral ||
-      opts.command == Command::consense || opts.command == Command::au_test ||
-      opts.command == Command::treeset)
+      opts.command == Command::consense || opts.command == Command::au_test)
   {
     if (opts.tree_file.empty() && (opts.start_trees.count(StartingTree::user) || opts.start_trees.empty()))
       throw OptionException("Please provide a valid Newick file as an argument of --tree option.");
@@ -1605,6 +1604,14 @@ void CommandLineParser::parse_options(int argc, char** argv, Options &opts)
         break;
       case 80: /* treeset */
         opts.command = Command::treeset;
+        optarg_tree_required = false;
+
+        // fill in a default amount of starting trees if none are given. Starting trees behave differently for this
+        // command, as we just fill up starting trees with parsimony if they are insufficient.
+        if (optarg_tree.empty()) {
+          optarg_tree = "pars{16}"; // TODO this hard-codes the batch size of the initial full inference to 16
+        }
+
         num_commands++;
         break;
       default:
