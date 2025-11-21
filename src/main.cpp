@@ -3973,7 +3973,8 @@ void thread_main(RaxmlInstance& instance, CheckpointManager& cm)
   if ((opts.command == Command::search || opts.command == Command::all ||
       opts.command == Command::evaluate || opts.command == Command::sitelh ||
       opts.command == Command::ancestral || opts.command == Command::mutmap ||
-      opts.command == Command::au_test) && !instance.start_trees.empty())
+      opts.command == Command::au_test || opts.command == Command::treeset) &&
+      !instance.start_trees.empty())
   {
     thread_infer_ml(instance, cm);
     ParallelContext::global_barrier();
@@ -4172,6 +4173,13 @@ void master_main(RaxmlInstance& instance, CheckpointManager& cm)
 
   // Main routines
   thread_main(instance, cm);
+
+  // treeset computation reuses the above treesearch code for the first batch and then switches over to aggressive
+  // heuristics
+  if (opts.command == Command::treeset) {
+    ParallelContext::finalize_threads();
+    instance.treeset_optimizer->infer_treeset(instance.opts, cm);
+  }
 
   if (ParallelContext::master_rank())
   {
@@ -4454,6 +4462,11 @@ int internal_main(int argc, char** argv, void* comm)
         instance.au_test = std::make_shared<AuTest>(instance.parted_msa, instance.persite_loglh, AU_DEFAULT_SCALES, AU_DEFAULT_REPS, opts.random_seed);
         command_au_test(instance);
         break;
+      }
+      case Command::treeset:
+      {
+          master_main(instance, cm);
+          break;
       }
       case Command::none:
       default:
