@@ -70,10 +70,12 @@ private:
  */
 class TunedBatch final {
 public:
-    TunedBatch(const bool light_spr, const bool skip_model, const unsigned int num_spr, const unsigned int batch_size, const unsigned int num_threads)
+    TunedBatch(const bool light_spr, const bool skip_model, const unsigned int num_spr,
+               const unsigned int starting_seed, const unsigned int batch_size, const unsigned int num_threads)
         : light_spr(light_spr),
           skip_model(skip_model),
           num_spr(num_spr),
+          starting_seed(starting_seed),
           num_threads(num_threads),
           batch_start_trees(new TreeList(batch_size)) {
     }
@@ -104,6 +106,13 @@ public:
     void infer_batch(RaxmlInstance &instance, const Options &opts);
 
 protected:
+    /**
+     * The starting seed (starting from 0) for this batch. Batches infer starting trees with ascending seeds, so this
+     * number is the number of starting trees in previous batches.
+     */
+    const unsigned int starting_seed;
+
+
     /**
      * How many threads are used in this batch.
      */
