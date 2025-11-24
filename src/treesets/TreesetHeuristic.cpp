@@ -7,7 +7,7 @@ void TreesetHeuristic::infer_treeset(RaxmlInstance &instance, const Options &opt
     // then generating seeds using rand(), so we won't be creating duplicates by starting over from the random_seed.
     auto seed_offset = opts.random_seed;
 
-    auto batch1 = TunedBatch(true, false, 4, seed_offset, BATCH_SIZE, this->recommended_thread_count());
+    auto batch1 = TunedBatch(true, false, 4, seed_offset, BATCH_SIZE, this->recommended_thread_count(), msa, persite_loglh);
     seed_offset += BATCH_SIZE;
     batch1.infer_batch(instance, opts);
 

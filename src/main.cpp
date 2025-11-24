@@ -2391,7 +2391,7 @@ void init_treeset_optimizer(RaxmlInstance& instance, CheckpointManager& cm) {
   if (opts.command != Command::treeset)
     return;
 
-  instance.treeset_optimizer.reset(new TreesetHeuristic);
+  instance.treeset_optimizer.reset(new TreesetHeuristic(instance.parted_msa, instance.persite_loglh));
 }
 
 unsigned int read_newick_trees_custom(SplitsTree& ref_tree, const std::string& fname,
