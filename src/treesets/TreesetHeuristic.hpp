@@ -2,6 +2,7 @@
 #define RAXML_TREESETHEURISTIC_HPP_
 
 #include "../Checkpoint.hpp"
+#include "../au/AuTest.hpp"
 
 // forward declaration of RaxmlInstance
 struct RaxmlInstance;
@@ -23,7 +24,9 @@ void thread_start_trees(RaxmlInstance &instance, TreeList &tree_list, StartingTr
  */
 class TreesetHeuristic {
 public:
-    explicit TreesetHeuristic() : num_spr(0) {
+    explicit TreesetHeuristic(const std::shared_ptr<PartitionedMSA> &msa,
+                              const std::vector<std::vector<doubleVector> > &persite_loglh)
+        : num_spr(0), msa(msa), persite_loglh(persite_loglh) {
     }
 
     /**
@@ -55,6 +58,17 @@ private:
     unsigned int num_spr;
 
     /**
+     * A reference to the MSA used in inference. We need it for the AU test.
+     */
+    const std::shared_ptr<PartitionedMSA> &msa;
+
+    /**
+     * Per-site log-likelihoods of the reference trees already inferred before the treeset heuristic kicked in.
+     * These cannot change, and constitute the first part of the AU test input for each batch.
+     */
+    const std::vector<std::vector<doubleVector> > &persite_loglh;
+
+    /**
      * @return the recommended number of threads for workers
      */
     int recommended_thread_count();
@@ -65,19 +79,24 @@ private:
     int recommended_worker_count();
 };
 
+// TODO we should reuse bootstrap resamplings of the reference trees for the AU test, since they stay the same.
 /**
  * A batch of local searches tuned with a specific set of parameters chosen by a {@link TreesetHeuristic} instance.
  */
 class TunedBatch final {
 public:
     TunedBatch(const bool light_spr, const bool skip_model, const unsigned int num_spr,
-               const unsigned int starting_seed, const unsigned int batch_size, const unsigned int num_threads)
+               const unsigned int starting_seed, const unsigned int batch_size, const unsigned int num_threads,
+               const std::shared_ptr<PartitionedMSA> &msa,
+               const std::vector<std::vector<doubleVector> > &reference_persite_loglh)
         : light_spr(light_spr),
           skip_model(skip_model),
           num_spr(num_spr),
           starting_seed(starting_seed),
           num_threads(num_threads),
-          batch_start_trees(new TreeList(batch_size)) {
+          batch_start_trees(new TreeList(batch_size)),
+          msa(msa),
+          reference_persite_loglh(reference_persite_loglh) {
     }
 
     /**
@@ -122,6 +141,27 @@ protected:
      * Starting trees for this inference batch
      */
     const shared_ptr<TreeList> batch_start_trees;
+
+    /**
+     * AU test instance
+     */
+    const shared_ptr<AuTest> au_test;
+
+    /**
+     * A reference to the MSA used in inference. We need it for the AU test.
+     */
+    const shared_ptr<PartitionedMSA> &msa;
+
+    /**
+     * Per-site log-likelihoods of the reference trees already inferred before the treeset heuristic kicked in.
+     * These cannot change, and constitute the first part of the AU test input.
+     */
+    const std::vector<std::vector<doubleVector> > &reference_persite_loglh;
+
+    /**
+     * Perform the AU test on the trees in the batch, as well as the supplied reference trees.
+     */
+    void perform_au_test();
 };
 
 #endif //RAXML_TREESETHEURISTIC_HPP_
