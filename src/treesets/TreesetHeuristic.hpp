@@ -120,6 +120,11 @@ public:
     unsigned int get_batch_size() const;
 
     /**
+     * Generate parsimony starting trees for this batch, and initialize the tree inference.
+     */
+    void generate_starting_trees(RaxmlInstance &instance, const Options &opts);
+
+    /**
      * Using the batch configuration, infer K trees in parallel.
      */
     void infer_batch(RaxmlInstance &instance, const Options &opts);
