@@ -4178,7 +4178,7 @@ void master_main(RaxmlInstance& instance, CheckpointManager& cm)
   // heuristics
   if (opts.command == Command::treeset) {
     ParallelContext::finalize_threads();
-    instance.treeset_optimizer->infer_treeset(instance, instance.opts, cm);
+    instance.treeset_optimizer->infer_treeset(instance, instance.opts, cm, *instance.load_balancer);
   }
 
   if (ParallelContext::master_rank())

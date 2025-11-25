@@ -1,8 +1,9 @@
 #ifndef RAXML_TREESETHEURISTIC_HPP_
 #define RAXML_TREESETHEURISTIC_HPP_
 
-#include "../Checkpoint.hpp"
 #include "../au/AuTest.hpp"
+#include "../loadbalance/LoadBalancer.hpp"
+#include "../Checkpoint.hpp"
 
 // forward declaration of RaxmlInstance
 struct RaxmlInstance;
@@ -34,7 +35,8 @@ public:
      * dynamically adjust load balancing and thread auto-tuning. It is called by master_main instead of starting
      * pthreads in `thread_main` if the treeset command is called.
      */
-    void infer_treeset(RaxmlInstance &instance, const Options &opts, CheckpointManager &cm);
+    void infer_treeset(RaxmlInstance &instance, const Options &opts, CheckpointManager &cm,
+                       LoadBalancer &load_balancer);
 
 private:
     /**
@@ -122,12 +124,12 @@ public:
     /**
      * Generate parsimony starting trees for this batch, and initialize the tree inference.
      */
-    void generate_starting_trees(RaxmlInstance &instance, const Options &opts);
+    void generate_starting_trees(RaxmlInstance &instance, const Options &opts, LoadBalancer &load_balancer);
 
     /**
      * Using the batch configuration, infer K trees in parallel.
      */
-    void infer_batch(RaxmlInstance &instance, const Options &opts);
+    void infer_batch(RaxmlInstance &instance, const Options &opts, LoadBalancer &load_balancer);
 
 protected:
     /**
@@ -162,6 +164,12 @@ protected:
      * These cannot change, and constitute the first part of the AU test input.
      */
     const std::vector<std::vector<doubleVector> > &reference_persite_loglh;
+
+    /**
+     * Assignment of partitions within the thread assignment of the batch. This differs from the part assignment of the
+     * main algorithm, if the batch got assigned different numbers of threads and workers.
+     */
+    unique_ptr<PartitionAssignmentList> part_assignment;
 
     /**
      * Perform the AU test on the trees in the batch, as well as the supplied reference trees.
