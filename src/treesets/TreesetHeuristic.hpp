@@ -26,8 +26,9 @@ void thread_start_trees(RaxmlInstance &instance, TreeList &tree_list, StartingTr
 class TreesetHeuristic {
 public:
     explicit TreesetHeuristic(const std::shared_ptr<PartitionedMSA> &msa,
-                              const std::vector<std::vector<doubleVector> > &persite_loglh)
-        : num_spr(0), msa(msa), persite_loglh(persite_loglh) {
+                              const std::vector<std::vector<doubleVector> > &persite_loglh,
+                              const IDVector &tip_msa_idmap)
+        : num_spr(0), msa(msa), persite_loglh(persite_loglh), tip_msa_idmap(tip_msa_idmap) {
     }
 
     /**
@@ -69,6 +70,11 @@ private:
      * These cannot change, and constitute the first part of the AU test input for each batch.
      */
     const std::vector<std::vector<doubleVector> > &persite_loglh;
+
+    /**
+     * Reference to the MSA tip index map in RaxmlInstance
+     */
+    const IDVector &tip_msa_idmap;
 
     /**
      * @return the recommended number of threads for workers
@@ -124,12 +130,12 @@ public:
     /**
      * Generate parsimony starting trees for this batch, and initialize the tree inference.
      */
-    void generate_starting_trees(RaxmlInstance &instance, const Options &opts, LoadBalancer &load_balancer);
+    void generate_starting_trees(RaxmlInstance &instance, const Options &opts, LoadBalancer &load_balancer, const IDVector &tip_msa_idmap);
 
     /**
      * Using the batch configuration, infer K trees in parallel.
      */
-    void infer_batch(RaxmlInstance &instance, const Options &opts, LoadBalancer &load_balancer);
+    void infer_batch(RaxmlInstance &instance, const Options &opts, LoadBalancer &load_balancer, const IDVector &tip_msa_idmap);
 
 protected:
     /**
@@ -170,6 +176,17 @@ protected:
      * main algorithm, if the batch got assigned different numbers of threads and workers.
      */
     unique_ptr<PartitionAssignmentList> part_assignment;
+
+    /**
+     * Treeinfo objects for the trees inferred in this batch. These objects are updated by the inference algorithm.
+     */
+    std::vector<TreeInfo> batch_trees { std::vector<TreeInfo>() };
+
+    /**
+     * Per-site log-likelihoods of the trees inferred in this batch. We recalculate these if the tree has changed,
+     * and we perform the AU test by combining it with the reference tree loglikelihood vectors.
+     */
+    std::vector<std::vector<doubleVector>> batch_persite_logh;
 
     /**
      * Perform the AU test on the trees in the batch, as well as the supplied reference trees.
