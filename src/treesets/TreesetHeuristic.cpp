@@ -9,7 +9,7 @@ void TreesetHeuristic::infer_treeset(RaxmlInstance &instance, const Options &opt
 
     auto batch1 = TunedBatch(true, false, 4, seed_offset, BATCH_SIZE, this->recommended_thread_count(), msa, persite_loglh);
     seed_offset += BATCH_SIZE;
-    batch1.infer_batch(instance, opts, load_balancer);
+    batch1.infer_batch(instance, opts, load_balancer, this->tip_msa_idmap);
 
     LOG_INFO_TS << "treeset inference complete." << std::endl;
 }
@@ -28,7 +28,7 @@ unsigned int TunedBatch::get_batch_size() const {
     return this->batch_start_trees->size();
 }
 
-void TunedBatch::generate_starting_trees(RaxmlInstance &instance, const Options &opts, LoadBalancer &load_balancer) {
+void TunedBatch::generate_starting_trees(RaxmlInstance &instance, const Options &opts, LoadBalancer &load_balancer, const IDVector &tip_msa_idmap) {
     intVector seeds(this->get_batch_size());
     // generate ascending seeds from a starting point to allow coordinating batch seeds reproducibly.
     std::iota(seeds.begin(), seeds.end(), this->starting_seed);
@@ -50,20 +50,22 @@ void TunedBatch::generate_starting_trees(RaxmlInstance &instance, const Options 
     PartitionAssignment part_sizes;
 
     /* init list of partition sizes */
-    size_t i = 0;
-    for (auto const& pinfo: this->msa->part_list())
-    {
-        part_sizes.assign_sites(i, 0, pinfo.length(), pinfo.model().clv_entry_size());
-        ++i;
+    for (unsigned int i = 0; i < this->msa->part_list().size(); ++i) {
+        auto pinfo = &this->msa->part_list()[i];
+        part_sizes.assign_sites(i, 0, pinfo->length(), pinfo->model().clv_entry_size());
     }
 
     this->part_assignment.reset(new PartitionAssignmentList(load_balancer.get_all_assignments(part_sizes, num_threads)));
+
+    // step 3: create context for tree inference
+    for (unsigned int i = 0; i < this->batch_start_trees->size(); ++i) {
+        this->batch_trees.push_back(TreeInfo(opts, this->batch_start_trees->at(i), *this->msa, tip_msa_idmap, this->part_assignment->at(i)));
+    }
 }
 
-
-void TunedBatch::infer_batch(RaxmlInstance &instance, const Options &opts, LoadBalancer &load_balancer) {
+void TunedBatch::infer_batch(RaxmlInstance &instance, const Options &opts, LoadBalancer &load_balancer, const IDVector &tip_msa_idmap) {
     LOG_INFO_TS << "Running inference batch [BLO: " << !this->light_spr << ", MO: " << !this->skip_model << ", SPR: " <<
             this->num_spr << "] with " << this->num_threads << " threads." << std::endl;
 
-    this->generate_starting_trees(instance, opts, load_balancer);
+    this->generate_starting_trees(instance, opts, load_balancer, tip_msa_idmap);
 }
