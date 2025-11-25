@@ -28,11 +28,9 @@ unsigned int TunedBatch::get_batch_size() const {
     return this->batch_start_trees->size();
 }
 
-void TunedBatch::infer_batch(RaxmlInstance &instance, const Options &opts) {
-    LOG_INFO_TS << "Running inference batch [BLO: " << !this->light_spr << ", MO: " << !this->skip_model << ", SPR: " <<
-            this->num_spr << "] with " << this->num_threads << " threads." << std::endl;
-
+void TunedBatch::generate_starting_trees(RaxmlInstance &instance, const Options &opts) {
     intVector seeds(this->get_batch_size());
+    // generate ascending seeds from a starting point to allow coordinating batch seeds reproducibly.
     std::iota(seeds.begin(), seeds.end(), this->starting_seed);
 
     auto tree_builder = std::bind(thread_start_trees,
@@ -43,8 +41,16 @@ void TunedBatch::infer_batch(RaxmlInstance &instance, const Options &opts) {
                                   0,
                                   false);
 
-    // step 1: infer starting trees
+    // infer starting trees
     ParallelContext::init_pthreads_custom(opts, tree_builder, this->num_threads, this->num_threads);
     tree_builder();
     ParallelContext::finalize_threads();
+}
+
+
+void TunedBatch::infer_batch(RaxmlInstance &instance, const Options &opts) {
+    LOG_INFO_TS << "Running inference batch [BLO: " << !this->light_spr << ", MO: " << !this->skip_model << ", SPR: " <<
+            this->num_spr << "] with " << this->num_threads << " threads." << std::endl;
+
+    this->generate_starting_trees(instance, opts);
 }
