@@ -105,6 +105,12 @@ public:
           batch_start_trees(new TreeList(batch_size)),
           msa(msa),
           reference_persite_loglh(reference_persite_loglh) {
+        batch_persite_logh = std::vector<std::vector<doubleVector> >(batch_size);
+
+        for (auto &tree_slh: batch_persite_logh) {
+            for (const auto &pinfo: msa->part_list())
+                tree_slh.emplace_back(pinfo.msa().length());
+        }
     }
 
     /**
@@ -130,12 +136,14 @@ public:
     /**
      * Generate parsimony starting trees for this batch, and initialize the tree inference.
      */
-    void generate_starting_trees(RaxmlInstance &instance, const Options &opts, LoadBalancer &load_balancer, const IDVector &tip_msa_idmap);
+    void generate_starting_trees(RaxmlInstance &instance, const Options &opts, LoadBalancer &load_balancer,
+                                 const IDVector &tip_msa_idmap);
 
     /**
      * Using the batch configuration, infer K trees in parallel.
      */
-    void infer_batch(RaxmlInstance &instance, const Options &opts, LoadBalancer &load_balancer, const IDVector &tip_msa_idmap);
+    void infer_batch(RaxmlInstance &instance, const Options &opts, LoadBalancer &load_balancer,
+                     const IDVector &tip_msa_idmap);
 
 protected:
     /**
@@ -180,13 +188,13 @@ protected:
     /**
      * Treeinfo objects for the trees inferred in this batch. These objects are updated by the inference algorithm.
      */
-    std::vector<TreeInfo> batch_trees { std::vector<TreeInfo>() };
+    std::vector<TreeInfo> batch_trees{std::vector<TreeInfo>()};
 
     /**
      * Per-site log-likelihoods of the trees inferred in this batch. We recalculate these if the tree has changed,
      * and we perform the AU test by combining it with the reference tree loglikelihood vectors.
      */
-    std::vector<std::vector<doubleVector>> batch_persite_logh;
+    std::vector<std::vector<doubleVector> > batch_persite_logh;
 
     /**
      * Perform the AU test on the trees in the batch, as well as the supplied reference trees.
