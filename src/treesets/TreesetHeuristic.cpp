@@ -69,3 +69,26 @@ void TunedBatch::infer_batch(RaxmlInstance &instance, const Options &opts, LoadB
 
     this->generate_starting_trees(instance, opts, load_balancer, tip_msa_idmap);
 }
+
+void TunedBatch::perform_au_test() {
+    LOG_INFO_TS << "Running AU test for batch [BLO: " << !this->light_spr << ", MO: " << !this->skip_model << ", SPR: " <<
+            this->num_spr << "] with " << this->num_threads << " threads." << std::endl;
+
+    // TODO paralellelize
+    // first, calculate per-site loglikelihoods of the batch trees
+    for (unsigned int i = 0; i < this->batch_start_trees->size(); ++i) {
+        // collect the sub-partitions for the local worker
+        auto& thread_assignment = part_assignment->at(ParallelContext::local_proc_id());
+        auto& tree_likelihood_vec = batch_persite_logh[i];
+        std::vector<double*> thread_partition_view(msa->part_count(), nullptr);
+
+        for (const auto& pa: thread_assignment)
+            thread_partition_view[pa.part_id] = tree_likelihood_vec[pa.part_id].data() + pa.start;
+
+        // calculate site likelihoods for the assigned sub-partitions
+        batch_trees[i].persite_loglh(thread_partition_view);
+    }
+
+    // TODO combine the persite-lnl vectors into a single vector and instance the AU test with it
+}
+
