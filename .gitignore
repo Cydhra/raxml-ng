@@ -42,6 +42,9 @@ release/
 .settings/
 .idea/
 
+# scratch folder
+run/
+
 # python scripts
 *.py
 
