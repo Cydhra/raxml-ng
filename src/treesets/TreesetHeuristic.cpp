@@ -59,7 +59,7 @@ void TunedBatch::generate_starting_trees(RaxmlInstance &instance, const Options 
 
     // step 3: create context for tree inference
     for (unsigned int i = 0; i < this->batch_start_trees->size(); ++i) {
-        this->batch_trees.push_back(TreeInfo(opts, this->batch_start_trees->at(i), *this->msa, tip_msa_idmap, this->part_assignment->at(i)));
+        this->batch_trees.push_back(TreeInfo(opts, this->batch_start_trees->at(i), *this->msa, tip_msa_idmap, part_sizes));
     }
 }
 
