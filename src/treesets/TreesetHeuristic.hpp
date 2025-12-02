@@ -95,13 +95,14 @@ class TunedBatch final {
 public:
     TunedBatch(const bool light_spr, const bool skip_model, const unsigned int num_spr,
                const unsigned int starting_seed, const unsigned int batch_size, const unsigned int num_threads,
+               const unsigned int num_workers,
                const std::shared_ptr<PartitionedMSA> &msa,
                const std::vector<std::vector<doubleVector> > &reference_persite_loglh)
         : light_spr(light_spr),
           skip_model(skip_model),
           num_spr(num_spr),
           starting_seed(starting_seed),
-          num_threads(num_threads),
+          num_threads(num_threads), num_workers(num_workers),
           batch_start_trees(new TreeList(batch_size)),
           msa(msa),
           reference_persite_loglh(reference_persite_loglh),
@@ -156,9 +157,14 @@ protected:
 
 
     /**
-     * How many threads are used in this batch.
+     * How many threads are used in this batch. Divisible by the number of workers.
      */
     const unsigned int num_threads;
+
+    /**
+     * Number of workers assigned to this batch.
+     */
+    const unsigned int num_workers;
 
     /**
      * Starting trees for this inference batch
@@ -201,7 +207,7 @@ protected:
     /**
      * Perform the AU test on the trees in the batch, as well as the supplied reference trees.
      */
-    void perform_au_test();
+    void perform_au_test(const Options &opts);
 };
 
 #endif //RAXML_TREESETHEURISTIC_HPP_
