@@ -104,13 +104,15 @@ public:
           num_threads(num_threads),
           batch_start_trees(new TreeList(batch_size)),
           msa(msa),
-          reference_persite_loglh(reference_persite_loglh) {
-        batch_persite_logh = std::vector<std::vector<doubleVector> >(batch_size);
-
+          reference_persite_loglh(reference_persite_loglh),
+          batch_persite_logh(std::vector<std::vector<doubleVector> >(batch_size)),
+          au_test(new AuTest(msa, batch_persite_logh, AU_DEFAULT_SCALES, AU_DEFAULT_REPS, starting_seed)) {
         for (auto &tree_slh: batch_persite_logh) {
             for (const auto &pinfo: msa->part_list())
                 tree_slh.emplace_back(pinfo.msa().length());
         }
+
+        this->au_test->allocate_test_statistics();
     }
 
     /**
@@ -164,11 +166,6 @@ protected:
     const shared_ptr<TreeList> batch_start_trees;
 
     /**
-     * AU test instance
-     */
-    const shared_ptr<AuTest> au_test;
-
-    /**
      * A reference to the MSA used in inference. We need it for the AU test.
      */
     const shared_ptr<PartitionedMSA> &msa;
@@ -195,6 +192,11 @@ protected:
      * and we perform the AU test by combining it with the reference tree loglikelihood vectors.
      */
     std::vector<std::vector<doubleVector> > batch_persite_logh;
+
+    /**
+    * AU test instance
+    */
+    const shared_ptr<AuTest> au_test;
 
     /**
      * Perform the AU test on the trees in the batch, as well as the supplied reference trees.
