@@ -1,5 +1,7 @@
 #include "TreesetHeuristic.hpp"
 
+#include "../loadbalance/CoarseLoadBalancer.hpp"
+
 const unsigned int BATCH_SIZE = 16;
 
 void TreesetHeuristic::infer_treeset(RaxmlInstance &instance, const Options &opts, CheckpointManager &cm, LoadBalancer &load_balancer) {
@@ -7,7 +9,7 @@ void TreesetHeuristic::infer_treeset(RaxmlInstance &instance, const Options &opt
     // then generating seeds using rand(), so we won't be creating duplicates by starting over from the random_seed.
     auto seed_offset = opts.random_seed;
 
-    auto batch1 = TunedBatch(true, false, 4, seed_offset, BATCH_SIZE, this->recommended_thread_count(), msa, persite_loglh);
+    auto batch1 = TunedBatch(true, false, 4, seed_offset, BATCH_SIZE, this->recommended_thread_count(), this->recommended_worker_count(), msa, persite_loglh);
     seed_offset += BATCH_SIZE;
     batch1.infer_batch(instance, opts, load_balancer, this->tip_msa_idmap);
 
@@ -68,27 +70,71 @@ void TunedBatch::infer_batch(RaxmlInstance &instance, const Options &opts, LoadB
             this->num_spr << "] with " << this->num_threads << " threads." << std::endl;
 
     this->generate_starting_trees(instance, opts, load_balancer, tip_msa_idmap);
+    this->perform_au_test(opts);
+
 }
 
-void TunedBatch::perform_au_test() {
+void parallel_au_bootstrap(AuTest &tester, const CoarseAssignmentList &assignment_list) {
+    unsigned int worker_id = ParallelContext::local_thread_id();
+    auto& tree_ids = assignment_list.at(worker_id);
+
+    const auto slice_start = *tree_ids.begin();
+
+    tester.run_bootstrap(tree_ids.size(), slice_start);
+    ParallelContext::global_barrier();
+}
+
+void TunedBatch::perform_au_test(const Options &opts) {
     LOG_INFO_TS << "Running AU test for batch [BLO: " << !this->light_spr << ", MO: " << !this->skip_model << ", SPR: " <<
             this->num_spr << "] with " << this->num_threads << " threads." << std::endl;
 
-    // TODO paralellelize
+    // TODO paralellelize (for per-site lnl calculation only)
     // first, calculate per-site loglikelihoods of the batch trees
     for (unsigned int i = 0; i < this->batch_start_trees->size(); ++i) {
         // collect the sub-partitions for the local worker
-        auto& thread_assignment = part_assignment->at(ParallelContext::local_proc_id());
+        // auto& thread_assignment = part_assignment->at(ParallelContext::local_proc_id());
         auto& tree_likelihood_vec = batch_persite_logh[i];
         std::vector<double*> thread_partition_view(msa->part_count(), nullptr);
 
-        for (const auto& pa: thread_assignment)
-            thread_partition_view[pa.part_id] = tree_likelihood_vec[pa.part_id].data() + pa.start;
+        // TODO mind thread assignment
+        // for (const auto& pa: thread_assignment)
+            // thread_partition_view[pa.part_id] = tree_likelihood_vec[pa.part_id].data() + pa.start;
+
+        for (unsigned int part = 0; part < msa->part_count(); part++) {
+            thread_partition_view[part] = tree_likelihood_vec[part].data();
+        }
 
         // calculate site likelihoods for the assigned sub-partitions
         batch_trees[i].persite_loglh(thread_partition_view);
     }
 
-    // TODO combine the persite-lnl vectors into a single vector and instance the AU test with it
+    // next, change the parallelization scheme to avoid splitting trees between workers. If we have more workers than
+    // trees, this sucks, but currently AU doesn't support per-partition parallelization because that would require
+    // synchronizing accesses to the bootstrap replicate likelihood sums.
+    // we therefore use as many workers as possible with one thread each now.
+    unsigned int max_assigned_workers = min(static_cast<unsigned int>(this->batch_start_trees->size()), this->num_threads);
+    ContiguousCoarseLoadBalancer load_balancer;
+    CoarseAssignment tree_ids(batch_trees.size());
+    std::iota(tree_ids.begin(), tree_ids.end(), 0);
+
+    const auto assignment = load_balancer.get_all_assignments(tree_ids, num_workers);
+
+    auto au_worker = std::bind(parallel_au_bootstrap, std::ref(*this->au_test), std::ref(assignment));
+    ParallelContext::init_pthreads_custom(opts, au_worker, max_assigned_workers, max_assigned_workers);
+    au_worker();
+
+    this->au_test->finalize_test_statistics();
+    this->au_test->calculate_p_values();
+
+    LOG_INFO_TS << "AU Test finished" << endl;
+
+    auto i = 0;
+    for (double p_value : this->au_test->get_p_values()) {
+        LOG_INFO_TS << "P" << i++ << ": " << p_value << std::endl;
+    }
+
+    ParallelContext::finalize_threads();
+
+
 }
 
