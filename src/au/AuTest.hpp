@@ -39,6 +39,19 @@ public:
                         seed(seed) {
     }
 
+    // custom move constructor
+    AuTest(AuTest &&other) noexcept : msa(std::move(other.msa)),
+                                          persite_loglh(std::move(other.persite_loglh)),
+                                          test_statistics(other.test_statistics),
+                                          p_values(std::move(other.p_values)),
+                                          finished(other.finished),
+                                          scales(std::move(other.scales)),
+                                          num_replicates(std::move(other.num_replicates)),
+                                          num_trees(other.num_trees),
+                                          seed(other.seed) {
+        other.test_statistics = nullptr;
+    }
+
 
     virtual ~AuTest() {
         if (!test_statistics) return;
@@ -50,6 +63,10 @@ public:
         }
         free(test_statistics);
     }
+
+    // disable copy-construction and assignment, since we are guarding a C-style allocation
+    AuTest(const AuTest&) = delete;
+    AuTest& operator=(const AuTest&) = delete;
 
     /**
      *  Allocate the test statistic arrays for bootstrap replicates for all trees.
