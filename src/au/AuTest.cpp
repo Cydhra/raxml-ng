@@ -116,6 +116,15 @@ void AuTest::calculate_p_values() {
     finished = true;
 }
 
+void AuTest::reset_test_statistics() {
+    finished = false;
+
+    for (unsigned int scale = 0; scale < scales.size(); scale++) {
+        memset(test_statistics[scale], 0, num_trees * num_replicates[scale]);
+    }
+}
+
+
 doubleVector &AuTest::get_p_values() {
     if (!finished) {
         LOG_ERROR << "please call calculate_p_values before calling get_p_values" << std::endl;

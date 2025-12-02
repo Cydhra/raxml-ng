@@ -107,6 +107,11 @@ public:
     doubleVector &get_p_values();
 
     /**
+     * Reset the test statistics to be able to re-run bootstrapping.
+     */
+    void reset_test_statistics();
+
+    /**
      * @return true, if the p-values have been calculated
      */
     bool is_finished() const;
