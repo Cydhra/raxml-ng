@@ -7,20 +7,6 @@
 const doubleVector AU_DEFAULT_SCALES = {0.5, 0.6, 0.7, 0.8, 0.9, 1.0, 1.1, 1.2, 1.3, 1.4};
 const uintVector AU_DEFAULT_REPS = {10000, 10000, 10000, 10000, 10000, 10000, 10000, 10000, 10000, 10000};
 
-AuTest::AuTest(const std::shared_ptr<PartitionedMSA> &msa,
-               const std::vector<std::vector<doubleVector> > &persite_loglh,
-               const doubleVector &scales,
-               const uintVector &num_replicates, const long seed) : msa(msa),
-                                                                    persite_loglh(persite_loglh),
-                                                                    test_statistics(nullptr),
-                                                                    p_values(doubleVector(persite_loglh.size())),
-                                                                    finished(false),
-                                                                    scales(scales),
-                                                                    num_replicates(num_replicates),
-                                                                    num_trees(persite_loglh.size()),
-                                                                    seed(seed) {
-}
-
 void AuTest::allocate_test_statistics() {
     if (!corax_RELL_allocate_multiscale_matrices(&test_statistics,
                                                  num_trees,
@@ -60,7 +46,7 @@ void AuTest::run_bootstrap(const size_t num_rows, const size_t offset) {
         // create a row of pointers for the per-site likelihoods
         std::vector<const double *> per_site_lnl_matrix;
         for (size_t i = offset; i < offset + num_rows; ++i) {
-            per_site_lnl_matrix.push_back(persite_loglh[i][part_id].data());
+            per_site_lnl_matrix.push_back(persite_loglh[i][part_id]);
         }
 
         // add up the partial replicates of this partition into test_statistics
