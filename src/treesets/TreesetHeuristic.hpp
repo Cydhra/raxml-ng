@@ -113,7 +113,7 @@ public:
         }
 
         // we can initialize au_test only after initializing the per-site lnl partition vectors
-        this->au_test.reset(new AuTest(msa, batch_persite_logh, AU_DEFAULT_SCALES, AU_DEFAULT_REPS, starting_seed));
+        this->au_test.reset(new AuTest(msa, reference_persite_loglh, batch_persite_logh, AU_DEFAULT_SCALES, AU_DEFAULT_REPS, starting_seed));
         this->au_test->allocate_test_statistics();
     }
 
