@@ -114,7 +114,7 @@ void TunedBatch::perform_au_test(const Options &opts) {
     // we therefore use as many workers as possible with one thread each now.
     unsigned int max_assigned_workers = min(static_cast<unsigned int>(this->batch_start_trees->size()), this->num_threads);
     ContiguousCoarseLoadBalancer load_balancer;
-    CoarseAssignment tree_ids(batch_trees.size());
+    CoarseAssignment tree_ids(  reference_persite_loglh.size() + batch_persite_logh.size());
     std::iota(tree_ids.begin(), tree_ids.end(), 0);
 
     const auto assignment = load_balancer.get_all_assignments(tree_ids, num_workers);
