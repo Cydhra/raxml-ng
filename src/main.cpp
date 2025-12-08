@@ -2247,7 +2247,7 @@ void init_ancestral(RaxmlInstance& instance)
 
 void init_persite_loglh(RaxmlInstance& instance)
 {
-  if (instance.opts.command == Command::sitelh || instance.opts.command == Command::au_test)
+  if (instance.opts.command == Command::sitelh || instance.opts.command == Command::au_test || instance.opts.command == Command::treeset)
   {
     const auto& parted_msa = *instance.parted_msa;
 
