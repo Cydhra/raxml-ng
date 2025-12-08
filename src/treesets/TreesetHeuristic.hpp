@@ -106,13 +106,14 @@ public:
           batch_start_trees(new TreeList(batch_size)),
           msa(msa),
           reference_persite_loglh(reference_persite_loglh),
-          batch_persite_logh(std::vector<std::vector<doubleVector> >(batch_size)),
-          au_test(new AuTest(msa, batch_persite_logh, AU_DEFAULT_SCALES, AU_DEFAULT_REPS, starting_seed)) {
+          batch_persite_logh(std::vector<std::vector<doubleVector> >(batch_size)) {
         for (auto &tree_slh: batch_persite_logh) {
             for (const auto &pinfo: msa->part_list())
                 tree_slh.emplace_back(pinfo.msa().length());
         }
 
+        // we can initialize au_test only after initializing the per-site lnl partition vectors
+        this->au_test.reset(new AuTest(msa, batch_persite_logh, AU_DEFAULT_SCALES, AU_DEFAULT_REPS, starting_seed));
         this->au_test->allocate_test_statistics();
     }
 
@@ -202,7 +203,7 @@ protected:
     /**
     * AU test instance
     */
-    const shared_ptr<AuTest> au_test;
+    shared_ptr<AuTest> au_test;
 
     /**
      * Perform the AU test on the trees in the batch, as well as the supplied reference trees.
