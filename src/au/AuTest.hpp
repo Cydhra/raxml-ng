@@ -29,6 +29,14 @@ public:
     }
 
     AuTest(std::shared_ptr<PartitionedMSA> msa,
+           const std::vector<std::vector<doubleVector>> &reference_logh_matrix,
+           const std::vector<std::vector<doubleVector>> &comparison_logh_matrix,
+           const doubleVector &scales,
+           const uintVector &num_replicates,
+           long seed) : AuTest(msa, combine_persite_vec(reference_logh_matrix, comparison_logh_matrix), scales, num_replicates, seed) {
+    }
+
+    AuTest(std::shared_ptr<PartitionedMSA> msa,
            std::vector<std::vector<const double *> > loglh_matrices,
            const doubleVector &scales,
            const uintVector &num_replicates,
@@ -146,11 +154,55 @@ private:
 
     const int seed;
 
+    /**
+     * Construct arrays of raw pointers from a persite_loglh matrix array, where each matrix gets turned into a linear
+     * array of pointers onto the matrix rows.
+     * This prepares the per-partition matrices as double** parameters for coraxlib, and allows us to flexibly combine
+     * per-site log-likelihood vectors from various sources.
+     * @param persite_loglh a list of vectors (one per tree search) of vectors (one per partition)
+     *                      of per-site log-likelihoods
+     * @return a vector of double** pointers.
+     */
     static std::vector<std::vector<const double *> > make_persite_vec(
         const std::vector<std::vector<doubleVector> > &persite_loglh) {
-        std::vector<std::vector<const double *> > loglh_matrices;
+        std::vector<std::vector<const double *>> loglh_matrices;
         loglh_matrices.reserve(persite_loglh.size());
 
+        append_persite_lnl_vectors(loglh_matrices, persite_loglh);
+
+        return loglh_matrices;
+    }
+
+    /**
+     * Construct arrays of raw pointers from a persite_loglh matrix array, where each matrix gets turned into a linear
+     * array of pointers onto the matrix rows.
+     * This prepares the per-partition matrices as double** parameters for coraxlib, and allows us to flexibly combine
+     * per-site log-likelihood vectors from various sources.
+     *
+     * @param first the first vector of per-site log-likelihood vectors
+     * @param second the second vector of per-site log-likelihood vectors that gets appended to the matrix
+     * @return a vector of double** pointers.
+     */
+    static std::vector<std::vector<const double *> > combine_persite_vec(
+    const std::vector<std::vector<doubleVector>> &first,
+       const std::vector<std::vector<doubleVector>> &second) {
+        std::vector<std::vector<const double *>> loglh_matrices;
+
+        loglh_matrices.reserve(first.size() + second.size());
+
+        append_persite_lnl_vectors(loglh_matrices, first);
+        append_persite_lnl_vectors(loglh_matrices, second);
+
+        return loglh_matrices;
+    }
+
+    /**
+     * Append pointers to the entries in persite_loglh to the back of loglh_matrices.
+     */
+    static void append_persite_lnl_vectors(
+        std::vector<std::vector<const double *>> &loglh_matrices,
+        const std::vector<std::vector<doubleVector> > &persite_loglh
+        ) {
         for (auto &partitions: persite_loglh) {
             std::vector<const double *> partition_logh;
             partition_logh.reserve(partitions.size());
@@ -159,8 +211,6 @@ private:
             }
             loglh_matrices.push_back(partition_logh);
         }
-
-        return loglh_matrices;
     }
 };
 
