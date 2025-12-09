@@ -13,6 +13,11 @@ void TreesetHeuristic::infer_treeset(RaxmlInstance &instance, const Options &opt
     auto batch1 = TunedBatch(true, false, 4, seed_offset, BATCH_SIZE, this->recommended_thread_count(),
                              this->recommended_worker_count(), msa, persite_loglh);
     seed_offset += BATCH_SIZE;
+
+    batch1.generate_starting_trees(instance, opts, load_balancer, tip_msa_idmap);
+    const unsigned int plausible_trees = batch1.perform_au_test(opts);
+    LOG_INFO_TS << plausible_trees << " starting trees are already plausible" << std::endl;
+
     batch1.infer_batch(instance, opts, load_balancer, this->tip_msa_idmap);
 
     LOG_INFO_TS << "treeset inference complete." << std::endl;
@@ -87,13 +92,6 @@ void TunedBatch::infer_batch(RaxmlInstance &instance, const Options &opts, LoadB
                              const IDVector &tip_msa_idmap) {
     LOG_INFO_TS << "Running inference batch [BLO: " << !this->light_spr << ", MO: " << !this->skip_model << ", SPR: " <<
             this->num_spr << "] with " << this->num_threads << " threads." << std::endl;
-
-    this->generate_starting_trees(instance, opts, load_balancer, tip_msa_idmap);
-    this->perform_au_test(opts);
-
-    unsigned int plausible_trees = count_plausible_trees(
-        this->au_test->get_p_values().begin() + reference_persite_loglh.size(), this->au_test->get_p_values().end());
-    LOG_INFO_TS << plausible_trees << " starting trees are already plausible" << std::endl;
 }
 
 void parallel_au_bootstrap(AuTest &tester, const CoarseAssignmentList &assignment_list) {
