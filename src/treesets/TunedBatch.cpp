@@ -91,8 +91,15 @@ void TunedBatch::infer_batch(RaxmlInstance &instance, const Options &opts, LoadB
     this->optimize_all_parameters(3.0);
 
     if (this->light_spr) {
-        // TODO: we need SPR parameters: radii, ntopol_keep (1 at light spr, but how many at normal spr?), ...
-        //  we should obtain as many parameters as possible from the normal optimization.
+        this->spr_params.ntopol_keep = 1;
+    }
+
+    // TODO parallelize
+    for (unsigned int i = 0; i < this->get_batch_size(); ++i) {
+        for (unsigned int spr_round = 0; spr_round < this->num_spr; ++spr_round) {
+            LOG_PROGRESS(this->batch_trees[i].loglh()) << (light_spr ? "GREEDY" : "FAST") << " spr round " << spr_round << " (radius: " << spr_params.radius_min << ")" << std::endl;
+            this->batch_trees[i].spr_round(this->spr_params);
+        }
     }
 }
 
