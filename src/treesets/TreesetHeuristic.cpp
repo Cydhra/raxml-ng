@@ -99,6 +99,11 @@ void TunedBatch::infer_batch(RaxmlInstance &instance, const Options &opts, LoadB
             this->num_spr << "] with " << this->num_threads << " threads." << std::endl;
 }
 
+/**
+ * Parallel kernel of the AU test bootstrapping, given to pthreads as their main function.
+ * @param tester AuTest instance
+ * @param assignment_list assignment of trees to workers
+ */
 void parallel_au_bootstrap(AuTest &tester, const CoarseAssignmentList &assignment_list) {
     unsigned int worker_id = ParallelContext::local_thread_id();
     auto &tree_ids = assignment_list.at(worker_id);
