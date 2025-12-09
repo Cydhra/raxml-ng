@@ -7,6 +7,23 @@
 // forward declaration of RaxmlInstance
 struct RaxmlInstance;
 
+enum TuningPhase {
+    /** First phase: Check if starting trees are plausible */
+    TUNE_STARTING_TREES,
+
+    /** Check if greedy hillclimbing without keeping topologies suffices */
+    TUNE_GREEDY,
+
+    /** Check if inheriting models from other tree searches suffices */
+    TUNE_MODEL_OPT,
+
+    /** Check how many SPR rounds suffice */
+    TUNE_SPR,
+
+    /** Tuning is done, infer trees with current parameters */
+    FINALIZED,
+};
+
 /**
  * An aggressive stateful local search heuristic for treeset-search. This differs substantially from other topological
  * heuristics because those are stateless (i.e., they do not depend on previous results of the same raxml search).
@@ -37,12 +54,12 @@ private:
     /**
      * If true, the heuristic is still tuning parameters,
      */
-    bool tuning_phase{true};
+    TuningPhase tuning_phase{TUNE_STARTING_TREES};
 
     /**
      * If true, replace fast SPR rounds with light SPR rounds that do even less BLOs.
      */
-    bool light_spr{false};
+    bool greedy_spr{true};
 
     /**
      * If true, skip the first model optimization by reusing model parameters from the previous search.
