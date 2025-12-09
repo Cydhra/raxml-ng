@@ -20,7 +20,8 @@ void thread_start_trees(RaxmlInstance &instance, TreeList &tree_list, StartingTr
 class TunedBatch final {
 public:
     TunedBatch(const bool light_spr, const bool skip_model, const unsigned int num_spr,
-               const unsigned int starting_seed, const unsigned int batch_size, const unsigned int num_threads,
+               const unsigned int starting_seed, const unsigned int batch_size, spr_round_params spr_params,
+               const unsigned int num_threads,
                const unsigned int num_workers,
                const std::shared_ptr<PartitionedMSA> &msa,
                const std::vector<std::vector<doubleVector> > &reference_persite_loglh)
@@ -28,9 +29,10 @@ public:
           skip_model(skip_model),
           num_spr(num_spr),
           starting_seed(starting_seed),
-          num_threads(num_threads), num_workers(num_workers),
-          batch_start_trees(new TreeList(batch_size)),
+          num_threads(num_threads),
+          num_workers(num_workers), batch_start_trees(new TreeList(batch_size)),
           msa(msa),
+          spr_params(spr_params),
           reference_persite_loglh(reference_persite_loglh),
           batch_persite_logh(std::vector<std::vector<doubleVector> >(batch_size)) {
         for (auto &tree_slh: batch_persite_logh) {
@@ -42,6 +44,9 @@ public:
         this->au_test.reset(new AuTest(msa, reference_persite_loglh, batch_persite_logh, AU_DEFAULT_SCALES,
                                        AU_DEFAULT_REPS, starting_seed));
         this->au_test->allocate_test_statistics();
+
+        // hard-update spr params to sensible settings
+        this->spr_params.thorough = false;
     }
 
     /**
@@ -110,6 +115,12 @@ protected:
      * A reference to the MSA used in inference. We need it for the AU test.
      */
     const shared_ptr<PartitionedMSA> &msa;
+
+    /**
+     * SPR round parameters inherited from the default checkpoint manager. They will be updated by the batch according
+     * to the batch settings
+     */
+    spr_round_params spr_params;
 
     /**
      * Per-site log-likelihoods of the reference trees already inferred before the treeset heuristic kicked in.
