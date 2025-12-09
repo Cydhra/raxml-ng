@@ -1,6 +1,7 @@
 #include "TreesetHeuristic.hpp"
 
 #include "../loadbalance/CoarseLoadBalancer.hpp"
+#include "../coraxlib/src/corax/optimize/opt_generic.h"
 
 constexpr unsigned int BATCH_SIZE = 16;
 constexpr double ACCEPT_TUNING_THRESHOLD = 0.9;
@@ -163,12 +164,24 @@ unsigned int TunedBatch::perform_au_test(const Options &opts) {
 }
 
 bool TunedBatch::is_plausible(const Options &opts) {
-    for (unsigned int i = 0; i < this->batch_start_trees->size(); ++i) {
-        // optimize model and branch lengths, such that we get accurate site likelihoods.
-        // TODO if they already are optimized from previous AU tests, do not re-optimize to avoid oscillation
-        batch_trees[i].optimize_params_all(0.1);
-    }
-
+    this->optimize_all_parameters(0.1, true);
     const unsigned int plausible_trees = this->perform_au_test(opts);
     return plausible_trees >= static_cast<int>(static_cast<double>(BATCH_SIZE) * ACCEPT_TUNING_THRESHOLD);
 }
+
+void TunedBatch::optimize_all_parameters(const double epsilon, const bool force) {
+    // TODO parallelize over trees
+    for (unsigned int i = 0; i < this->batch_start_trees->size(); ++i) {
+        if (!this->skip_model || force) {
+            // optimize model and branch lengths, such that we get accurate site likelihoods.
+            // TODO if they already are optimized from previous AU tests, do not re-optimize to avoid oscillation
+            batch_trees[i].optimize_model(epsilon);
+        } else {
+            // TODO load model from backup
+        }
+
+        // optimize branches
+        batch_trees[i].optimize_params(CORAX_OPT_PARAM_BRANCHES_ITERATIVE, epsilon);
+    }
+}
+
