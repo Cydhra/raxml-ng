@@ -19,15 +19,19 @@ void thread_start_trees(RaxmlInstance &instance, TreeList &tree_list, StartingTr
  */
 class TunedBatch final {
 public:
-    TunedBatch(const bool light_spr, const bool skip_model, const unsigned int num_spr,
-               const unsigned int starting_seed, const unsigned int batch_size, spr_round_params spr_params,
+    TunedBatch(const bool light_spr,
+               const bool skip_model,
+               unsigned int num_spr,
+               const unsigned int starting_seed,
+               const unsigned int batch_size,
+               spr_round_params spr_params,
                const unsigned int num_threads,
                const unsigned int num_workers,
                const std::shared_ptr<PartitionedMSA> &msa,
                const std::vector<std::vector<doubleVector> > &reference_persite_loglh)
         : light_spr(light_spr),
           skip_model(skip_model),
-          num_spr(num_spr),
+          target_num_spr(num_spr),
           starting_seed(starting_seed),
           num_threads(num_threads),
           num_workers(num_workers), batch_start_trees(new TreeList(batch_size)),
@@ -60,9 +64,9 @@ public:
     const bool skip_model;
 
     /**
-     * How many SPR rounds to perform for each tree search
+     * How many SPR rounds to perform for each tree search. This parameter can be updated.
      */
-    const unsigned int num_spr;
+    unsigned int target_num_spr;
 
     /**
      * @return the number of trees that are inferred in this batch.
@@ -121,6 +125,12 @@ protected:
      * to the batch settings
      */
     spr_round_params spr_params;
+
+    /**
+     * Number of SPR rounds that have already been performed on the tree. This is increased by the `infer_batch`
+     * method.
+     */
+    unsigned int num_spr_performed{0};
 
     /**
      * Per-site log-likelihoods of the reference trees already inferred before the treeset heuristic kicked in.

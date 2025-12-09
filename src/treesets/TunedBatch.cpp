@@ -85,7 +85,7 @@ void TunedBatch::generate_starting_trees(RaxmlInstance &instance, const Options 
 void TunedBatch::infer_batch(RaxmlInstance &instance, const Options &opts, LoadBalancer &load_balancer,
                              const IDVector &tip_msa_idmap) {
     LOG_INFO_TS << "Running inference batch [BLO: " << !this->light_spr << ", MO: " << !this->skip_model << ", SPR: " <<
-            this->num_spr << "] with " << this->num_threads << " threads." << std::endl;
+            this->target_num_spr << "] with " << this->num_threads << " threads." << std::endl;
 
     // do initial model and branch length optimization
     this->optimize_all_parameters(3.0);
@@ -96,16 +96,20 @@ void TunedBatch::infer_batch(RaxmlInstance &instance, const Options &opts, LoadB
 
     // TODO parallelize
     for (unsigned int i = 0; i < this->get_batch_size(); ++i) {
-        for (unsigned int spr_round = 0; spr_round < this->num_spr; ++spr_round) {
+        for (unsigned int spr_round = num_spr_performed; spr_round < this->target_num_spr; ++spr_round) {
             LOG_PROGRESS(this->batch_trees[i].loglh()) << (light_spr ? "GREEDY" : "FAST") << " spr round " << spr_round << " (radius: " << spr_params.radius_min << ")" << std::endl;
             this->batch_trees[i].spr_round(this->spr_params);
         }
     }
+
+    // TODO this only works if checkpoints cannot recover tree states. When checkpointing is added, this mechanism needs
+    //  to be changed
+    num_spr_performed = this->target_num_spr;
 }
 
 unsigned int TunedBatch::perform_au_test(const Options &opts) {
     LOG_INFO_TS << "Running AU test for batch [BLO: " << !this->light_spr << ", MO: "
-            << !this->skip_model << ", SPR: " << this->num_spr << "] with "
+            << !this->skip_model << ", SPR: " << this->target_num_spr << "] with "
             << this->num_threads << " threads." << std::endl;
 
     // TODO paralellelize (for per-site lnl calculation only)
