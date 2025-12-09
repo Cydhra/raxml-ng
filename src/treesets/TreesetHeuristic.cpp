@@ -98,7 +98,7 @@ void TunedBatch::infer_batch(RaxmlInstance &instance, const Options &opts, LoadB
 
 void parallel_au_bootstrap(AuTest &tester, const CoarseAssignmentList &assignment_list) {
     unsigned int worker_id = ParallelContext::local_thread_id();
-    auto& tree_ids = assignment_list.at(worker_id);
+    auto &tree_ids = assignment_list.at(worker_id);
 
     const auto slice_start = *tree_ids.begin();
 
@@ -107,8 +107,9 @@ void parallel_au_bootstrap(AuTest &tester, const CoarseAssignmentList &assignmen
 }
 
 void TunedBatch::perform_au_test(const Options &opts) {
-    LOG_INFO_TS << "Running AU test for batch [BLO: " << !this->light_spr << ", MO: " << !this->skip_model << ", SPR: " <<
-            this->num_spr << "] with " << this->num_threads << " threads." << std::endl;
+    LOG_INFO_TS << "Running AU test for batch [BLO: " << !this->light_spr << ", MO: "
+            << !this->skip_model << ", SPR: " << this->num_spr << "] with "
+            << this->num_threads << " threads." << std::endl;
 
     // TODO paralellelize (for per-site lnl calculation only)
     // first, calculate per-site loglikelihoods of the batch trees
@@ -125,6 +126,9 @@ void TunedBatch::perform_au_test(const Options &opts) {
         for (unsigned int part = 0; part < msa->part_count(); part++) {
             thread_partition_view[part] = tree_likelihood_vec[part].data();
         }
+
+        // optimize model and branch lengths at least once here, such that we get accurate site likelihoods
+        batch_trees[i].optimize_params_all(0.1);
 
         // calculate site likelihoods for the assigned sub-partitions
         batch_trees[i].persite_loglh(thread_partition_view);
