@@ -70,7 +70,7 @@ void TunedBatch::generate_starting_trees(RaxmlInstance &instance, const Options 
     }
 }
 
-/// Count the plausible trees in an AuTest instance
+/** Count the plausible trees in an AuTest instance */
 template<class Iter>
 static unsigned int count_plausible_trees(Iter first, Iter last) {
     unsigned int unrejected_trees = 0;
@@ -106,7 +106,7 @@ void parallel_au_bootstrap(AuTest &tester, const CoarseAssignmentList &assignmen
     ParallelContext::global_barrier();
 }
 
-void TunedBatch::perform_au_test(const Options &opts) {
+unsigned int TunedBatch::perform_au_test(const Options &opts) {
     LOG_INFO_TS << "Running AU test for batch [BLO: " << !this->light_spr << ", MO: "
             << !this->skip_model << ", SPR: " << this->num_spr << "] with "
             << this->num_threads << " threads." << std::endl;
@@ -157,4 +157,8 @@ void TunedBatch::perform_au_test(const Options &opts) {
 
     // TODO: there is a bug here that forces us to detach, find it.
     ParallelContext::finalize_threads(true);
+
+    const unsigned int plausible_trees = count_plausible_trees(
+        this->au_test->get_p_values().begin() + reference_persite_loglh.size(), this->au_test->get_p_values().end());
+    return plausible_trees;
 }

@@ -149,6 +149,10 @@ public:
     void infer_batch(RaxmlInstance &instance, const Options &opts, LoadBalancer &load_balancer,
                      const IDVector &tip_msa_idmap);
 
+    /**
+     * Perform the AU test on the trees in the batch, as well as the supplied reference trees.
+     */
+    unsigned int perform_au_test(const Options &opts);
 protected:
     /**
      * The starting seed (starting from 0) for this batch. Batches infer starting trees with ascending seeds, so this
@@ -204,11 +208,6 @@ protected:
     * AU test instance
     */
     shared_ptr<AuTest> au_test;
-
-    /**
-     * Perform the AU test on the trees in the batch, as well as the supplied reference trees.
-     */
-    void perform_au_test(const Options &opts);
 };
 
 #endif //RAXML_TREESETHEURISTIC_HPP_
