@@ -2,7 +2,8 @@
 
 #include "../loadbalance/CoarseLoadBalancer.hpp"
 
-const unsigned int BATCH_SIZE = 16;
+constexpr unsigned int BATCH_SIZE = 16;
+constexpr double ACCEPT_TUNING_THRESHOLD = 0.9;
 
 void TreesetHeuristic::infer_treeset(RaxmlInstance &instance, const Options &opts, CheckpointManager &cm,
                                      LoadBalancer &load_balancer) {
@@ -15,10 +16,13 @@ void TreesetHeuristic::infer_treeset(RaxmlInstance &instance, const Options &opt
     seed_offset += BATCH_SIZE;
 
     batch1.generate_starting_trees(instance, opts, load_balancer, tip_msa_idmap);
-    const unsigned int plausible_trees = batch1.perform_au_test(opts);
-    LOG_INFO_TS << plausible_trees << " starting trees are already plausible" << std::endl;
-
-    batch1.infer_batch(instance, opts, load_balancer, this->tip_msa_idmap);
+    if (batch1.is_plausible(opts)) {
+        LOG_INFO_TS << "Most starting trees are already plausible; topology optimization unnecessary" << std::endl;
+        this->accept_starting_trees = true;
+        // TODO exit tuning phase
+    } else {
+        batch1.infer_batch(instance, opts, load_balancer, this->tip_msa_idmap);
+    }
 
     LOG_INFO_TS << "treeset inference complete." << std::endl;
 }
@@ -119,14 +123,11 @@ unsigned int TunedBatch::perform_au_test(const Options &opts) {
 
         // TODO mind thread assignment
         // for (const auto& pa: thread_assignment)
-            // thread_partition_view[pa.part_id] = tree_likelihood_vec[pa.part_id].data() + pa.start;
+        // thread_partition_view[pa.part_id] = tree_likelihood_vec[pa.part_id].data() + pa.start;
 
         for (unsigned int part = 0; part < msa->part_count(); part++) {
             thread_partition_view[part] = tree_likelihood_vec[part].data();
         }
-
-        // optimize model and branch lengths at least once here, such that we get accurate site likelihoods
-        batch_trees[i].optimize_params_all(0.1);
 
         // calculate site likelihoods for the assigned sub-partitions
         batch_trees[i].persite_loglh(thread_partition_view);
@@ -159,4 +160,15 @@ unsigned int TunedBatch::perform_au_test(const Options &opts) {
     const unsigned int plausible_trees = count_plausible_trees(
         this->au_test->get_p_values().begin() + reference_persite_loglh.size(), this->au_test->get_p_values().end());
     return plausible_trees;
+}
+
+bool TunedBatch::is_plausible(const Options &opts) {
+    for (unsigned int i = 0; i < this->batch_start_trees->size(); ++i) {
+        // optimize model and branch lengths, such that we get accurate site likelihoods.
+        // TODO if they already are optimized from previous AU tests, do not re-optimize to avoid oscillation
+        batch_trees[i].optimize_params_all(0.1);
+    }
+
+    const unsigned int plausible_trees = this->perform_au_test(opts);
+    return plausible_trees >= static_cast<int>(static_cast<double>(BATCH_SIZE) * ACCEPT_TUNING_THRESHOLD);
 }

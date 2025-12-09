@@ -61,6 +61,11 @@ private:
     unsigned int num_spr;
 
     /**
+     * If true, skip all model optimization and simply accept parsimony starting trees as the final resulting topology.
+     */
+    bool accept_starting_trees{false};
+
+    /**
      * A reference to the MSA used in inference. We need it for the AU test.
      */
     const std::shared_ptr<PartitionedMSA> &msa;
@@ -153,6 +158,14 @@ public:
      * Perform the AU test on the trees in the batch, as well as the supplied reference trees.
      */
     unsigned int perform_au_test(const Options &opts);
+
+    /**
+     * Perform low-epsilon parameter optimization followed by the AU test against the reference topologies,
+     * and calculate the ratio of batch trees which are considered plausible. Returns true, if the ratio reaches
+     * the threshold.
+     */
+    bool is_plausible(const Options &opts);
+
 protected:
     /**
      * The starting seed (starting from 0) for this batch. Batches infer starting trees with ascending seeds, so this
