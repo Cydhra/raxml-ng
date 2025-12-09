@@ -97,7 +97,7 @@ void TunedBatch::infer_batch(RaxmlInstance &instance, const Options &opts, LoadB
     // TODO parallelize
     for (unsigned int i = 0; i < this->get_batch_size(); ++i) {
         for (unsigned int spr_round = num_spr_performed; spr_round < this->target_num_spr; ++spr_round) {
-            LOG_PROGRESS(this->batch_trees[i].loglh()) << (light_spr ? "GREEDY" : "FAST") << " spr round " << spr_round << " (radius: " << spr_params.radius_min << ")" << std::endl;
+            LOG_PROGRESS(this->batch_trees[i].loglh()) << (light_spr ? "GREEDY" : "FAST") << " spr round " << (spr_round + 1) << " (radius: " << spr_params.radius_min << ") for treesearch #" << (i + 1) << std::endl;
             this->batch_trees[i].spr_round(this->spr_params);
         }
     }
@@ -111,6 +111,8 @@ unsigned int TunedBatch::perform_au_test(const Options &opts) {
     LOG_INFO_TS << "Running AU test for batch [BLO: " << !this->light_spr << ", MO: "
             << !this->skip_model << ", SPR: " << this->target_num_spr << "] with "
             << this->num_threads << " threads." << std::endl;
+
+    this->au_test->reset_test_statistics();
 
     // TODO paralellelize (for per-site lnl calculation only)
     // first, calculate per-site loglikelihoods of the batch trees

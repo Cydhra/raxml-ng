@@ -13,15 +13,14 @@ void TreesetHeuristic::infer_treeset(RaxmlInstance &instance, const Options &opt
     // then generating seeds using rand(), so we won't be creating duplicates by starting over from the random_seed.
     auto seed_offset = opts.random_seed;
 
-    auto batch = new TunedBatch(this->greedy_spr, this->skip_model, this->skip_model, seed_offset, BATCH_SIZE, spr_params, this->recommended_thread_count(),
-                                 this->recommended_worker_count(), msa, persite_loglh);
-    seed_offset += BATCH_SIZE;
-    batch->generate_starting_trees(instance, opts, load_balancer, tip_msa_idmap);
-
     while (tuning_phase != FINALIZED) {
+        const auto batch = new TunedBatch(this->greedy_spr, this->skip_model, this->num_spr, seed_offset, BATCH_SIZE, spr_params, this->recommended_thread_count(),
+                                         this->recommended_worker_count(), msa, persite_loglh);
+        seed_offset += BATCH_SIZE;
+        batch->generate_starting_trees(instance, opts, load_balancer, tip_msa_idmap);
 
         switch (tuning_phase) {
-            case TUNE_STARTING_TREES:
+            case TUNE_BASELINE:
                 if (batch->is_plausible(opts)) {
                     LOG_INFO_TS << "Most starting trees are already plausible; topology optimization unnecessary" << std::endl;
                     this->accept_starting_trees = true;
@@ -30,15 +29,23 @@ void TreesetHeuristic::infer_treeset(RaxmlInstance &instance, const Options &opt
                 }
 
                 LOG_INFO_TS << "Starting trees generally implausible; topology optimization necessary" << std::endl;
+                do {
+                    this->num_spr += 1;
+                    batch->target_num_spr = this->num_spr;
+                    batch->infer_batch(instance, opts, load_balancer, tip_msa_idmap);
+                } while (!batch->is_plausible(opts));
 
-                // fall through
+                LOG_INFO_TS << this->num_spr << " spr rounds sufficient." << std::endl;
+                tuning_phase = TUNE_GREEDY;
+                this->greedy_spr = true;
+                break;
             case TUNE_GREEDY:
                 batch->infer_batch(instance, opts, load_balancer, this->tip_msa_idmap);
                 if (!batch->is_plausible(opts)) {
-                    LOG_INFO_TS << "Greedy SPR yielded implausible trees, reverting to Top-K" << std::endl;
+                    LOG_INFO_TS << "Greedy spr yielded implausible trees, reverting to Top-K" << std::endl;
                     this->greedy_spr = false;
                 } else {
-                    LOG_INFO_TS << "Greedy SPR rounds yielded plausible trees. Disabling Top-K." << std::endl;
+                    LOG_INFO_TS << "Greedy spr rounds yielded plausible trees. Disabling Top-K." << std::endl;
                 }
 
                 this->skip_model = true;
@@ -53,20 +60,11 @@ void TreesetHeuristic::infer_treeset(RaxmlInstance &instance, const Options &opt
                     LOG_INFO_TS << "Skipping model optimization yielded plausible trees, disabling per-tree model optimization." << std::endl;
                 }
 
-                this->tuning_phase = TUNE_SPR;
-                break;
-            case TUNE_SPR:
-                // TODO implement SPR tuning
-                batch->infer_batch(instance, opts, load_balancer, this->tip_msa_idmap);
                 this->tuning_phase = FINALIZED;
+                break;
             case FINALIZED:
                 break;
         }
-
-        batch = new TunedBatch(this->greedy_spr, this->skip_model, this->num_spr, seed_offset, BATCH_SIZE, spr_params, this->recommended_thread_count(),
-                                 this->recommended_worker_count(), msa, persite_loglh);
-        seed_offset += BATCH_SIZE;
-        batch->generate_starting_trees(instance, opts, load_balancer, tip_msa_idmap);
     }
 
     LOG_INFO_TS << "treeset inference complete." << std::endl;
