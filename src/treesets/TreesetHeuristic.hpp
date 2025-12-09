@@ -207,6 +207,11 @@ protected:
     std::vector<TreeInfo> batch_trees{std::vector<TreeInfo>()};
 
     /**
+     * Backup for the model parameters, such that the model can be restored after changing it in the TreeInfo instances.
+     */
+    std::vector<Model> batch_model_backup{std::vector<Model>()};
+
+    /**
      * Per-site log-likelihoods of the trees inferred in this batch. We recalculate these if the tree has changed,
      * and we perform the AU test by combining it with the reference tree loglikelihood vectors.
      */
@@ -225,8 +230,22 @@ protected:
     /**
      * Perform model and branch length optimization according to the current tuning parameters and the given epsilon.
      * If model optimization is currently disabled, load models from a backup.
+     *
+     * @param epsilon the likelihood threshold when to stop optimizing
+     * @param force if true, model optimization is forced, disregarding batch tuning parameters
      */
     void optimize_all_parameters(double epsilon, bool force = false);
+
+    /**
+     * Store the current model parameters in a backup, such that we can restore them if optimization needs to continue.
+     * The backup can also be obtained from the outside, to allow sharing models across batches.
+     */
+    void save_model_backup();
+
+    /**
+     * Restore model parameters from the internal backup.
+     */
+    void restore_model_backup();
 };
 
 #endif //RAXML_TREESETHEURISTIC_HPP_
