@@ -8,17 +8,14 @@
 struct RaxmlInstance;
 
 enum TuningPhase {
-    /** First phase: Check if starting trees are plausible */
-    TUNE_STARTING_TREES,
+    /** First phase: Check how many SPR rounds we need */
+    TUNE_BASELINE,
 
     /** Check if greedy hillclimbing without keeping topologies suffices */
     TUNE_GREEDY,
 
     /** Check if inheriting models from other tree searches suffices */
     TUNE_MODEL_OPT,
-
-    /** Check how many SPR rounds suffice */
-    TUNE_SPR,
 
     /** Tuning is done, infer trees with current parameters */
     FINALIZED,
@@ -54,12 +51,12 @@ private:
     /**
      * If true, the heuristic is still tuning parameters,
      */
-    TuningPhase tuning_phase{TUNE_STARTING_TREES};
+    TuningPhase tuning_phase{TUNE_BASELINE};
 
     /**
      * If true, replace fast SPR rounds with light SPR rounds that do even less BLOs.
      */
-    bool greedy_spr{true};
+    bool greedy_spr{false};
 
     /**
      * If true, skip the first model optimization by reusing model parameters from the previous search.
