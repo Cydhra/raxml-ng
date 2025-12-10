@@ -163,8 +163,14 @@ unsigned int TunedBatch::perform_au_test(const Options &opts) {
 }
 
 bool TunedBatch::is_plausible(const Options &opts) {
+    // we need to save the model backup, for two reasons: we do not want to perform tree search on hyper-optimized
+    // models to allow for shallower likelihood curves of slightly suboptimal models.
+    // Further, multiple calls to is_plausible must not optimize the hyper-optimized model with low episolon again
+    // to avoid numerical oscillation.
+    this->save_model_backup();
     this->optimize_all_parameters(0.1, true);
     const unsigned int plausible_trees = this->perform_au_test(opts);
+    this->restore_model_backup();
     return plausible_trees >= static_cast<unsigned int>(static_cast<double>(this->get_batch_size()) * ACCEPT_TUNING_THRESHOLD);
 }
 
@@ -173,7 +179,6 @@ void TunedBatch::optimize_all_parameters(const double epsilon, const bool force)
     for (unsigned int i = 0; i < this->get_batch_size(); ++i) {
         if (!this->skip_model || force) {
             // optimize model and branch lengths, such that we get accurate site likelihoods.
-            // TODO if they already are optimized from previous AU tests, do not re-optimize to avoid oscillation
             batch_trees[i].optimize_model(epsilon);
         } else {
             // TODO load model from backup
@@ -181,5 +186,19 @@ void TunedBatch::optimize_all_parameters(const double epsilon, const bool force)
 
         // optimize branches
         batch_trees[i].optimize_params(CORAX_OPT_PARAM_BRANCHES_ITERATIVE, epsilon);
+    }
+}
+
+void TunedBatch::save_model_backup() {
+    for (unsigned int i = 0; i < this->get_batch_size(); ++i) {
+        for (size_t part_id = 0; part_id < this->msa->part_count(); ++part_id) {
+            assign(this->batch_model_backup[i][part_id], batch_trees[i], part_id);
+        }
+    }
+}
+
+void TunedBatch::restore_model_backup() {
+    for (unsigned int i = 0; i < this->get_batch_size(); ++i) {
+        assign_models(batch_trees[i], this->batch_model_backup[i]);
     }
 }
