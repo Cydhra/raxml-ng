@@ -49,6 +49,11 @@ public:
                                        AU_DEFAULT_REPS, starting_seed));
         this->au_test->allocate_test_statistics();
 
+        this->batch_model_backup.reserve(this->get_batch_size());
+        for (unsigned int tree_id = 0; tree_id < this->get_batch_size(); ++tree_id) {
+            this->batch_model_backup.emplace_back();
+        }
+
         // hard-update spr params to sensible settings
         this->spr_params.thorough = false;
     }
@@ -152,7 +157,7 @@ protected:
     /**
      * Backup for the model parameters, such that the model can be restored after changing it in the TreeInfo instances.
      */
-    std::vector<Model> batch_model_backup{std::vector<Model>()};
+    std::vector<ModelMap> batch_model_backup{std::vector<ModelMap>()};
 
     /**
      * Per-site log-likelihoods of the trees inferred in this batch. We recalculate these if the tree has changed,
