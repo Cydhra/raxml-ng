@@ -154,14 +154,12 @@ unsigned int TunedBatch::perform_au_test(const Options &opts) {
     this->au_test->finalize_test_statistics();
     this->au_test->calculate_p_values();
 
-    LOG_INFO_TS << "AU Test finished" << endl;
-
     // TODO: there is a bug here that forces us to detach, find it.
     ParallelContext::finalize_threads(true);
 
     const unsigned int plausible_trees = count_plausible_trees(
         this->au_test->get_p_values().begin() + reference_persite_loglh.size(), this->au_test->get_p_values().end());
-    LOG_WORKER_TS(LogLevel::debug) << "AU test found " << plausible_trees << " plausible trees." << std::endl;
+    LOG_WORKER_TS(LogLevel::progress) << "AU test found " << plausible_trees << " plausible trees." << std::endl;
     return plausible_trees;
 }
 

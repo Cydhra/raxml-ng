@@ -1,7 +1,7 @@
 #include "TreesetHeuristic.hpp"
 #include "TunedBatch.hpp"
 
-constexpr unsigned int BATCH_SIZE = 16;
+constexpr unsigned int BATCH_SIZE = 32;
 
 void TreesetHeuristic::infer_treeset(RaxmlInstance &instance, const Options &opts, CheckpointManager &cm,
                                      LoadBalancer &load_balancer) {
