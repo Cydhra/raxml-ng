@@ -97,6 +97,13 @@ public:
      */
     bool is_plausible(const Options &opts);
 
+    /**
+     * Copy the model from a previous instance of TunedBatch, which allows restoring the model instead of
+     * optimizing it from scratch. The model will be written into this batch's model backup and then directly
+     * applied.
+     */
+    void inherit_model(const TunedBatch &other);
+
 protected:
     /**
      * The starting seed (starting from 0) for this batch. Batches infer starting trees with ascending seeds, so this

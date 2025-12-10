@@ -88,7 +88,9 @@ void TunedBatch::infer_batch(RaxmlInstance &instance, const Options &opts, LoadB
             this->target_num_spr << "] with " << this->num_threads << " threads." << std::endl;
 
     // do initial model and branch length optimization
-    this->optimize_all_parameters(3.0);
+    if (num_spr_performed == 0) {
+        this->optimize_all_parameters(3.0);
+    }
 
     if (this->light_spr) {
         this->spr_params.ntopol_keep = 1;
@@ -159,6 +161,7 @@ unsigned int TunedBatch::perform_au_test(const Options &opts) {
 
     const unsigned int plausible_trees = count_plausible_trees(
         this->au_test->get_p_values().begin() + reference_persite_loglh.size(), this->au_test->get_p_values().end());
+    LOG_WORKER_TS(LogLevel::debug) << "AU test found " << plausible_trees << " plausible trees." << std::endl;
     return plausible_trees;
 }
 
@@ -181,7 +184,7 @@ void TunedBatch::optimize_all_parameters(const double epsilon, const bool force)
             // optimize model and branch lengths, such that we get accurate site likelihoods.
             batch_trees[i].optimize_model(epsilon);
         } else {
-            // TODO load model from backup
+            restore_model_backup();
         }
 
         // optimize branches
@@ -200,5 +203,13 @@ void TunedBatch::save_model_backup() {
 void TunedBatch::restore_model_backup() {
     for (unsigned int i = 0; i < this->get_batch_size(); ++i) {
         assign_models(batch_trees[i], this->batch_model_backup[i]);
+    }
+}
+
+void TunedBatch::inherit_model(const TunedBatch &other) {
+    for (unsigned int i = 0; i < this->get_batch_size(); ++i) {
+        for (size_t part_id = 0; part_id < this->msa->part_count(); ++part_id) {
+            assign(this->batch_model_backup[i][part_id], other.batch_trees[i], part_id);
+        }
     }
 }
