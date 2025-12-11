@@ -193,7 +193,7 @@ protected:
      * Get the number of threads per worker
      */
     unsigned int num_threads_per_worker() const {
-        return num_workers / num_threads;
+        return num_threads / num_workers;
     }
 
     /**
