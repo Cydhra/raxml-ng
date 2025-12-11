@@ -2,6 +2,7 @@
 #define RAXML_TUNEDBATCH_HPP_
 
 #include "../loadbalance/LoadBalancer.hpp"
+#include "../loadbalance/CoarseLoadBalancer.hpp"
 #include "../au/AuTest.hpp"
 #include "../Checkpoint.hpp"
 
@@ -54,6 +55,13 @@ public:
 
         // hard-update spr params to sensible settings
         this->spr_params.thorough = false;
+
+        // initialize coarse load balancing (i.e. split trees among workers for inference)
+        assert(this->num_workers <= this->get_batch_size());
+        ContiguousCoarseLoadBalancer load_balancer;
+        CoarseAssignment tree_ids(reference_persite_loglh.size());
+        std::iota(tree_ids.begin(), tree_ids.end(), 0);
+        this->coarse_assignments = load_balancer.get_all_assignments(tree_ids, this->num_workers);
     }
 
     /**
@@ -147,6 +155,12 @@ protected:
      * These cannot change, and constitute the first part of the AU test input.
      */
     const std::vector<std::vector<doubleVector> > &reference_persite_loglh;
+
+    /**
+     * Assignment of trees to workers for tree inference. The AU test diverges from this assignment because the AU
+     * test cannot split partitions between threads.
+     */
+    CoarseAssignmentList coarse_assignments;
 
     /**
      * Assignment of partitions within the thread assignment of the batch. This differs from the part assignment of the
