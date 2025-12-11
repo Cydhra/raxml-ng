@@ -178,6 +178,13 @@ protected:
     shared_ptr<AuTest> au_test;
 
     /**
+     * Get the number of threads per worker
+     */
+    unsigned int num_threads_per_worker() const {
+        return num_workers / num_threads;
+    }
+
+    /**
      * Perform the AU test on the trees in the batch, as well as the supplied reference trees.
      */
     unsigned int perform_au_test(const Options &opts);
