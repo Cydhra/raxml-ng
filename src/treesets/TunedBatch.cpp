@@ -59,7 +59,8 @@ void TunedBatch::generate_starting_trees(RaxmlInstance &instance, const Options 
                                   false);
 
     // infer starting trees
-    ParallelContext::init_pthreads_custom(opts, tree_builder, this->num_threads, this->num_threads);
+    auto tree_workers = min(this->num_threads, this->get_batch_size());
+    ParallelContext::init_pthreads_custom(opts, tree_builder, tree_workers, tree_workers);
     tree_builder();
     ParallelContext::finalize_threads();
 
@@ -73,7 +74,7 @@ void TunedBatch::generate_starting_trees(RaxmlInstance &instance, const Options 
     }
 
     this->part_assignment.
-            reset(new PartitionAssignmentList(load_balancer.get_all_assignments(part_sizes, num_threads)));
+            reset(new PartitionAssignmentList(load_balancer.get_all_assignments(part_sizes, this->num_threads_per_worker())));
 
     // step 3: create context for tree inference
     for (unsigned int i = 0; i < this->get_batch_size(); ++i) {
