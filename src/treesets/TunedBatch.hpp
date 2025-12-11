@@ -166,7 +166,7 @@ protected:
      * Assignment of partitions within the thread assignment of the batch. This differs from the part assignment of the
      * main algorithm, if the batch got assigned different numbers of threads and workers.
      */
-    unique_ptr<PartitionAssignmentList> part_assignment;
+    PartitionAssignmentList part_assignment;
 
     /**
      * Treeinfo objects for the trees inferred in this batch. These objects are updated by the inference algorithm.
