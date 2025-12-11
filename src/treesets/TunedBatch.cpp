@@ -73,8 +73,7 @@ void TunedBatch::generate_starting_trees(RaxmlInstance &instance, const Options 
         part_sizes.assign_sites(i, 0, pinfo->length(), pinfo->model().clv_entry_size());
     }
 
-    this->part_assignment.
-            reset(new PartitionAssignmentList(load_balancer.get_all_assignments(part_sizes, this->num_threads_per_worker())));
+    this->part_assignment = load_balancer.get_all_assignments(part_sizes, this->num_threads_per_worker());
 
     // step 3: create context for tree inference
     for (unsigned int i = 0; i < this->get_batch_size(); ++i) {
