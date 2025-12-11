@@ -49,10 +49,8 @@ public:
                                        AU_DEFAULT_REPS, starting_seed));
         this->au_test->allocate_test_statistics();
 
-        this->batch_model_backup.reserve(this->get_batch_size());
-        for (unsigned int tree_id = 0; tree_id < this->get_batch_size(); ++tree_id) {
-            this->batch_model_backup.emplace_back();
-        }
+        // initialize model maps for storing backups
+        this->batch_model_backup.resize(this->get_batch_size());
 
         // hard-update spr params to sensible settings
         this->spr_params.thorough = false;
