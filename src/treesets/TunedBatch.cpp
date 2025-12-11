@@ -73,12 +73,16 @@ void TunedBatch::generate_starting_trees(RaxmlInstance &instance, const Options 
         part_sizes.assign_sites(i, 0, pinfo->length(), pinfo->model().clv_entry_size());
     }
 
-    this->part_assignment = load_balancer.get_all_assignments(part_sizes, this->num_threads_per_worker());
+    const auto threads_per_worker = this->num_threads_per_worker();
+    this->part_assignments = load_balancer.get_all_assignments(part_sizes, threads_per_worker);
 
     // step 3: create context for tree inference
-    for (unsigned int i = 0; i < this->get_batch_size(); ++i) {
-        this->batch_trees.push_back(TreeInfo(opts, this->batch_start_trees->at(i), *this->msa, tip_msa_idmap,
-                                             part_sizes));
+    for (unsigned int tree_id = 0; tree_id < this->get_batch_size(); ++tree_id) {
+        this->batch_trees.emplace_back();
+        for (unsigned int local_thread_id = 0; local_thread_id < threads_per_worker; ++local_thread_id) {
+            this->batch_trees[tree_id].emplace_back(opts, this->batch_start_trees->at(tree_id), *this->msa,
+                                                    tip_msa_idmap, part_sizes);
+        }
     }
 }
 
@@ -99,8 +103,9 @@ void TunedBatch::infer_batch(RaxmlInstance &instance, const Options &opts, LoadB
     // TODO parallelize
     for (unsigned int i = 0; i < this->get_batch_size(); ++i) {
         for (unsigned int spr_round = num_spr_performed; spr_round < this->target_num_spr; ++spr_round) {
-            LOG_PROGRESS(this->batch_trees[i].loglh()) << (light_spr ? "GREEDY" : "FAST") << " spr round " << (spr_round + 1) << " (radius: " << spr_params.radius_min << ") for treesearch #" << (i + 1) << std::endl;
-            this->batch_trees[i].spr_round(this->spr_params);
+            LOG_PROGRESS(this->batch_trees[i][0].loglh()) << (light_spr ? "GREEDY" : "FAST") << " spr round " << (
+                spr_round + 1) << " (radius: " << spr_params.radius_min << ") for treesearch #" << (i + 1) << std::endl;
+            this->batch_trees[i][0].spr_round(this->spr_params);
         }
     }
 
@@ -116,8 +121,7 @@ unsigned int TunedBatch::perform_au_test(const Options &opts) {
 
     this->au_test->reset_test_statistics();
 
-    // TODO paralellelize (for per-site lnl calculation only)
-    // first, calculate per-site loglikelihoods of the batch trees
+    // compute per-site log-likelihood in parallel
     for (unsigned int i = 0; i < this->get_batch_size(); ++i) {
         // collect the sub-partitions for the local worker
         // auto& thread_assignment = part_assignment->at(ParallelContext::local_proc_id());
@@ -133,7 +137,7 @@ unsigned int TunedBatch::perform_au_test(const Options &opts) {
         }
 
         // calculate site likelihoods for the assigned sub-partitions
-        batch_trees[i].persite_loglh(thread_partition_view);
+        batch_trees[i][0].persite_loglh(thread_partition_view);
     }
 
     // next, change the parallelization scheme to avoid splitting trees between workers. If we have more workers than
@@ -173,7 +177,8 @@ bool TunedBatch::is_plausible(const Options &opts) {
     this->optimize_all_parameters(0.1, true);
     const unsigned int plausible_trees = this->perform_au_test(opts);
     this->restore_model_backup();
-    return plausible_trees >= static_cast<unsigned int>(static_cast<double>(this->get_batch_size()) * ACCEPT_TUNING_THRESHOLD);
+    return plausible_trees >= static_cast<unsigned int>(
+               static_cast<double>(this->get_batch_size()) * ACCEPT_TUNING_THRESHOLD);
 }
 
 void TunedBatch::optimize_all_parameters(const double epsilon, const bool force) {
@@ -181,34 +186,38 @@ void TunedBatch::optimize_all_parameters(const double epsilon, const bool force)
     for (unsigned int i = 0; i < this->get_batch_size(); ++i) {
         if (!this->skip_model || force) {
             // optimize model and branch lengths, such that we get accurate site likelihoods.
-            batch_trees[i].optimize_model(epsilon);
+            batch_trees[i][0].optimize_model(epsilon);
         } else {
             restore_model_backup();
         }
 
         // optimize branches
-        batch_trees[i].optimize_params(CORAX_OPT_PARAM_BRANCHES_ITERATIVE, epsilon);
+        batch_trees[i][0].optimize_params(CORAX_OPT_PARAM_BRANCHES_ITERATIVE, epsilon);
     }
 }
 
 void TunedBatch::save_model_backup() {
     for (unsigned int i = 0; i < this->get_batch_size(); ++i) {
         for (size_t part_id = 0; part_id < this->msa->part_count(); ++part_id) {
-            assign(this->batch_model_backup[i][part_id], batch_trees[i], part_id);
+            // all threads have the same model, so backup from the first thread is sufficient
+            assign(this->batch_model_backup[i][part_id], batch_trees[i][0], part_id);
         }
     }
 }
 
 void TunedBatch::restore_model_backup() {
     for (unsigned int i = 0; i < this->get_batch_size(); ++i) {
-        assign_models(batch_trees[i], this->batch_model_backup[i]);
+        for (unsigned int local_thread_id = 0; local_thread_id < this->num_threads_per_worker(); ++local_thread_id) {
+            assign_models(batch_trees[i][local_thread_id], this->batch_model_backup[i]);
+        }
     }
 }
 
 void TunedBatch::inherit_model(const TunedBatch &other) {
     for (unsigned int i = 0; i < this->get_batch_size(); ++i) {
         for (size_t part_id = 0; part_id < this->msa->part_count(); ++part_id) {
-            assign(this->batch_model_backup[i][part_id], other.batch_trees[i], part_id);
+            // all threads have the same model, so backup from the first thread is sufficient
+            assign(this->batch_model_backup[i][part_id], other.batch_trees[i][0], part_id);
         }
     }
 }

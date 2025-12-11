@@ -166,12 +166,14 @@ protected:
      * Assignment of partitions within the thread assignment of the batch. This differs from the part assignment of the
      * main algorithm, if the batch got assigned different numbers of threads and workers.
      */
-    PartitionAssignmentList part_assignment;
+    PartitionAssignmentList part_assignments;
 
     /**
      * Treeinfo objects for the trees inferred in this batch. These objects are updated by the inference algorithm.
+     * The outer vector is indexed by tree, the inner by in-worker thread id (i.e. if each worker has 4 threads,
+     * the inner vectors contain 4 TreeInfo instances).
      */
-    std::vector<TreeInfo> batch_trees{std::vector<TreeInfo>()};
+    std::vector<std::vector<TreeInfo>> batch_trees{std::vector<std::vector<TreeInfo>>()};
 
     /**
      * Backup for the model parameters, such that the model can be restored after changing it in the TreeInfo instances.
