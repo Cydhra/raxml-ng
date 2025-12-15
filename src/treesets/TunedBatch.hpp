@@ -59,7 +59,7 @@ public:
         // initialize coarse load balancing (i.e. split trees among workers for inference)
         assert(this->num_workers <= this->get_batch_size());
         ContiguousCoarseLoadBalancer load_balancer;
-        CoarseAssignment tree_ids(reference_persite_loglh.size());
+        CoarseAssignment tree_ids(batch_size);
         std::iota(tree_ids.begin(), tree_ids.end(), 0);
         this->coarse_assignments = load_balancer.get_all_assignments(tree_ids, this->num_workers);
     }
