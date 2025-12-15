@@ -3,6 +3,8 @@
 #include "../coraxlib/src/corax/optimize/opt_generic.h"
 #include "../loadbalance/CoarseLoadBalancer.hpp"
 
+using namespace std::placeholders;
+
 /**
  * Ratio of plausible sets a batch needs to achieve to consider the thread parameters sufficient for inference
  */
@@ -21,6 +23,92 @@ void parallel_au_bootstrap(AuTest &tester, const CoarseAssignmentList &assignmen
 
     tester.run_bootstrap(tree_ids.size(), slice_start);
     ParallelContext::global_barrier();
+}
+
+/**
+ * Helper function to perform fine-grained parallelization on a given function.
+ */
+void fine_grained_parallel(const CoarseAssignmentList &assignment_list,
+                           const std::function<void(unsigned int, unsigned int)> &kernel) {
+    const unsigned int worker_id = ParallelContext::local_group_id();
+    const unsigned int thread_id = ParallelContext::local_proc_id();
+    auto &tree_ids = assignment_list.at(worker_id);
+
+    for (const unsigned int tree_id: tree_ids) {
+        kernel(thread_id, tree_id);
+    }
+}
+
+/**
+ * Convert a std::function that takes a thread_id and a tree_id into a kernel for a p-thread.
+ *
+ * @param assignment_list coarse load balance assignment for the trees in the batch
+ * @param kernel the function that is called for each tree in the assignment
+ * @return a functor that acts as a main function for a p-thread
+ */
+std::function<void()> make_kernel(const CoarseAssignmentList &assignment_list,
+                                  const std::function<void(unsigned int, unsigned int)> &kernel) {
+    return std::bind(fine_grained_parallel, assignment_list, kernel);
+}
+
+/**
+ * Parallel kernel for the per-site log-likelihood calculation, given to make_kernel to create a pthread-main
+ */
+void sitelh_kernel(const PartitionedMSA &msa,
+                             const PartitionAssignmentList &partition_assignment,
+                             std::vector<std::vector<doubleVector> > &persite_loglh,
+                             std::vector<std::vector<TreeInfo> > &batch_trees,
+                             const unsigned int thread_id,
+                             const unsigned int tree_id) {
+    // collect the sub-partitions for the local worker
+    auto &partitions = partition_assignment.at(thread_id);
+    auto &tree_likelihood_vec = persite_loglh[tree_id];
+    std::vector<double *> thread_partition_view(msa.part_count(), nullptr);
+
+    for (const auto &pa: partitions) {
+        thread_partition_view[pa.part_id] = tree_likelihood_vec[pa.part_id].data() + pa.start;
+    }
+
+    // calculate site likelihoods for the assigned sub-partitions
+    batch_trees[tree_id][thread_id].persite_loglh(thread_partition_view);
+}
+
+/**
+ * Parallel kernel for SPR rounds, given to make_kernel to create a pthread-main
+ */
+void spr_kernel(std::vector<std::vector<TreeInfo> > &batch_trees,
+                          spr_round_params &spr_params,
+                          const unsigned int num_spr_performed,
+                          const unsigned int target_num_spr,
+                          const unsigned int thread_id,
+                          const unsigned int tree_id) {
+    for (unsigned int spr_round = num_spr_performed; spr_round < target_num_spr; ++spr_round) {
+        batch_trees[tree_id][thread_id].spr_round(spr_params);
+    }
+
+    LOG_WORKER_TS(LogLevel::progress) << "performed " << (target_num_spr - num_spr_performed)
+            << (spr_params.ntopol_keep < 20 ? " GREEDY" : " FAST") << " spr rounds (radius: " << spr_params.radius_min
+            << ") for tree search #" << (tree_id + 1) << std::endl;
+}
+
+/**
+ * Parallel kernel for model optimization, given to make_kernel to create a pthread-main
+ */
+void model_opt_kernel(std::vector<std::vector<TreeInfo> > &batch_trees,
+                             const double epsilon,
+                             const unsigned int thread_id,
+                             const unsigned int tree_id) {
+    batch_trees[tree_id][thread_id].optimize_model(epsilon);
+}
+
+/**
+ * Parallel kernel for branch length optimization, given to make_kernel to create a pthread-main
+ */
+void blo_kernel(std::vector<std::vector<TreeInfo> > &batch_trees,
+                                const double epsilon,
+                                const unsigned int thread_id,
+                                const unsigned int tree_id) {
+    batch_trees[tree_id][thread_id].optimize_params(CORAX_OPT_PARAM_BRANCHES_ITERATIVE, epsilon);
 }
 
 /**
@@ -86,28 +174,31 @@ void TunedBatch::generate_starting_trees(RaxmlInstance &instance, const Options 
     }
 }
 
-void TunedBatch::infer_batch(RaxmlInstance &instance, const Options &opts, LoadBalancer &load_balancer,
-                             const IDVector &tip_msa_idmap) {
+void TunedBatch::infer_batch(const Options &opts) {
     LOG_INFO_TS << "Running inference batch [BLO: " << !this->light_spr << ", MO: " << !this->skip_model << ", SPR: " <<
             this->target_num_spr << "] with " << this->num_threads << " threads." << std::endl;
 
     // do initial model and branch length optimization
     if (num_spr_performed == 0) {
-        this->optimize_all_parameters(3.0);
+        this->optimize_all_parameters(opts, 3.0);
     }
 
     if (this->light_spr) {
         this->spr_params.ntopol_keep = 1;
     }
 
-    // TODO parallelize
-    for (unsigned int i = 0; i < this->get_batch_size(); ++i) {
-        for (unsigned int spr_round = num_spr_performed; spr_round < this->target_num_spr; ++spr_round) {
-            LOG_PROGRESS(this->batch_trees[i][0].loglh()) << (light_spr ? "GREEDY" : "FAST") << " spr round " << (
-                spr_round + 1) << " (radius: " << spr_params.radius_min << ") for treesearch #" << (i + 1) << std::endl;
-            this->batch_trees[i][0].spr_round(this->spr_params);
-        }
-    }
+    // compute SPR rounds in parallel
+    const auto spr_worker = make_kernel(
+        std::ref(this->coarse_assignments),
+        std::bind(spr_kernel,
+                  std::ref(this->batch_trees),
+                  std::ref(this->spr_params),
+                  this->num_spr_performed,
+                  this->target_num_spr,
+                  _1, _2));
+    ParallelContext::init_pthreads_custom(opts, spr_worker, num_threads, num_workers);
+    spr_worker();
+    ParallelContext::finalize_threads();
 
     // TODO this only works if checkpoints cannot recover tree states. When checkpointing is added, this mechanism needs
     //  to be changed
@@ -121,24 +212,20 @@ unsigned int TunedBatch::perform_au_test(const Options &opts) {
 
     this->au_test->reset_test_statistics();
 
+    // TODO this parallelization doesn't work yet
     // compute per-site log-likelihood in parallel
-    for (unsigned int i = 0; i < this->get_batch_size(); ++i) {
-        // collect the sub-partitions for the local worker
-        // auto& thread_assignment = part_assignment->at(ParallelContext::local_proc_id());
-        auto &tree_likelihood_vec = batch_persite_logh[i];
-        std::vector<double *> thread_partition_view(msa->part_count(), nullptr);
-
-        // TODO mind thread assignment
-        // for (const auto& pa: thread_assignment)
-        // thread_partition_view[pa.part_id] = tree_likelihood_vec[pa.part_id].data() + pa.start;
-
-        for (unsigned int part = 0; part < msa->part_count(); part++) {
-            thread_partition_view[part] = tree_likelihood_vec[part].data();
-        }
-
-        // calculate site likelihoods for the assigned sub-partitions
-        batch_trees[i][0].persite_loglh(thread_partition_view);
-    }
+    // const auto sitelh_worker = make_kernel(
+    //     std::ref(this->coarse_assignments),
+    //     std::bind(sitelh_kernel,
+    //               std::ref(*this->msa),
+    //               std::ref(this->part_assignments),
+    //               std::ref(this->batch_persite_logh),
+    //               std::ref(this->batch_trees),
+    //               _1, _2)
+    // );
+    // ParallelContext::init_pthreads_custom(opts, sitelh_worker, num_threads, num_workers);
+    // sitelh_worker();
+    // ParallelContext::finalize_threads();
 
     // next, change the parallelization scheme to avoid splitting trees between workers. If we have more workers than
     // trees, this sucks, but currently AU doesn't support per-partition parallelization because that would require
@@ -174,26 +261,41 @@ bool TunedBatch::is_plausible(const Options &opts) {
     // Further, multiple calls to is_plausible must not optimize the hyper-optimized model with low episolon again
     // to avoid numerical oscillation.
     this->save_model_backup();
-    this->optimize_all_parameters(0.1, true);
+    this->optimize_all_parameters(opts, 0.1, true);
     const unsigned int plausible_trees = this->perform_au_test(opts);
     this->restore_model_backup();
     return plausible_trees >= static_cast<unsigned int>(
                static_cast<double>(this->get_batch_size()) * ACCEPT_TUNING_THRESHOLD);
 }
 
-void TunedBatch::optimize_all_parameters(const double epsilon, const bool force) {
-    // TODO parallelize over trees
-    for (unsigned int i = 0; i < this->get_batch_size(); ++i) {
-        if (!this->skip_model || force) {
-            // optimize model and branch lengths, such that we get accurate site likelihoods.
-            batch_trees[i][0].optimize_model(epsilon);
-        } else {
-            restore_model_backup();
-        }
-
-        // optimize branches
-        batch_trees[i][0].optimize_params(CORAX_OPT_PARAM_BRANCHES_ITERATIVE, epsilon);
+void TunedBatch::optimize_all_parameters(const Options &opts, const double epsilon, const bool force) {
+    if (!this->skip_model || force) {
+        // optimize model and branch lengths, such that we get accurate site likelihoods.
+        const auto model_worker = make_kernel(
+            std::ref(this->coarse_assignments),
+            std::bind(model_opt_kernel,
+                      std::ref(this->batch_trees),
+                      epsilon,
+                      _1, _2)
+        );
+        ParallelContext::init_pthreads_custom(opts, model_worker, num_threads, num_workers);
+        model_worker();
+        ParallelContext::finalize_threads();
+    } else {
+        restore_model_backup();
     }
+
+    // optimize branches
+    const auto branch_worker = make_kernel(
+        std::ref(this->coarse_assignments),
+        std::bind(blo_kernel,
+                  std::ref(this->batch_trees),
+                  epsilon,
+                  _1, _2)
+    );
+    ParallelContext::init_pthreads_custom(opts, branch_worker, num_threads, num_workers);
+    branch_worker();
+    ParallelContext::finalize_threads();
 }
 
 void TunedBatch::save_model_backup() {

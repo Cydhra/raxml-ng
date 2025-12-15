@@ -35,7 +35,7 @@ void TreesetHeuristic::infer_treeset(RaxmlInstance &instance, const Options &opt
                 do {
                     this->num_spr += 1;
                     batch.target_num_spr = this->num_spr;
-                    batch.infer_batch(instance, opts, load_balancer, tip_msa_idmap);
+                    batch.infer_batch(opts);
                 } while (!batch.is_plausible(opts));
 
                 LOG_INFO_TS << this->num_spr << " spr rounds sufficient." << std::endl;
@@ -43,7 +43,7 @@ void TreesetHeuristic::infer_treeset(RaxmlInstance &instance, const Options &opt
                 this->greedy_spr = true;
                 break;
             case TUNE_GREEDY:
-                batch.infer_batch(instance, opts, load_balancer, this->tip_msa_idmap);
+                batch.infer_batch(opts);
                 if (!batch.is_plausible(opts)) {
                     LOG_INFO_TS << "Greedy spr yielded implausible trees, reverting to Top-K" << std::endl;
                     this->greedy_spr = false;
@@ -56,7 +56,7 @@ void TreesetHeuristic::infer_treeset(RaxmlInstance &instance, const Options &opt
                 break;
             case TUNE_MODEL_OPT:
                 batch.inherit_model(*(finished_batches.end() - 1));
-                batch.infer_batch(instance, opts, load_balancer, this->tip_msa_idmap);
+                batch.infer_batch(opts);
                 if (!batch.is_plausible(opts)) {
                     LOG_INFO_TS << "Skipping model optimization yielded implausible trees, reverting to per-tree model optimization." << std::endl;
                     this->skip_model = false;
