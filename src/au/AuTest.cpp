@@ -120,7 +120,7 @@ void AuTest::reset_test_statistics() {
     finished = false;
 
     for (unsigned int scale = 0; scale < scales.size(); scale++) {
-        memset(test_statistics[scale], 0, num_trees * num_replicates[scale]);
+        memset(test_statistics[scale], 0, sizeof(double) * num_trees * num_replicates[scale]);
     }
 }
 
