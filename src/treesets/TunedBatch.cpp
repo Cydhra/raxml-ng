@@ -169,7 +169,7 @@ void TunedBatch::generate_starting_trees(RaxmlInstance &instance, const Options 
         this->batch_trees.emplace_back();
         for (unsigned int local_thread_id = 0; local_thread_id < threads_per_worker; ++local_thread_id) {
             this->batch_trees[tree_id].emplace_back(opts, this->batch_start_trees->at(tree_id), *this->msa,
-                                                    tip_msa_idmap, part_sizes);
+                                                    tip_msa_idmap, this->part_assignments[local_thread_id]);
         }
     }
 }
@@ -212,20 +212,19 @@ unsigned int TunedBatch::perform_au_test(const Options &opts) {
 
     this->au_test->reset_test_statistics();
 
-    // TODO this parallelization doesn't work yet
     // compute per-site log-likelihood in parallel
-    // const auto sitelh_worker = make_kernel(
-    //     std::ref(this->coarse_assignments),
-    //     std::bind(sitelh_kernel,
-    //               std::ref(*this->msa),
-    //               std::ref(this->part_assignments),
-    //               std::ref(this->batch_persite_logh),
-    //               std::ref(this->batch_trees),
-    //               _1, _2)
-    // );
-    // ParallelContext::init_pthreads_custom(opts, sitelh_worker, num_threads, num_workers);
-    // sitelh_worker();
-    // ParallelContext::finalize_threads();
+    const auto sitelh_worker = make_kernel(
+        std::ref(this->coarse_assignments),
+        std::bind(sitelh_kernel,
+                  std::ref(*this->msa),
+                  std::ref(this->part_assignments),
+                  std::ref(this->batch_persite_logh),
+                  std::ref(this->batch_trees),
+                  _1, _2)
+    );
+    ParallelContext::init_pthreads_custom(opts, sitelh_worker, num_threads, num_workers);
+    sitelh_worker();
+    ParallelContext::finalize_threads();
 
     // next, change the parallelization scheme to avoid splitting trees between workers. If we have more workers than
     // trees, this sucks, but currently AU doesn't support per-partition parallelization because that would require
