@@ -53,9 +53,6 @@ public:
         // initialize model maps for storing backups
         this->batch_model_backup.resize(this->get_batch_size());
 
-        // hard-update spr params to sensible settings
-        this->spr_params.thorough = false;
-
         // initialize coarse load balancing (i.e. split trees among workers for inference)
         assert(this->num_workers <= this->get_batch_size());
         ContiguousCoarseLoadBalancer load_balancer;
