@@ -16,7 +16,7 @@ constexpr double ACCEPT_TUNING_THRESHOLD = 0.9;
  * @param assignment_list assignment of trees to workers
  */
 void parallel_au_bootstrap(AuTest &tester, const CoarseAssignmentList &assignment_list) {
-    unsigned int worker_id = ParallelContext::local_thread_id();
+    const unsigned int worker_id = ParallelContext::local_group_id();
     auto &tree_ids = assignment_list.at(worker_id);
 
     const auto slice_start = *tree_ids.begin();
