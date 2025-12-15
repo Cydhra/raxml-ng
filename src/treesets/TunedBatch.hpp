@@ -93,8 +93,7 @@ public:
     /**
      * Using the batch configuration, infer K trees in parallel.
      */
-    void infer_batch(RaxmlInstance &instance, const Options &opts, LoadBalancer &load_balancer,
-                     const IDVector &tip_msa_idmap);
+    void infer_batch(const Options &opts);
 
     /**
      * Perform low-epsilon parameter optimization followed by the AU test against the reference topologies,
@@ -207,10 +206,11 @@ protected:
      * Perform model and branch length optimization according to the current tuning parameters and the given epsilon.
      * If model optimization is currently disabled, load models from a backup.
      *
+     * @param opts parsed command line options and forced RAxML parameters
      * @param epsilon the likelihood threshold when to stop optimizing
      * @param force if true, model optimization is forced, disregarding batch tuning parameters
      */
-    void optimize_all_parameters(double epsilon, bool force = false);
+    void optimize_all_parameters(const Options &opts, double epsilon, bool force = false);
 
     /**
      * Store the current model parameters in a backup, such that we can restore them if optimization needs to continue.
