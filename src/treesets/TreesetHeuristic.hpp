@@ -90,7 +90,7 @@ private:
     const IDVector &tip_msa_idmap;
 
     /**
-     * @return the recommended number of threads for workers
+     * @return the recommended number of threads across all workers. Should be divisible by the number of workers
      */
     int recommended_thread_count();
 
