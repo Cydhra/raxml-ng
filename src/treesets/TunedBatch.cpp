@@ -84,6 +84,7 @@ void spr_kernel(std::vector<std::vector<TreeInfo> > &batch_trees,
                           const unsigned int tree_id) {
     for (unsigned int spr_round = num_spr_performed; spr_round < target_num_spr; ++spr_round) {
         batch_trees[tree_id][thread_id].spr_round(spr_params);
+        batch_trees[tree_id][thread_id].optimize_branches(1.0, 1);
     }
 
     LOG_WORKER_TS(LogLevel::progress) << "performed " << (target_num_spr - num_spr_performed)
