@@ -2,6 +2,7 @@
 
 #include "../coraxlib/src/corax/optimize/opt_generic.h"
 #include "../loadbalance/CoarseLoadBalancer.hpp"
+#include <chrono>
 
 using namespace std::placeholders;
 
@@ -55,11 +56,11 @@ std::function<void()> make_kernel(const CoarseAssignmentList &assignment_list,
  * Parallel kernel for the per-site log-likelihood calculation, given to make_kernel to create a pthread-main
  */
 void sitelh_kernel(const PartitionedMSA &msa,
-                             const PartitionAssignmentList &partition_assignment,
-                             std::vector<std::vector<doubleVector> > &persite_loglh,
-                             std::vector<std::vector<TreeInfo> > &batch_trees,
-                             const unsigned int thread_id,
-                             const unsigned int tree_id) {
+                   const PartitionAssignmentList &partition_assignment,
+                   std::vector<std::vector<doubleVector> > &persite_loglh,
+                   std::vector<std::vector<TreeInfo> > &batch_trees,
+                   const unsigned int thread_id,
+                   const unsigned int tree_id) {
     // collect the sub-partitions for the local worker
     auto &partitions = partition_assignment.at(thread_id);
     auto &tree_likelihood_vec = persite_loglh[tree_id];
@@ -77,28 +78,37 @@ void sitelh_kernel(const PartitionedMSA &msa,
  * Parallel kernel for SPR rounds, given to make_kernel to create a pthread-main
  */
 void spr_kernel(std::vector<std::vector<TreeInfo> > &batch_trees,
-                          spr_round_params &spr_params,
-                          const unsigned int num_spr_performed,
-                          const unsigned int target_num_spr,
-                          const unsigned int thread_id,
-                          const unsigned int tree_id) {
+                std::vector<unsigned int> &time_measurements,
+                spr_round_params &spr_params,
+                const unsigned int num_spr_performed,
+                const unsigned int target_num_spr,
+                const unsigned int thread_id,
+                const unsigned int tree_id) {
+    const auto global_thread_id = ParallelContext::group_id() * ParallelContext::threads_per_group() + thread_id;
+
+    const auto begin = std::chrono::steady_clock::now();
     for (unsigned int spr_round = num_spr_performed; spr_round < target_num_spr; ++spr_round) {
         batch_trees[tree_id][thread_id].spr_round(spr_params);
         batch_trees[tree_id][thread_id].optimize_branches(1.0, 1);
     }
+    const auto end = std::chrono::steady_clock::now();
+    const unsigned int elapsed = static_cast<unsigned int>(std::chrono::duration_cast<
+        std::chrono::milliseconds>(end - begin).count());
+
+    time_measurements[global_thread_id] += elapsed;
 
     LOG_WORKER_TS(LogLevel::progress) << "performed " << (target_num_spr - num_spr_performed)
             << (spr_params.ntopol_keep < 20 ? " GREEDY" : " FAST") << " spr rounds (radius: " << spr_params.radius_min
-            << ") for tree search #" << (tree_id + 1) << std::endl;
+            << ") for tree search #" << (tree_id + 1) << " in " << elapsed << "ms" << std::endl;
 }
 
 /**
  * Parallel kernel for model optimization, given to make_kernel to create a pthread-main
  */
 void model_opt_kernel(std::vector<std::vector<TreeInfo> > &batch_trees,
-                             const double epsilon,
-                             const unsigned int thread_id,
-                             const unsigned int tree_id) {
+                      const double epsilon,
+                      const unsigned int thread_id,
+                      const unsigned int tree_id) {
     batch_trees[tree_id][thread_id].optimize_model(epsilon);
 }
 
@@ -106,9 +116,9 @@ void model_opt_kernel(std::vector<std::vector<TreeInfo> > &batch_trees,
  * Parallel kernel for branch length optimization, given to make_kernel to create a pthread-main
  */
 void blo_kernel(std::vector<std::vector<TreeInfo> > &batch_trees,
-                                const double epsilon,
-                                const unsigned int thread_id,
-                                const unsigned int tree_id) {
+                const double epsilon,
+                const unsigned int thread_id,
+                const unsigned int tree_id) {
     batch_trees[tree_id][thread_id].optimize_params(CORAX_OPT_PARAM_BRANCHES_ITERATIVE, epsilon);
 }
 
@@ -193,6 +203,7 @@ void TunedBatch::infer_batch(const Options &opts) {
         std::ref(this->coarse_assignments),
         std::bind(spr_kernel,
                   std::ref(this->batch_trees),
+                  std::ref(this->per_thread_timing),
                   std::ref(this->spr_params),
                   this->num_spr_performed,
                   this->target_num_spr,

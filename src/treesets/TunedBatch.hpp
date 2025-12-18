@@ -59,6 +59,8 @@ public:
         CoarseAssignment tree_ids(batch_size);
         std::iota(tree_ids.begin(), tree_ids.end(), 0);
         this->coarse_assignments = load_balancer.get_all_assignments(tree_ids, this->num_workers);
+
+        this->per_thread_timing = std::vector<unsigned int>(num_threads);
     }
 
     /**
@@ -105,6 +107,13 @@ public:
      * applied.
      */
     void inherit_model(const TunedBatch &other);
+
+    /**
+     * Compute the total CPU (wall) time spent on inferring the batch. This includes the sum of all wall times spent
+     * by all threads.
+     * @return
+     */
+    unsigned int elapsed_cpu_time();
 
 protected:
     /**
@@ -186,6 +195,12 @@ protected:
     * AU test instance
     */
     shared_ptr<AuTest> au_test;
+
+    /**
+     * A vector of millisecond-timing of SPR rounds. The vector contains one entry per thread, which includes
+     * the time for all SPR rounds performed by the batch.
+     */
+    std::vector<unsigned int> per_thread_timing;
 
     /**
      * Get the number of threads per worker
