@@ -113,7 +113,7 @@ public:
      * by all threads.
      * @return
      */
-    unsigned int elapsed_cpu_time();
+    unsigned int elapsed_cpu_time() const;
 
 protected:
     /**
