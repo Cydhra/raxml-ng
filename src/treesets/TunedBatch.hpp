@@ -115,6 +115,12 @@ public:
      */
     unsigned int elapsed_cpu_time() const;
 
+    /**
+     * If an AU test has already been performed, count how many of the batch's trees are plausible.
+     * @return Number of trees with a p-value above 0.05. If no AU test has been performed
+     */
+    unsigned int plausible_tree_count() const;
+
 protected:
     /**
      * The starting seed (starting from 0) for this batch. Batches infer starting trees with ascending seeds, so this
