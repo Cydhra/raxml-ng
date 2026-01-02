@@ -337,9 +337,19 @@ void TunedBatch::inherit_model(const TunedBatch &other) {
 
 unsigned int TunedBatch::elapsed_cpu_time() const {
     unsigned int total = 0;
-    for (const auto time : this->per_thread_timing) {
+    for (const auto time: this->per_thread_timing) {
         total += time;
     }
 
     return total;
+}
+
+unsigned int TunedBatch::plausible_tree_count() const {
+    if (au_test->is_finished()) {
+        return count_plausible_trees(
+            this->au_test->get_p_values().begin() + reference_persite_loglh.size(),
+            this->au_test->get_p_values().end());
+    }
+
+    return 0;
 }
