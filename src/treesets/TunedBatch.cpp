@@ -78,28 +78,19 @@ void sitelh_kernel(const PartitionedMSA &msa,
  * Parallel kernel for SPR rounds, given to make_kernel to create a pthread-main
  */
 void spr_kernel(std::vector<std::vector<TreeInfo> > &batch_trees,
-                std::vector<unsigned int> &time_measurements,
                 spr_round_params &spr_params,
                 const unsigned int num_spr_performed,
                 const unsigned int target_num_spr,
                 const unsigned int thread_id,
                 const unsigned int tree_id) {
-    const auto global_thread_id = ParallelContext::group_id() * ParallelContext::threads_per_group() + thread_id;
-
-    const auto begin = std::chrono::steady_clock::now();
     for (unsigned int spr_round = num_spr_performed; spr_round < target_num_spr; ++spr_round) {
         batch_trees[tree_id][thread_id].spr_round(spr_params);
         batch_trees[tree_id][thread_id].optimize_branches(1.0, 1);
     }
-    const auto end = std::chrono::steady_clock::now();
-    const unsigned int elapsed = static_cast<unsigned int>(std::chrono::duration_cast<
-        std::chrono::milliseconds>(end - begin).count());
-
-    time_measurements[global_thread_id] += elapsed;
 
     LOG_WORKER_TS(LogLevel::progress) << "performed " << (target_num_spr - num_spr_performed)
             << (spr_params.ntopol_keep < 20 ? " GREEDY" : " FAST") << " spr rounds (radius: " << spr_params.radius_min
-            << ") for tree search #" << (tree_id + 1) << " in " << elapsed << "ms" << std::endl;
+            << ") for tree search #" << (tree_id + 1) << std::endl;
 }
 
 /**
@@ -199,11 +190,12 @@ void TunedBatch::infer_batch(const Options &opts) {
     }
 
     // compute SPR rounds in parallel
+    const auto begin = std::chrono::steady_clock::now();
+
     const auto spr_worker = make_kernel(
         std::ref(this->coarse_assignments),
         std::bind(spr_kernel,
                   std::ref(this->batch_trees),
-                  std::ref(this->per_thread_timing),
                   std::ref(this->spr_params),
                   this->num_spr_performed,
                   this->target_num_spr,
@@ -211,6 +203,12 @@ void TunedBatch::infer_batch(const Options &opts) {
     ParallelContext::init_pthreads_custom(opts, spr_worker, num_threads, num_workers);
     spr_worker();
     ParallelContext::finalize_threads();
+
+    const auto end = std::chrono::steady_clock::now();
+    const unsigned int elapsed = static_cast<unsigned int>(std::chrono::duration_cast<
+        std::chrono::milliseconds>(end - begin).count());
+    this->wall_time += elapsed;
+    LOG_INFO_TS << "Total batch time after " << this->target_num_spr << ": " << this->wall_time << "ms." << std::endl;
 
     // TODO this only works if checkpoints cannot recover tree states. When checkpointing is added, this mechanism needs
     //  to be changed
@@ -336,12 +334,7 @@ void TunedBatch::inherit_model(const TunedBatch &other) {
 }
 
 unsigned int TunedBatch::elapsed_cpu_time() const {
-    unsigned int total = 0;
-    for (const auto time: this->per_thread_timing) {
-        total += time;
-    }
-
-    return total;
+    return this->wall_time;
 }
 
 unsigned int TunedBatch::plausible_tree_count() const {
