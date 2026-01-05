@@ -3,6 +3,44 @@
 
 constexpr unsigned int BATCH_SIZE = 32;
 
+/**
+ * A collection of measurements associated with one TunedBatch instance.
+ * The benchmark tracks a series of wall-times for tree inference and the improvements in plausible tree counts.
+ *
+ * We can use those times to obtain the best parameters for batches that will yield the most plausible trees with the
+ * least wall-time spent.
+ */
+class BatchBenchmark {
+public:
+    std::vector<unsigned int> cost{};
+
+    /**
+     * Add a data point to the benchmark.
+     * @param plausible_trees How many plausible trees were reached (total)
+     * @param wall_time How many nanoseconds did it take to obtain the plausible tree count (total)
+     */
+    void add_data_point(const unsigned int plausible_trees, const unsigned int wall_time) {
+        cost.push_back(wall_time / plausible_trees);
+    }
+
+    /**
+     * Get the index of the data point where the cost (i.e. the time spent per plausible tree) is lowest.
+     * @return 0-based index of the datapoint of minimum time spent per plausible tree.
+     */
+    unsigned int get_cheapest_point() const {
+        return distance(cost.begin(), min_element(cost.begin(), cost.end()));
+    }
+
+    /**
+     * @return Returns true, if the last two data points did not improve the time per plausible tree metric,
+     *         meaning doing more work does not speed up computation.
+     */
+    bool is_converged() const {
+        const auto min = min_element(cost.begin(), cost.end());
+        return distance(min, cost.end()) > 2;
+    }
+};
+
 void TreesetHeuristic::infer_treeset(RaxmlInstance &instance, const Options &opts, CheckpointManager &cm,
                                      LoadBalancer &load_balancer) {
     // copy SPR parameters from local search state
@@ -29,6 +67,8 @@ void TreesetHeuristic::infer_treeset(RaxmlInstance &instance, const Options &opt
         seed_offset += BATCH_SIZE;
         batch.generate_starting_trees(instance, opts, load_balancer, tip_msa_idmap);
 
+        BatchBenchmark benchmark;
+
         switch (tuning_phase) {
             case TUNE_BASELINE:
                 if (batch.is_plausible(opts)) {
@@ -39,13 +79,24 @@ void TreesetHeuristic::infer_treeset(RaxmlInstance &instance, const Options &opt
                 }
 
                 LOG_INFO_TS << "Starting trees generally implausible; topology optimization necessary" << std::endl;
+
                 do {
+                    benchmark.add_data_point(batch.plausible_tree_count(), batch.elapsed_wall_time());
+
                     this->num_spr += 1;
                     batch.target_num_spr = this->num_spr;
                     batch.infer_batch(opts);
-                } while (!batch.is_plausible(opts));
+                } while (!batch.is_plausible(opts) && !benchmark.is_converged());
 
-                LOG_INFO_TS << this->num_spr << " spr rounds sufficient." << std::endl;
+                if (benchmark.is_converged()) {
+                    LOG_INFO_TS << "after " << benchmark.get_cheapest_point() << " spr rounds, plausibility converged."
+                            << std::endl;
+                } else {
+                    LOG_INFO_TS << benchmark.get_cheapest_point() << " spr rounds sufficient." << std::endl;
+                }
+
+                LOG_INFO_TS << "estimated time per FAST chunk: " << batch.elapsed_wall_time() << "ms." << std::endl;
+
                 tuning_phase = TUNE_GREEDY;
                 this->greedy_spr = true;
                 break;
