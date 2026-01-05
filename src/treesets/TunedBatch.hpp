@@ -59,8 +59,6 @@ public:
         CoarseAssignment tree_ids(batch_size);
         std::iota(tree_ids.begin(), tree_ids.end(), 0);
         this->coarse_assignments = load_balancer.get_all_assignments(tree_ids, this->num_workers);
-
-        this->per_thread_timing = std::vector<unsigned int>(num_threads);
     }
 
     /**
@@ -203,10 +201,12 @@ protected:
     shared_ptr<AuTest> au_test;
 
     /**
-     * A vector of millisecond-timing of SPR rounds. The vector contains one entry per thread, which includes
-     * the time for all SPR rounds performed by the batch.
+     * Time spent on this batch. Does not include overhead that could be largely avoided on batches outside the tuning
+     * phase.
+     * This mostly excludes time spent on model optimization (MO) because we only do a MO after all SPR rounds are finished.
+     * During tuning we do BLO between all SPR rounds though, which would throw off the walltime measurement.
      */
-    std::vector<unsigned int> per_thread_timing;
+    unsigned int wall_time { 0 };
 
     /**
      * Get the number of threads per worker
