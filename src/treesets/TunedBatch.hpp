@@ -107,11 +107,10 @@ public:
     void inherit_model(const TunedBatch &other);
 
     /**
-     * Compute the total CPU (wall) time spent on inferring the batch. This includes the sum of all wall times spent
-     * by all threads.
-     * @return
+     * Compute the total (wall) time spent on inferring the batch, ignoring the parallelization.
+     * @return Time spent working on inference in milliseconds.
      */
-    unsigned int elapsed_cpu_time() const;
+    unsigned int elapsed_wall_time() const;
 
     /**
      * If an AU test has already been performed, count how many of the batch's trees are plausible.

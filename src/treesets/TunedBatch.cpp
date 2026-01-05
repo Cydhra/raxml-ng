@@ -341,7 +341,7 @@ void TunedBatch::inherit_model(const TunedBatch &other) {
     }
 }
 
-unsigned int TunedBatch::elapsed_cpu_time() const {
+unsigned int TunedBatch::elapsed_wall_time() const {
     return this->wall_time;
 }
 
