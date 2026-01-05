@@ -136,6 +136,7 @@ unsigned int TunedBatch::get_batch_size() const {
 
 void TunedBatch::generate_starting_trees(RaxmlInstance &instance, const Options &opts, LoadBalancer &load_balancer,
                                          const IDVector &tip_msa_idmap) {
+    const auto begin = std::chrono::steady_clock::now();
     intVector seeds(this->get_batch_size());
     // generate ascending seeds from a starting point to allow coordinating batch seeds reproducibly.
     std::iota(seeds.begin(), seeds.end(), this->starting_seed);
@@ -174,6 +175,13 @@ void TunedBatch::generate_starting_trees(RaxmlInstance &instance, const Options 
                                                     tip_msa_idmap, this->part_assignments[local_thread_id]);
         }
     }
+
+    const auto end = std::chrono::steady_clock::now();
+    const unsigned int elapsed = static_cast<unsigned int>(std::chrono::duration_cast<
+        std::chrono::milliseconds>(end - begin).count());
+    this->wall_time += elapsed;
+
+    LOG_INFO_TS << "Total batch time after generating starting trees: " << this->wall_time << "ms." << std::endl;
 }
 
 void TunedBatch::infer_batch(const Options &opts) {
