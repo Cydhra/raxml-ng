@@ -26,7 +26,7 @@ void AuTest::run_bootstrap(const size_t num_rows, const size_t offset) {
     finished = false;
 
     // some debug information
-    LOG_INFO_TS << "Run Bootstrapping..." << std::endl;
+    LOG_DEBUG_TS << "Run Bootstrapping..." << std::endl;
 
     // prepare matrix array with offset matrices
     // we collect subarray pointers in `test_statistics_views` and since corax expects double pointers,
@@ -69,7 +69,7 @@ void AuTest::run_bootstrap(const size_t num_rows, const size_t offset) {
 }
 
 void AuTest::finalize_test_statistics() {
-    LOG_INFO_TS << "Calculating test statistics" << std::endl;
+    LOG_DEBUG_TS << "Calculating test statistics" << std::endl;
     for (unsigned int id_scale = 0; id_scale < AU_DEFAULT_SCALES.size(); id_scale++) {
         corax_normalize_lnl_bootstrap(test_statistics[id_scale], num_replicates[id_scale], num_trees);
     }
@@ -80,7 +80,7 @@ void AuTest::finalize_test_statistics() {
 
 
 void AuTest::calculate_p_values() {
-    LOG_INFO_TS << "Calculating p-values" << std::endl;
+    LOG_DEBUG_TS << "Calculating p-values" << std::endl;
     // TODO handle fine-grained parallelization: after all workers have generated their bootstrap replicates, we need
     //  to collect them on a master-worker of all worker groups and add them there, and the master will do the AU test
 
