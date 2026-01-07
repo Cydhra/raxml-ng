@@ -1,4 +1,7 @@
 #include "TreesetHeuristic.hpp"
+
+#include <climits>
+
 #include "TunedBatch.hpp"
 
 constexpr unsigned int BATCH_SIZE = 32;
@@ -12,6 +15,7 @@ constexpr unsigned int BATCH_SIZE = 32;
  */
 class BatchBenchmark {
 public:
+    std::vector<unsigned int> plausible_tree_counts{};
     std::vector<unsigned int> cost{};
 
     /**
@@ -20,6 +24,7 @@ public:
      * @param wall_time How many nanoseconds did it take to obtain the plausible tree count (total)
      */
     void add_data_point(const unsigned int plausible_trees, const unsigned int wall_time) {
+        plausible_tree_counts.push_back(plausible_trees);
         cost.push_back(wall_time / plausible_trees);
     }
 
@@ -29,6 +34,28 @@ public:
      */
     unsigned int get_cheapest_point() const {
         return distance(cost.begin(), min_element(cost.begin(), cost.end()));
+    }
+
+    /**
+     * Calculate the cost of improving the plausible tree set from the starting trees into the plausible tree set at
+     * the data point returned by get_cheapest_point.
+     * This allows comparing benchmarks across different starting tree sets: If a set has more plausible starting trees,
+     * it is probable that it will also have more plausible trees after N SPR rounds.
+     * But this doesn't mean that the parameters that were used during benchmarking are better, so to compare parameters,
+     * we compare the cost of adding trees to the plausible set.
+     *
+     * @return Milliseconds per tree added to the plausible tree set over the starting tree set, after N SPR rounds,
+     *         where N is the point of lowest cost.
+     */
+    unsigned int cost_of_improvement() const {
+        const auto cheapest_point = get_cheapest_point();
+        const auto improvement_count = plausible_tree_counts[cheapest_point] - plausible_tree_counts[0];
+
+        if (improvement_count == 0) {
+            return UINT_MAX;
+        }
+
+        return (cost[cheapest_point] - cost[0]) / improvement_count;
     }
 
     /**
