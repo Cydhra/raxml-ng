@@ -88,7 +88,7 @@ void spr_kernel(std::vector<std::vector<TreeInfo> > &batch_trees,
         batch_trees[tree_id][thread_id].optimize_branches(1.0, 1);
     }
 
-    LOG_WORKER_TS(LogLevel::progress) << "performed " << (target_num_spr - num_spr_performed)
+    LOG_WORKER_TS(LogLevel::debug) << "performed " << (target_num_spr - num_spr_performed)
             << (spr_params.ntopol_keep < 20 ? " GREEDY" : " FAST") << " spr rounds (radius: " << spr_params.radius_min
             << ") for tree search #" << (tree_id + 1) << std::endl;
 }
@@ -216,7 +216,7 @@ void TunedBatch::infer_batch(const Options &opts) {
     const unsigned int elapsed = static_cast<unsigned int>(std::chrono::duration_cast<
         std::chrono::milliseconds>(end - begin).count());
     this->wall_time += elapsed;
-    LOG_INFO_TS << "Total batch time after " << this->target_num_spr << ": " << this->wall_time << "ms." << std::endl;
+    LOG_INFO_TS << "Total batch time after round " << this->target_num_spr << ": " << this->wall_time << "ms." << std::endl;
 
     // TODO this only works if checkpoints cannot recover tree states. When checkpointing is added, this mechanism needs
     //  to be changed
