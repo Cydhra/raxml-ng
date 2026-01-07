@@ -87,10 +87,14 @@ void TreesetHeuristic::infer_treeset(RaxmlInstance &instance, const Options &opt
 
     // keep all batches around
     std::vector<TunedBatch> finished_batches;
+    std::vector<BatchBenchmark> benchmarks;
 
     while (tuning_phase != FINALIZED) {
-        auto batch = TunedBatch(this->greedy_spr, this->skip_model, this->num_spr, seed_offset, BATCH_SIZE, spr_params, this->recommended_thread_count(),
-                                         this->recommended_worker_count(), msa, persite_loglh);
+        auto batch = TunedBatch(this->greedy_spr, this->skip_model, this->num_spr, seed_offset, BATCH_SIZE, spr_params,
+                                this->recommended_thread_count(),
+                                this->recommended_worker_count(), msa, persite_loglh);
+        LOG_INFO_TS << "Inferring " << batch.get_batch_size() << " trees in batch for phase " << tuning_phase << std::endl;
+
         seed_offset += BATCH_SIZE;
         batch.generate_starting_trees(instance, opts, load_balancer, tip_msa_idmap);
 
@@ -99,7 +103,8 @@ void TreesetHeuristic::infer_treeset(RaxmlInstance &instance, const Options &opt
         switch (tuning_phase) {
             case TUNE_BASELINE:
                 if (batch.is_plausible(opts)) {
-                    LOG_INFO_TS << "Most starting trees are already plausible; topology optimization unnecessary" << std::endl;
+                    LOG_INFO_TS << "Most starting trees are already plausible; topology optimization unnecessary" <<
+                            std::endl;
                     this->accept_starting_trees = true;
                     tuning_phase = FINALIZED;
                     break;
@@ -115,25 +120,52 @@ void TreesetHeuristic::infer_treeset(RaxmlInstance &instance, const Options &opt
                     batch.infer_batch(opts);
                 } while (!batch.is_plausible(opts) && !benchmark.is_converged());
 
-                if (benchmark.is_converged()) {
-                    LOG_INFO_TS << "after " << benchmark.get_cheapest_point() << " spr rounds, plausibility converged."
-                            << std::endl;
-                } else {
-                    LOG_INFO_TS << benchmark.get_cheapest_point() << " spr rounds sufficient." << std::endl;
-                }
-
-                LOG_INFO_TS << "estimated time per FAST chunk: " << batch.elapsed_wall_time() << "ms." << std::endl;
+                LOG_INFO_TS << "FAST SPR rounds create cheapest improvement after " << benchmark.get_cheapest_point() << " SPR rounds." << std::endl;
 
                 tuning_phase = TUNE_GREEDY;
                 this->greedy_spr = true;
+                // reset spr for the greedy round measurement
+                this->num_spr = 0;
                 break;
             case TUNE_GREEDY:
-                batch.infer_batch(opts);
-                if (!batch.is_plausible(opts)) {
-                    LOG_INFO_TS << "Greedy spr yielded implausible trees, reverting to Top-K" << std::endl;
-                    this->greedy_spr = false;
+                // do AU test
+                if (batch.is_plausible(opts)) {
+                    // now we have a problem: we ran into a plausible batch by starting trees, but this did not happen
+                    // on the last batch, so we cannot rely on it.
+                    LOG_WARN << "GREEDY SPR benchmark prevented by plausible starting tree set." << std::endl;
+                    // TODO add the set to the batches and redraw trees?
+                }
+
+                do {
+                    benchmark.add_data_point(batch.plausible_tree_count(), batch.elapsed_wall_time());
+
+                    this->num_spr += 1;
+                    batch.target_num_spr = this->num_spr;
+                    batch.infer_batch(opts);
+                } while (!batch.is_plausible(opts) && !benchmark.is_converged());
+
+                LOG_INFO_TS << "GREEDY SPR rounds create cheapest improvement after " << benchmark.get_cheapest_point() << " SPR rounds." << std::endl;
+
+                if (benchmark.is_converged()) {
+                    LOG_INFO_TS << "after " << benchmark.get_cheapest_point() << " GREEDY spr rounds, plausibility converged."
+                            << std::endl;
+
+                    const auto fast_cost = benchmarks.back().cost_of_improvement();
+                    const auto greedy_cost = benchmark.cost_of_improvement();
+
+                    LOG_DEBUG_TS << "FAST SPR rounds improvement cost: " << fast_cost << "; GREEDY SPR rounds improvement cost: " << greedy_cost << std::endl;
+
+                    if (fast_cost < greedy_cost) {
+                        LOG_INFO_TS << "FAST SPR rounds provider cheaper improvement than GREEDY SPR rounds. Disabling GREEDY search." << std::endl;
+                        this->greedy_spr = false;
+                        this->num_spr = benchmarks.back().get_cheapest_point();
+                    } else {
+                        LOG_INFO_TS << "GREEDY SPR rounds provider cheaper improvement than FAST SPR rounds. Keeping GREEDY search." << std::endl;
+                        this->num_spr = benchmark.get_cheapest_point();
+                    }
                 } else {
-                    LOG_INFO_TS << "Greedy spr rounds yielded plausible trees. Disabling Top-K." << std::endl;
+                    LOG_WARN << benchmark.get_cheapest_point() << " GREEDY spr rounds saturated the benchmark. Keeping GREEDY search." << std::endl;
+                    this->num_spr = benchmark.get_cheapest_point();
                 }
 
                 this->skip_model = true;
@@ -143,10 +175,14 @@ void TreesetHeuristic::infer_treeset(RaxmlInstance &instance, const Options &opt
                 batch.inherit_model(*(finished_batches.end() - 1));
                 batch.infer_batch(opts);
                 if (!batch.is_plausible(opts)) {
-                    LOG_INFO_TS << "Skipping model optimization yielded implausible trees, reverting to per-tree model optimization." << std::endl;
+                    LOG_INFO_TS <<
+                            "Skipping model optimization yielded implausible trees, reverting to per-tree model optimization."
+                            << std::endl;
                     this->skip_model = false;
                 } else {
-                    LOG_INFO_TS << "Skipping model optimization yielded plausible trees, disabling per-tree model optimization." << std::endl;
+                    LOG_INFO_TS <<
+                            "Skipping model optimization yielded plausible trees, disabling per-tree model optimization."
+                            << std::endl;
                 }
 
                 this->tuning_phase = FINALIZED;
@@ -156,6 +192,8 @@ void TreesetHeuristic::infer_treeset(RaxmlInstance &instance, const Options &opt
         }
 
         finished_batches.push_back(std::move(batch));
+        benchmarks.push_back(std::move(benchmark));
+        LOG_INFO << std::endl;
     }
 
     LOG_INFO_TS << "treeset inference complete." << std::endl;
