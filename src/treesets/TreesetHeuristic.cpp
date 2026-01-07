@@ -59,12 +59,12 @@ public:
     }
 
     /**
-     * @return Returns true, if the last two data points did not improve the time per plausible tree metric,
+     * @return Returns true, if the last two data points did not improve the time-per-plausible-tree metric,
      *         meaning doing more work does not speed up computation.
      */
     bool is_converged() const {
         const auto min = min_element(cost.begin(), cost.end());
-        return distance(min, cost.end()) > 2;
+        return distance(min, cost.end()) > 1;
     }
 };
 
