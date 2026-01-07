@@ -93,6 +93,11 @@ public:
     void infer_batch(const Options &opts);
 
     /**
+     * Perform the AU test on the trees in the batch, as well as the supplied reference trees.
+     */
+    unsigned int perform_au_test(const Options &opts);
+
+    /**
      * Perform low-epsilon parameter optimization followed by the AU test against the reference topologies,
      * and calculate the ratio of batch trees which are considered plausible. Returns true, if the ratio reaches
      * the threshold.
@@ -213,11 +218,6 @@ protected:
     unsigned int num_threads_per_worker() const {
         return num_threads / num_workers;
     }
-
-    /**
-     * Perform the AU test on the trees in the batch, as well as the supplied reference trees.
-     */
-    unsigned int perform_au_test(const Options &opts);
 
     /**
      * Perform model and branch length optimization according to the current tuning parameters and the given epsilon.
