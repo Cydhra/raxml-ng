@@ -4,7 +4,7 @@
 
 #include "TunedBatch.hpp"
 
-constexpr unsigned int BATCH_SIZE = 16;
+constexpr unsigned int BATCH_SIZE = 32;
 
 constexpr unsigned int POOL_SIZE = 8;
 
