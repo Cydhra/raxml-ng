@@ -184,14 +184,14 @@ void TunedBatch::generate_starting_trees(RaxmlInstance &instance, const Options 
     LOG_INFO_TS << "Total batch time after generating starting trees: " << this->wall_time << "ms." << std::endl;
 }
 
-void TunedBatch::optimize_model(const Options &opts) {
+void TunedBatch::optimize(const Options &opts) {
     LOG_DEBUG_TS << "Optimizing model with (eps: 3.0) for batch [BLO: " << !this->greedy_spr << ", MO: " << !this->skip_model << ", SPR: " <<
             this->target_num_spr << "]" << std::endl;
-    this->optimize_all_parameters(opts, 3.0, false);
-}
+    if (this->num_spr_performed == 0) {
+        this->optimize_all_parameters(opts, 3.0, false);
+    }
 
-void TunedBatch::optimize_topology(const Options &opts) {
-    LOG_INFO_TS << "Running SPR rounds for batch [BLO: " << !this->greedy_spr << ", MO: " << !this->skip_model << ", SPR: " <<
+    LOG_DEBUG_TS << "Running SPR rounds for batch [BLO: " << !this->greedy_spr << ", MO: " << !this->skip_model << ", SPR: " <<
             this->target_num_spr << "] with " << this->num_threads << " threads." << std::endl;
 
     if (this->greedy_spr) {
@@ -275,7 +275,7 @@ unsigned int TunedBatch::perform_au_test(const Options &opts) {
     return plausible_trees;
 }
 
-bool TunedBatch::is_plausible(const Options &opts) {
+unsigned int TunedBatch::plausibility_check(const Options &opts) {
     // we need to save the model backup, for two reasons: we do not want to perform tree search on hyper-optimized
     // models to allow for shallower likelihood curves of slightly suboptimal models.
     // Further, multiple calls to is_plausible must not optimize the hyper-optimized model with low episolon again
@@ -284,6 +284,11 @@ bool TunedBatch::is_plausible(const Options &opts) {
     this->optimize_all_parameters(opts, 0.1, true);
     const unsigned int plausible_trees = this->perform_au_test(opts);
     this->restore_model_backup();
+    return plausible_trees;
+}
+
+bool TunedBatch::is_plausible(const Options &opts) {
+    const auto plausible_trees = this->plausibility_check(opts);
     return plausible_trees >= static_cast<unsigned int>(
                static_cast<double>(this->get_batch_size()) * ACCEPT_TUNING_THRESHOLD);
 }

@@ -88,19 +88,9 @@ public:
                                  const IDVector &tip_msa_idmap);
 
     /**
-     * Using the batch configuration, optimize the models of the current trees using an intermediate epsilon value.
-     * We do not hyper-optimize the model to avoid creating a local minimum around the trees to allow for further
-     * topological optimization.
-     *
-     * This should be called before SPR optimization. If skip-model optimization is true, this instead loads the model
-     * from the backup.
-     */
-    void optimize_model(const Options &opts);
-
-    /**
      * Using the batch configuration, infer K trees in parallel.
      */
-    void optimize_topology(const Options &opts);
+    void optimize(const Options &opts);
 
     /**
      * Perform the AU test on the trees in the batch, as well as the supplied reference trees.
@@ -108,9 +98,20 @@ public:
     unsigned int perform_au_test(const Options &opts);
 
     /**
+     * Perform the AU test on the trees in the batch, as well as the supplied reference trees,
+     * but backup the model before, optimize the model fully, and then restore the original model.
+     *
+     * @return The number of plausible trees.
+     */
+    unsigned int plausibility_check(const Options &opts);
+
+    /**
      * Perform low-epsilon parameter optimization followed by the AU test against the reference topologies,
      * and calculate the ratio of batch trees which are considered plausible. Returns true, if the ratio reaches
      * the threshold.
+     *
+     * This method does the same as plausibility_check, and then checks whether the batch has already exceeded
+     * 90% plausible trees.
      */
     bool is_plausible(const Options &opts);
 
