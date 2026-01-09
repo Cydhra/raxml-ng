@@ -85,15 +85,34 @@ void TreesetHeuristic::infer_treeset(RaxmlInstance &instance, const Options &opt
     // then generating seeds using rand(), so we won't be creating duplicates by starting over from the random_seed.
     auto seed_offset = opts.random_seed;
 
-    // keep all batches around
-    std::vector<TunedBatch> finished_batches;
+    // step 1: we need to prepare a set of batches so that we can use batches of similar starting tree plausibility for
+    // the tuning phase
+    std::vector<TunedBatch> all_batches;
+
+    // TODO add constant for the number of batches
+    for (auto i = 0; i < 8; ++i) {
+        all_batches.emplace_back(TunedBatch(false, false, 0, seed_offset, BATCH_SIZE, spr_params,
+                                            this->recommended_thread_count(), this->recommended_worker_count(), msa,
+                                            persite_loglh));
+        auto &batch = all_batches.back();
+        seed_offset += BATCH_SIZE;
+        batch.generate_starting_trees(instance, opts, load_balancer, tip_msa_idmap);
+
+        // calling infer_batch with target num_spr set to 0 will only perform a single model optimization
+        batch.infer_batch(opts);
+        auto plausible_tree_count = batch.perform_au_test(opts);
+        LOG_INFO << "Plausible Starting Trees: " << plausible_tree_count << std::endl;
+    }
+
+    // benchmarks during tuning
     std::vector<BatchBenchmark> benchmarks;
 
     while (tuning_phase != FINALIZED) {
         auto batch = TunedBatch(this->greedy_spr, this->skip_model, this->num_spr, seed_offset, BATCH_SIZE, spr_params,
                                 this->recommended_thread_count(),
                                 this->recommended_worker_count(), msa, persite_loglh);
-        LOG_INFO_TS << "Inferring " << batch.get_batch_size() << " trees in batch for phase " << tuning_phase << std::endl;
+        LOG_INFO_TS << "Inferring " << batch.get_batch_size() << " trees in batch for phase " << tuning_phase <<
+                std::endl;
 
         seed_offset += BATCH_SIZE;
         batch.generate_starting_trees(instance, opts, load_balancer, tip_msa_idmap);
@@ -120,7 +139,8 @@ void TreesetHeuristic::infer_treeset(RaxmlInstance &instance, const Options &opt
                     batch.infer_batch(opts);
                 } while (!batch.is_plausible(opts) && !benchmark.is_converged());
 
-                LOG_INFO_TS << "FAST SPR rounds create cheapest improvement after " << benchmark.get_cheapest_point() << " SPR rounds." << std::endl;
+                LOG_INFO_TS << "FAST SPR rounds create cheapest improvement after " << benchmark.get_cheapest_point() <<
+                        " SPR rounds." << std::endl;
 
                 tuning_phase = TUNE_GREEDY;
                 this->greedy_spr = true;
@@ -144,27 +164,35 @@ void TreesetHeuristic::infer_treeset(RaxmlInstance &instance, const Options &opt
                     batch.infer_batch(opts);
                 } while (!batch.is_plausible(opts) && !benchmark.is_converged());
 
-                LOG_INFO_TS << "GREEDY SPR rounds create cheapest improvement after " << benchmark.get_cheapest_point() << " SPR rounds." << std::endl;
+                LOG_INFO_TS << "GREEDY SPR rounds create cheapest improvement after " << benchmark.get_cheapest_point()
+                        << " SPR rounds." << std::endl;
 
                 if (benchmark.is_converged()) {
-                    LOG_INFO_TS << "after " << benchmark.get_cheapest_point() << " GREEDY spr rounds, plausibility converged."
+                    LOG_INFO_TS << "after " << benchmark.get_cheapest_point() <<
+                            " GREEDY spr rounds, plausibility converged."
                             << std::endl;
 
                     const auto fast_cost = benchmarks.back().cost_of_improvement();
                     const auto greedy_cost = benchmark.cost_of_improvement();
 
-                    LOG_DEBUG_TS << "FAST SPR rounds improvement cost: " << fast_cost << "; GREEDY SPR rounds improvement cost: " << greedy_cost << std::endl;
+                    LOG_DEBUG_TS << "FAST SPR rounds improvement cost: " << fast_cost <<
+                            "; GREEDY SPR rounds improvement cost: " << greedy_cost << std::endl;
 
                     if (fast_cost < greedy_cost) {
-                        LOG_INFO_TS << "FAST SPR rounds provider cheaper improvement than GREEDY SPR rounds. Disabling GREEDY search." << std::endl;
+                        LOG_INFO_TS <<
+                                "FAST SPR rounds provider cheaper improvement than GREEDY SPR rounds. Disabling GREEDY search."
+                                << std::endl;
                         this->greedy_spr = false;
                         this->num_spr = benchmarks.back().get_cheapest_point();
                     } else {
-                        LOG_INFO_TS << "GREEDY SPR rounds provider cheaper improvement than FAST SPR rounds. Keeping GREEDY search." << std::endl;
+                        LOG_INFO_TS <<
+                                "GREEDY SPR rounds provider cheaper improvement than FAST SPR rounds. Keeping GREEDY search."
+                                << std::endl;
                         this->num_spr = benchmark.get_cheapest_point();
                     }
                 } else {
-                    LOG_WARN << benchmark.get_cheapest_point() << " GREEDY spr rounds saturated the benchmark. Keeping GREEDY search." << std::endl;
+                    LOG_WARN << benchmark.get_cheapest_point() <<
+                            " GREEDY spr rounds saturated the benchmark. Keeping GREEDY search." << std::endl;
                     this->num_spr = benchmark.get_cheapest_point();
                 }
 
@@ -172,7 +200,7 @@ void TreesetHeuristic::infer_treeset(RaxmlInstance &instance, const Options &opt
                 this->tuning_phase = TUNE_MODEL_OPT;
                 break;
             case TUNE_MODEL_OPT:
-                batch.inherit_model(*(finished_batches.end() - 1));
+                batch.inherit_model(*(all_batches.end() - 1));
                 batch.infer_batch(opts);
                 if (!batch.is_plausible(opts)) {
                     LOG_INFO_TS <<
@@ -191,7 +219,7 @@ void TreesetHeuristic::infer_treeset(RaxmlInstance &instance, const Options &opt
                 break;
         }
 
-        finished_batches.push_back(std::move(batch));
+        all_batches.push_back(std::move(batch));
         benchmarks.push_back(std::move(benchmark));
         LOG_INFO << std::endl;
     }
