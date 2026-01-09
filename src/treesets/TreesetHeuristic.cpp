@@ -100,8 +100,7 @@ void TreesetHeuristic::infer_treeset(RaxmlInstance &instance, const Options &opt
         auto &batch = batch_pool.back();
         seed_offset += BATCH_SIZE;
         batch.generate_starting_trees(instance, opts, load_balancer, tip_msa_idmap);
-        batch.optimize_model(opts);
-        auto plausible_tree_count = batch.perform_au_test(opts);
+        auto plausible_tree_count = batch.plausibility_check(opts);
         total_plausible += plausible_tree_count;
         pool_index.push_back(make_tuple(pool_index.size(), plausible_tree_count));
     }
@@ -126,7 +125,7 @@ void TreesetHeuristic::infer_treeset(RaxmlInstance &instance, const Options &opt
     auto first_batch = 0;
     auto batch_cost = UINT_MAX;
     for (unsigned int i = 0; batch_cost > 0 && i < pool_index.size() - 1; i++) {
-        auto cost = batch_pool[get<0>(pool_index[i + 1])].plausible_tree_count() - batch_pool[get<0>(pool_index[i])].
+        const auto cost = batch_pool[get<0>(pool_index[i + 1])].plausible_tree_count() - batch_pool[get<0>(pool_index[i])].
                     plausible_tree_count();
         if (cost < batch_cost) {
             first_batch = i;
@@ -169,7 +168,7 @@ void TreesetHeuristic::infer_treeset(RaxmlInstance &instance, const Options &opt
                 do {
                     benchmark.add_data_point(batch.plausible_tree_count(), batch.elapsed_wall_time());
                     batch.target_num_spr += 1;
-                    batch.optimize_topology(opts);
+                    batch.optimize(opts);
                 } while (!batch.is_plausible(opts) && !benchmark.is_converged());
 
                 LOG_INFO << "FAST SPR rounds create cheapest improvement after " << benchmark.get_cheapest_point() <<
@@ -184,7 +183,7 @@ void TreesetHeuristic::infer_treeset(RaxmlInstance &instance, const Options &opt
                 do {
                     benchmark.add_data_point(batch.plausible_tree_count(), batch.elapsed_wall_time());
                     batch.target_num_spr += 1;
-                    batch.optimize_topology(opts);
+                    batch.optimize(opts);
                 } while (!batch.is_plausible(opts) && !benchmark.is_converged());
 
                 LOG_INFO << "GREEDY SPR rounds create cheapest improvement after " << benchmark.get_cheapest_point()
@@ -224,8 +223,8 @@ void TreesetHeuristic::infer_treeset(RaxmlInstance &instance, const Options &opt
                 this->tuning_phase = TUNE_MODEL_OPT;
                 break;
             case TUNE_MODEL_OPT:
-                batch.inherit_model(*(all_batches.end() - 1));
-                batch.optimize_topology(opts);
+                batch.inherit_model(all_batches[cursor - 1]);
+                batch.optimize(opts);
                 if (!batch.is_plausible(opts)) {
                     LOG_INFO_TS <<
                             "Skipping model optimization yielded implausible trees, reverting to per-tree model optimization."
@@ -254,7 +253,6 @@ void TreesetHeuristic::infer_treeset(RaxmlInstance &instance, const Options &opt
                                                 recommended_worker_count(), msa, persite_loglh));
             seed_offset += BATCH_SIZE;
             all_batches.back().generate_starting_trees(instance, opts, load_balancer, tip_msa_idmap);
-            all_batches.back().optimize_model(opts);
         }
         LOG_INFO << std::endl;
     }
