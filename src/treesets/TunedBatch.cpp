@@ -184,14 +184,15 @@ void TunedBatch::generate_starting_trees(RaxmlInstance &instance, const Options 
     LOG_INFO_TS << "Total batch time after generating starting trees: " << this->wall_time << "ms." << std::endl;
 }
 
-void TunedBatch::infer_batch(const Options &opts) {
-    LOG_INFO_TS << "Running inference batch [BLO: " << !this->light_spr << ", MO: " << !this->skip_model << ", SPR: " <<
-            this->target_num_spr << "] with " << this->num_threads << " threads." << std::endl;
+void TunedBatch::optimize_model(const Options &opts) {
+    LOG_DEBUG_TS << "Optimizing model with (eps: 3.0) for batch [BLO: " << !this->light_spr << ", MO: " << !this->skip_model << ", SPR: " <<
+            this->target_num_spr << "]" << std::endl;
+    this->optimize_all_parameters(opts, 3.0, false);
+}
 
-    // do initial model and branch length optimization
-    if (num_spr_performed == 0) {
-        this->optimize_all_parameters(opts, 3.0);
-    }
+void TunedBatch::optimize_topology(const Options &opts) {
+    LOG_INFO_TS << "Running SPR rounds for batch [BLO: " << !this->light_spr << ", MO: " << !this->skip_model << ", SPR: " <<
+            this->target_num_spr << "] with " << this->num_threads << " threads." << std::endl;
 
     if (this->light_spr) {
         this->spr_params.ntopol_keep = 1;
