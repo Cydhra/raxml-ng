@@ -99,7 +99,7 @@ void TreesetHeuristic::infer_treeset(RaxmlInstance &instance, const Options &opt
         batch.generate_starting_trees(instance, opts, load_balancer, tip_msa_idmap);
 
         // calling infer_batch with target num_spr set to 0 will only perform a single model optimization
-        batch.infer_batch(opts);
+        batch.optimize_model(opts);
         auto plausible_tree_count = batch.perform_au_test(opts);
         LOG_INFO << "Plausible Starting Trees: " << plausible_tree_count << std::endl;
     }
@@ -116,6 +116,7 @@ void TreesetHeuristic::infer_treeset(RaxmlInstance &instance, const Options &opt
 
         seed_offset += BATCH_SIZE;
         batch.generate_starting_trees(instance, opts, load_balancer, tip_msa_idmap);
+        batch.optimize_model(opts);
 
         BatchBenchmark benchmark;
 
@@ -136,7 +137,7 @@ void TreesetHeuristic::infer_treeset(RaxmlInstance &instance, const Options &opt
 
                     this->num_spr += 1;
                     batch.target_num_spr = this->num_spr;
-                    batch.infer_batch(opts);
+                    batch.optimize_topology(opts);
                 } while (!batch.is_plausible(opts) && !benchmark.is_converged());
 
                 LOG_INFO_TS << "FAST SPR rounds create cheapest improvement after " << benchmark.get_cheapest_point() <<
@@ -161,7 +162,7 @@ void TreesetHeuristic::infer_treeset(RaxmlInstance &instance, const Options &opt
 
                     this->num_spr += 1;
                     batch.target_num_spr = this->num_spr;
-                    batch.infer_batch(opts);
+                    batch.optimize_topology(opts);
                 } while (!batch.is_plausible(opts) && !benchmark.is_converged());
 
                 LOG_INFO_TS << "GREEDY SPR rounds create cheapest improvement after " << benchmark.get_cheapest_point()
@@ -201,7 +202,7 @@ void TreesetHeuristic::infer_treeset(RaxmlInstance &instance, const Options &opt
                 break;
             case TUNE_MODEL_OPT:
                 batch.inherit_model(*(all_batches.end() - 1));
-                batch.infer_batch(opts);
+                batch.optimize_topology(opts);
                 if (!batch.is_plausible(opts)) {
                     LOG_INFO_TS <<
                             "Skipping model optimization yielded implausible trees, reverting to per-tree model optimization."

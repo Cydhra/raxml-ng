@@ -88,9 +88,19 @@ public:
                                  const IDVector &tip_msa_idmap);
 
     /**
+     * Using the batch configuration, optimize the models of the current trees using an intermediate epsilon value.
+     * We do not hyper-optimize the model to avoid creating a local minimum around the trees to allow for further
+     * topological optimization.
+     *
+     * This should be called before SPR optimization. If skip-model optimization is true, this instead loads the model
+     * from the backup.
+     */
+    void optimize_model(const Options &opts);
+
+    /**
      * Using the batch configuration, infer K trees in parallel.
      */
-    void infer_batch(const Options &opts);
+    void optimize_topology(const Options &opts);
 
     /**
      * Perform the AU test on the trees in the batch, as well as the supplied reference trees.
