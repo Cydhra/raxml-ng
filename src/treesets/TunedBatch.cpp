@@ -185,16 +185,16 @@ void TunedBatch::generate_starting_trees(RaxmlInstance &instance, const Options 
 }
 
 void TunedBatch::optimize_model(const Options &opts) {
-    LOG_DEBUG_TS << "Optimizing model with (eps: 3.0) for batch [BLO: " << !this->light_spr << ", MO: " << !this->skip_model << ", SPR: " <<
+    LOG_DEBUG_TS << "Optimizing model with (eps: 3.0) for batch [BLO: " << !this->greedy_spr << ", MO: " << !this->skip_model << ", SPR: " <<
             this->target_num_spr << "]" << std::endl;
     this->optimize_all_parameters(opts, 3.0, false);
 }
 
 void TunedBatch::optimize_topology(const Options &opts) {
-    LOG_INFO_TS << "Running SPR rounds for batch [BLO: " << !this->light_spr << ", MO: " << !this->skip_model << ", SPR: " <<
+    LOG_INFO_TS << "Running SPR rounds for batch [BLO: " << !this->greedy_spr << ", MO: " << !this->skip_model << ", SPR: " <<
             this->target_num_spr << "] with " << this->num_threads << " threads." << std::endl;
 
-    if (this->light_spr) {
+    if (this->greedy_spr) {
         this->spr_params.ntopol_keep = 1;
     }
 
@@ -227,7 +227,7 @@ void TunedBatch::optimize_topology(const Options &opts) {
 }
 
 unsigned int TunedBatch::perform_au_test(const Options &opts) {
-    LOG_INFO_TS << "Running AU test for batch [BLO: " << !this->light_spr << ", MO: "
+    LOG_INFO_TS << "Running AU test for batch [BLO: " << !this->greedy_spr << ", MO: "
             << !this->skip_model << ", SPR: " << this->target_num_spr << "] with "
             << this->num_threads << " threads." << std::endl;
 

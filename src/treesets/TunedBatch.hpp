@@ -30,7 +30,7 @@ public:
                const unsigned int num_workers,
                const std::shared_ptr<PartitionedMSA> &msa,
                const std::vector<std::vector<doubleVector> > &reference_persite_loglh)
-        : light_spr(light_spr),
+        : greedy_spr(light_spr),
           skip_model(skip_model),
           target_num_spr(num_spr),
           starting_seed(starting_seed),
@@ -64,12 +64,12 @@ public:
     /**
      * If true, replace fast SPR rounds with light SPR rounds that do even less BLOs.
      */
-    const bool light_spr;
+    bool greedy_spr;
 
     /**
      * If true, skip the first model optimization by reusing model parameters from the previous search.
      */
-    const bool skip_model;
+    bool skip_model;
 
     /**
      * How many SPR rounds to perform for each tree search. This parameter can be updated.
