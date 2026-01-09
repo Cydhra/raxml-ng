@@ -198,29 +198,31 @@ void TunedBatch::infer_batch(const Options &opts) {
     }
 
     // compute SPR rounds in parallel
-    const auto begin = std::chrono::steady_clock::now();
+    if (this->target_num_spr > this->num_spr_performed) {
+        const auto begin = std::chrono::steady_clock::now();
 
-    const auto spr_worker = make_kernel(
-        std::ref(this->coarse_assignments),
-        std::bind(spr_kernel,
-                  std::ref(this->batch_trees),
-                  std::ref(this->spr_params),
-                  this->num_spr_performed,
-                  this->target_num_spr,
-                  _1, _2));
-    ParallelContext::init_pthreads_custom(opts, spr_worker, num_threads, num_workers);
-    spr_worker();
-    ParallelContext::finalize_threads();
+        const auto spr_worker = make_kernel(
+            std::ref(this->coarse_assignments),
+            std::bind(spr_kernel,
+                      std::ref(this->batch_trees),
+                      std::ref(this->spr_params),
+                      this->num_spr_performed,
+                      this->target_num_spr,
+                      _1, _2));
+        ParallelContext::init_pthreads_custom(opts, spr_worker, num_threads, num_workers);
+        spr_worker();
+        ParallelContext::finalize_threads();
 
-    const auto end = std::chrono::steady_clock::now();
-    const unsigned int elapsed = static_cast<unsigned int>(std::chrono::duration_cast<
-        std::chrono::milliseconds>(end - begin).count());
-    this->wall_time += elapsed;
-    LOG_INFO_TS << "Total batch time after round " << this->target_num_spr << ": " << this->wall_time << "ms." << std::endl;
+        const auto end = std::chrono::steady_clock::now();
+        const unsigned int elapsed = static_cast<unsigned int>(std::chrono::duration_cast<
+            std::chrono::milliseconds>(end - begin).count());
+        this->wall_time += elapsed;
+        LOG_INFO_TS << "Total batch time after round " << this->target_num_spr << ": " << this->wall_time << "ms." << std::endl;
 
-    // TODO this only works if checkpoints cannot recover tree states. When checkpointing is added, this mechanism needs
-    //  to be changed
-    num_spr_performed = this->target_num_spr;
+        // TODO this only works if checkpoints cannot recover tree states. When checkpointing is added, this mechanism needs
+        //  to be changed
+        num_spr_performed = this->target_num_spr;
+    }
 }
 
 unsigned int TunedBatch::perform_au_test(const Options &opts) {
