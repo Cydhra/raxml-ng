@@ -223,18 +223,21 @@ void TreesetHeuristic::infer_treeset(RaxmlInstance &instance, const Options &opt
                 this->tuning_phase = TUNE_MODEL_OPT;
                 break;
             case TUNE_MODEL_OPT:
+                benchmark.add_data_point(batch.plausible_tree_count(), batch.elapsed_wall_time());
+
+                batch.greedy_spr = this->greedy_spr;
+                batch.target_num_spr = this->num_spr;
                 batch.inherit_model(all_batches[cursor - 1]);
                 batch.optimize(opts);
-                if (!batch.is_plausible(opts)) {
-                    LOG_INFO_TS <<
-                            "Skipping model optimization yielded implausible trees, reverting to per-tree model optimization."
-                            << std::endl;
-                    this->skip_model = false;
-                } else {
-                    LOG_INFO_TS <<
-                            "Skipping model optimization yielded plausible trees, disabling per-tree model optimization."
-                            << std::endl;
+
+                benchmark.add_data_point(batch.plausibility_check(opts), batch.elapsed_wall_time());
+
+                if (benchmark.cost_of_improvement() < benchmarks.back().cost_of_improvement()) {
+                    LOG_INFO << "Skipping model optimization is more efficient." << std::endl;
                     this->skip_model = true;
+                } else {
+                    LOG_INFO << "Skipping model optimization is less efficient." << std::endl;
+                    this->skip_model = false;
                 }
 
                 this->tuning_phase = FINALIZED;
