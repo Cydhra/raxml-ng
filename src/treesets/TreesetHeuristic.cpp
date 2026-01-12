@@ -27,7 +27,11 @@ public:
      */
     void add_data_point(const unsigned int plausible_trees, const unsigned int wall_time) {
         plausible_tree_counts.push_back(plausible_trees);
-        cost.push_back(wall_time / plausible_trees);
+        if (plausible_trees > 0) {
+            cost.push_back(wall_time / plausible_trees);
+        } else {
+            cost.push_back(UINT_MAX);
+        }
     }
 
     /**
