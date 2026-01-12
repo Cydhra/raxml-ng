@@ -231,6 +231,7 @@ void TreesetHeuristic::infer_treeset(RaxmlInstance &instance, const Options &opt
 
                 batch.greedy_spr = this->greedy_spr;
                 batch.target_num_spr = this->num_spr;
+                batch.skip_model = true;
                 batch.inherit_model(all_batches[cursor - 1]);
                 batch.optimize(opts);
 
