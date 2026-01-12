@@ -256,9 +256,9 @@ void TreesetHeuristic::infer_treeset(RaxmlInstance &instance, const Options &opt
         // advance batch cursor and create new batch if necessary
         cursor += 1;
         if (all_batches.size() == cursor) {
-            all_batches.emplace_back(TunedBatch(this->greedy_spr, this->skip_model, this->num_spr, seed_offset,
+            all_batches.emplace_back(this->greedy_spr, this->skip_model, this->num_spr, seed_offset,
                                                 BATCH_SIZE, spr_params, recommended_thread_count(),
-                                                recommended_worker_count(), msa, persite_loglh));
+                                                recommended_worker_count(), msa, persite_loglh);
             seed_offset += BATCH_SIZE;
             all_batches.back().generate_starting_trees(instance, opts, load_balancer, tip_msa_idmap);
         }
