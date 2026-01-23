@@ -188,6 +188,12 @@ protected:
     shared_ptr<AuTest> au_test;
 
     /**
+     * Flag indicating whether the au_test instance is outdated.
+     * The class must set the flag to true whenever the per-site log-likelihoods for the batch trees change.
+     */
+    bool au_test_dirty { true };
+
+    /**
      * Time spent on this batch. Does not include overhead that could be largely avoided on batches outside the tuning
      * phase.
      * This mostly excludes time spent on model optimization (MO) because we only do a MO after all SPR rounds are finished.
