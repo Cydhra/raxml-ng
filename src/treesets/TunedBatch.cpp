@@ -114,21 +114,8 @@ void blo_kernel(std::vector<std::vector<TreeInfo> > &batch_trees,
     batch_trees[tree_id][thread_id].optimize_params(CORAX_OPT_PARAM_BRANCHES_ITERATIVE, epsilon);
 }
 
-/**
- * Count the plausible trees in a range of p-values given through two iterators
- * @param first starting p-value (inclusive)
- * @param last end iterator state (exclusive)
- */
-template<class Iter>
-static unsigned int count_plausible_trees(Iter first, Iter last) {
-    unsigned int unrejected_trees = 0;
-    for (; first != last; ++first) {
-        if (*first > 0.05) {
-            unrejected_trees += 1;
-        }
-    }
-
-    return unrejected_trees;
+void TunedBatch::mark_p_values_dirty() {
+    this->au_test_dirty = true;
 }
 
 unsigned int TunedBatch::get_batch_size() const {
@@ -137,8 +124,7 @@ unsigned int TunedBatch::get_batch_size() const {
 
 void TunedBatch::generate_starting_trees(RaxmlInstance &instance, const Options &opts, LoadBalancer &load_balancer,
                                          const IDVector &tip_msa_idmap) {
-    // reset au test
-    this->au_test_dirty = true;
+    this->mark_p_values_dirty();
 
     const auto begin = std::chrono::steady_clock::now();
     intVector seeds(this->get_batch_size());
@@ -189,7 +175,7 @@ void TunedBatch::generate_starting_trees(RaxmlInstance &instance, const Options 
 }
 
 void TunedBatch::optimize(const Options &opts) {
-    this->au_test_dirty = true;
+    this->mark_p_values_dirty();
 
     LOG_DEBUG_TS << "Optimizing model with (eps: 3.0) for batch [TOPO: " << !this->meta_parameters->keep_top_k_topol << ", MO: " << !this->meta_parameters->skip_model << ", SPR: " <<
             this->meta_parameters->num_fast_spr << "]" << std::endl;
@@ -231,6 +217,10 @@ void TunedBatch::optimize(const Options &opts) {
 }
 
 unsigned int TunedBatch::perform_au_test(const Options &opts) {
+    if (!this->au_test_dirty) {
+        return this->plausible_tree_count;
+    }
+
     this->au_test->reset_test_statistics();
 
     // compute per-site log-likelihood in parallel
@@ -269,12 +259,20 @@ unsigned int TunedBatch::perform_au_test(const Options &opts) {
     // TODO: there is a bug here that forces us to detach, find it.
     ParallelContext::finalize_threads(true);
 
+    // mark AU test as valid
     this->au_test_dirty = false;
 
-    const unsigned int plausible_trees = count_plausible_trees(
-        this->au_test->get_p_values().begin() + reference_persite_loglh.size(), this->au_test->get_p_values().end());
-    LOG_WORKER_TS(LogLevel::progress) << "AU test found " << plausible_trees << " plausible trees." << std::endl;
-    return plausible_trees;
+    // count plausible trees
+    this->plausible_tree_count = 0;
+    auto first = this->au_test->get_p_values().begin() + reference_persite_loglh.size();
+    for (const auto last = this->au_test->get_p_values().end(); first != last; ++first) {
+        if (*first > 0.05) {
+            this->plausible_tree_count += 1;
+        }
+    }
+
+    LOG_WORKER_TS(LogLevel::progress) << "AU test found " << plausible_tree_count << " plausible trees." << std::endl;
+    return plausible_tree_count;
 }
 
 unsigned int TunedBatch::plausibility_check(const Options &opts) {
@@ -290,7 +288,7 @@ unsigned int TunedBatch::plausibility_check(const Options &opts) {
 }
 
 void TunedBatch::optimize_all_parameters(const Options &opts, const double epsilon, const bool force) {
-    this->au_test_dirty = true;
+    this->mark_p_values_dirty();
 
     if (!this->meta_parameters->skip_model || force) {
         // optimize model and branch lengths, such that we get accurate site likelihoods.
@@ -351,12 +349,10 @@ unsigned int TunedBatch::elapsed_wall_time() const {
     return this->wall_time;
 }
 
-unsigned int TunedBatch::plausible_tree_count() const {
+unsigned int TunedBatch::get_plausible_tree_count() const {
     if (au_test->is_finished() && !au_test_dirty) {
-        return count_plausible_trees(
-            this->au_test->get_p_values().begin() + reference_persite_loglh.size(),
-            this->au_test->get_p_values().end());
+        return this->plausible_tree_count;
     }
 
-    return 0;
+    throw new RaxmlException("current p-values are dirty");
 }

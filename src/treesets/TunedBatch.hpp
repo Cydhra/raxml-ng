@@ -100,9 +100,12 @@ public:
 
     /**
      * If an AU test has already been performed, count how many of the batch's trees are plausible.
-     * @return Number of trees with a p-value above 0.05. If no AU test has been performed
+     * If no AU test has been performed, or the last AU test is no longer valid, the method throws a
+     * RaxmlException.
+     *
+     * @return Number of trees with a p-value above 0.05.
      */
-    unsigned int plausible_tree_count() const;
+    unsigned int get_plausible_tree_count() const;
 
 protected:
     shared_ptr<MetaParameters> meta_parameters;
@@ -194,6 +197,11 @@ protected:
     bool au_test_dirty { true };
 
     /**
+     * Number of plausible trees as determined by the last AU test.
+     */
+    unsigned int plausible_tree_count = 0;
+
+    /**
      * Time spent on this batch. Does not include overhead that could be largely avoided on batches outside the tuning
      * phase.
      * This mostly excludes time spent on model optimization (MO) because we only do a MO after all SPR rounds are finished.
@@ -207,6 +215,11 @@ protected:
     unsigned int num_threads_per_worker() const {
         return num_threads / num_workers;
     }
+
+    /**
+     * Called when the per-site log-likelihoods change, overriding the results of the AU-test
+     */
+    void mark_p_values_dirty();
 
     /**
      * Perform model and branch length optimization according to the current tuning parameters and the given epsilon.
