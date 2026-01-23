@@ -3,6 +3,7 @@
 #include "../coraxlib/src/corax/optimize/opt_generic.h"
 #include "../loadbalance/CoarseLoadBalancer.hpp"
 #include <chrono>
+#include "Bandit.hpp"
 
 using namespace std::placeholders;
 
@@ -185,21 +186,19 @@ void TunedBatch::generate_starting_trees(RaxmlInstance &instance, const Options 
 }
 
 void TunedBatch::optimize(const Options &opts) {
-    LOG_DEBUG_TS << "Optimizing model with (eps: 3.0) for batch [BLO: " << !this->greedy_spr << ", MO: " << !this->skip_model << ", SPR: " <<
-            this->target_num_spr << "]" << std::endl;
+    LOG_DEBUG_TS << "Optimizing model with (eps: 3.0) for batch [TOPO: " << !this->meta_parameters->keep_top_k_topol << ", MO: " << !this->meta_parameters->skip_model << ", SPR: " <<
+            this->meta_parameters->num_fast_spr << "]" << std::endl;
     if (this->num_spr_performed == 0) {
         this->optimize_all_parameters(opts, 3.0, false);
     }
 
-    LOG_DEBUG_TS << "Running SPR rounds for batch [BLO: " << !this->greedy_spr << ", MO: " << !this->skip_model << ", SPR: " <<
-            this->target_num_spr << "] with " << this->num_threads << " threads." << std::endl;
+    // LOG_DEBUG_TS << "Running SPR rounds for batch [BLO: " << !this->greedy_spr << ", MO: " << !this->skip_model << ", SPR: " <<
+            // this->target_num_spr << "] with " << this->num_threads << " threads." << std::endl;
 
-    if (this->greedy_spr) {
-        this->spr_params.ntopol_keep = 1;
-    }
+    this->spr_params.ntopol_keep = this->meta_parameters->keep_top_k_topol;
 
     // compute SPR rounds in parallel
-    if (this->target_num_spr > this->num_spr_performed) {
+    if (this->meta_parameters->num_fast_spr > this->num_spr_performed) {
         const auto begin = std::chrono::steady_clock::now();
 
         const auto spr_worker = make_kernel(
@@ -208,7 +207,7 @@ void TunedBatch::optimize(const Options &opts) {
                       std::ref(this->batch_trees),
                       std::ref(this->spr_params),
                       this->num_spr_performed,
-                      this->target_num_spr,
+                      this->meta_parameters->num_fast_spr,
                       _1, _2));
         ParallelContext::init_pthreads_custom(opts, spr_worker, num_threads, num_workers);
         spr_worker();
@@ -218,19 +217,15 @@ void TunedBatch::optimize(const Options &opts) {
         const unsigned int elapsed = static_cast<unsigned int>(std::chrono::duration_cast<
             std::chrono::milliseconds>(end - begin).count());
         this->wall_time += elapsed;
-        LOG_INFO_TS << "Total batch time after round " << this->target_num_spr << ": " << this->wall_time << "ms." << std::endl;
+        LOG_INFO_TS << "Total batch time after round " << this->meta_parameters->num_fast_spr << ": " << this->wall_time << "ms." << std::endl;
 
         // TODO this only works if checkpoints cannot recover tree states. When checkpointing is added, this mechanism needs
         //  to be changed
-        num_spr_performed = this->target_num_spr;
+        num_spr_performed = this->meta_parameters->num_fast_spr;
     }
 }
 
 unsigned int TunedBatch::perform_au_test(const Options &opts) {
-    LOG_INFO_TS << "Running AU test for batch [BLO: " << !this->greedy_spr << ", MO: "
-            << !this->skip_model << ", SPR: " << this->target_num_spr << "] with "
-            << this->num_threads << " threads." << std::endl;
-
     this->au_test->reset_test_statistics();
 
     // compute per-site log-likelihood in parallel
@@ -287,14 +282,8 @@ unsigned int TunedBatch::plausibility_check(const Options &opts) {
     return plausible_trees;
 }
 
-bool TunedBatch::is_plausible(const Options &opts) {
-    const auto plausible_trees = this->plausibility_check(opts);
-    return plausible_trees >= static_cast<unsigned int>(
-               static_cast<double>(this->get_batch_size()) * ACCEPT_TUNING_THRESHOLD);
-}
-
 void TunedBatch::optimize_all_parameters(const Options &opts, const double epsilon, const bool force) {
-    if (!this->skip_model || force) {
+    if (!this->meta_parameters->skip_model || force) {
         // optimize model and branch lengths, such that we get accurate site likelihoods.
         const auto model_worker = make_kernel(
             std::ref(this->coarse_assignments),

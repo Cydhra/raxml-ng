@@ -1,6 +1,7 @@
 #ifndef RAXML_TUNEDBATCH_HPP_
 #define RAXML_TUNEDBATCH_HPP_
 
+#include "Bandit.hpp"
 #include "../loadbalance/LoadBalancer.hpp"
 #include "../loadbalance/CoarseLoadBalancer.hpp"
 #include "../au/AuTest.hpp"
@@ -20,20 +21,14 @@ void thread_start_trees(RaxmlInstance &instance, TreeList &tree_list, StartingTr
  */
 class TunedBatch final {
 public:
-    TunedBatch(const bool light_spr,
-               const bool skip_model,
-               unsigned int num_spr,
-               const unsigned int starting_seed,
+    TunedBatch(const unsigned int starting_seed,
                const unsigned int batch_size,
-               spr_round_params spr_params,
+               const spr_round_params &spr_params,
                const unsigned int num_threads,
                const unsigned int num_workers,
                const std::shared_ptr<PartitionedMSA> &msa,
                const std::vector<std::vector<doubleVector> > &reference_persite_loglh)
-        : greedy_spr(light_spr),
-          skip_model(skip_model),
-          target_num_spr(num_spr),
-          starting_seed(starting_seed),
+        : starting_seed(starting_seed),
           num_threads(num_threads),
           num_workers(num_workers), batch_start_trees(new TreeList(batch_size)),
           msa(msa),
@@ -60,21 +55,6 @@ public:
         std::iota(tree_ids.begin(), tree_ids.end(), 0);
         this->coarse_assignments = load_balancer.get_all_assignments(tree_ids, this->num_workers);
     }
-
-    /**
-     * If true, replace fast SPR rounds with light SPR rounds that do even less BLOs.
-     */
-    bool greedy_spr;
-
-    /**
-     * If true, skip the first model optimization by reusing model parameters from the previous search.
-     */
-    bool skip_model;
-
-    /**
-     * How many SPR rounds to perform for each tree search. This parameter can be updated.
-     */
-    unsigned int target_num_spr;
 
     /**
      * @return the number of trees that are inferred in this batch.
@@ -106,16 +86,6 @@ public:
     unsigned int plausibility_check(const Options &opts);
 
     /**
-     * Perform low-epsilon parameter optimization followed by the AU test against the reference topologies,
-     * and calculate the ratio of batch trees which are considered plausible. Returns true, if the ratio reaches
-     * the threshold.
-     *
-     * This method does the same as plausibility_check, and then checks whether the batch has already exceeded
-     * 90% plausible trees.
-     */
-    bool is_plausible(const Options &opts);
-
-    /**
      * Copy the model from a previous instance of TunedBatch, which allows restoring the model instead of
      * optimizing it from scratch. The model will be written into this batch's model backup and then directly
      * applied.
@@ -135,6 +105,8 @@ public:
     unsigned int plausible_tree_count() const;
 
 protected:
+    shared_ptr<MetaParameters> meta_parameters;
+
     /**
      * The starting seed (starting from 0) for this batch. Batches infer starting trees with ascending seeds, so this
      * number is the number of starting trees in previous batches.
