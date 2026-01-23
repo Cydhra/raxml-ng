@@ -137,6 +137,9 @@ unsigned int TunedBatch::get_batch_size() const {
 
 void TunedBatch::generate_starting_trees(RaxmlInstance &instance, const Options &opts, LoadBalancer &load_balancer,
                                          const IDVector &tip_msa_idmap) {
+    // reset au test
+    this->au_test_dirty = true;
+
     const auto begin = std::chrono::steady_clock::now();
     intVector seeds(this->get_batch_size());
     // generate ascending seeds from a starting point to allow coordinating batch seeds reproducibly.
@@ -186,6 +189,8 @@ void TunedBatch::generate_starting_trees(RaxmlInstance &instance, const Options 
 }
 
 void TunedBatch::optimize(const Options &opts) {
+    this->au_test_dirty = true;
+
     LOG_DEBUG_TS << "Optimizing model with (eps: 3.0) for batch [TOPO: " << !this->meta_parameters->keep_top_k_topol << ", MO: " << !this->meta_parameters->skip_model << ", SPR: " <<
             this->meta_parameters->num_fast_spr << "]" << std::endl;
     if (this->num_spr_performed == 0) {
@@ -264,6 +269,8 @@ unsigned int TunedBatch::perform_au_test(const Options &opts) {
     // TODO: there is a bug here that forces us to detach, find it.
     ParallelContext::finalize_threads(true);
 
+    this->au_test_dirty = false;
+
     const unsigned int plausible_trees = count_plausible_trees(
         this->au_test->get_p_values().begin() + reference_persite_loglh.size(), this->au_test->get_p_values().end());
     LOG_WORKER_TS(LogLevel::progress) << "AU test found " << plausible_trees << " plausible trees." << std::endl;
@@ -283,6 +290,8 @@ unsigned int TunedBatch::plausibility_check(const Options &opts) {
 }
 
 void TunedBatch::optimize_all_parameters(const Options &opts, const double epsilon, const bool force) {
+    this->au_test_dirty = true;
+
     if (!this->meta_parameters->skip_model || force) {
         // optimize model and branch lengths, such that we get accurate site likelihoods.
         const auto model_worker = make_kernel(
@@ -343,7 +352,7 @@ unsigned int TunedBatch::elapsed_wall_time() const {
 }
 
 unsigned int TunedBatch::plausible_tree_count() const {
-    if (au_test->is_finished()) {
+    if (au_test->is_finished() && !au_test_dirty) {
         return count_plausible_trees(
             this->au_test->get_p_values().begin() + reference_persite_loglh.size(),
             this->au_test->get_p_values().end());
