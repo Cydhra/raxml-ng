@@ -275,7 +275,7 @@ unsigned int TunedBatch::perform_au_test(const Options &opts) {
     return plausible_tree_count;
 }
 
-unsigned int TunedBatch::plausibility_check(const Options &opts) {
+unsigned int TunedBatch::perform_plausibility_check(const Options &opts) {
     // we need to save the model backup, for two reasons: we do not want to perform tree search on hyper-optimized
     // models to allow for shallower likelihood curves of slightly suboptimal models.
     // Further, multiple calls to is_plausible must not optimize the hyper-optimized model with low episolon again
@@ -336,7 +336,7 @@ void TunedBatch::restore_model_backup() {
     }
 }
 
-void TunedBatch::inherit_model(const TunedBatch &other) {
+void TunedBatch::replace_model(const TunedBatch &other) {
     for (unsigned int i = 0; i < this->get_batch_size(); ++i) {
         for (size_t part_id = 0; part_id < this->msa->part_count(); ++part_id) {
             // all threads have the same model, so backup from the first thread is sufficient
