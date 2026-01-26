@@ -17,5 +17,5 @@ double Bandit::get_mean() const {
 }
 
 void Bandit::take_measurement(const TunedBatch &batch) {
-    this->samples.emplace_back(batch.elapsed_wall_time(), batch.plausible_tree_count());
+    this->samples.emplace_back(batch.elapsed_wall_time(), batch.get_plausible_tree_count());
 }
