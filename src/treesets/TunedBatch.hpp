@@ -63,6 +63,23 @@ public:
                                  const IDVector &tip_msa_idmap);
 
     /**
+     * Perform model and branch length optimization according to the current tuning parameters and the given epsilon.
+     * If model optimization is currently disabled, load models from a backup.
+     *
+     * @param opts parsed command line options and forced RAxML settings
+     * @param epsilon the likelihood threshold when to stop optimizing
+     * @param force if true, model optimization is forced, disregarding batch tuning parameters
+     */
+    void optimize_all_parameters(const Options &opts, double epsilon, bool force = false);
+
+    /**
+     * Perform SPR rounds up to the target count, with meta-parameters according to the batch settings.
+     *
+     * @param opts parsed command line options and forced RAxML settings
+     */
+    void optimize_topology(const Options &opts);
+
+    /**
      * Using the batch configuration, infer K trees in parallel.
      */
     void optimize(const Options &opts);
@@ -225,16 +242,6 @@ protected:
      * Called when the per-site log-likelihoods change, overriding the results of the AU-test
      */
     void mark_p_values_dirty();
-
-    /**
-     * Perform model and branch length optimization according to the current tuning parameters and the given epsilon.
-     * If model optimization is currently disabled, load models from a backup.
-     *
-     * @param opts parsed command line options and forced RAxML parameters
-     * @param epsilon the likelihood threshold when to stop optimizing
-     * @param force if true, model optimization is forced, disregarding batch tuning parameters
-     */
-    void optimize_all_parameters(const Options &opts, double epsilon, bool force = false);
 
     /**
      * Store the current model parameters in a backup, such that we can restore them if optimization needs to continue.

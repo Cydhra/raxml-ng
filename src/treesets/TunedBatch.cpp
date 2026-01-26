@@ -174,22 +174,10 @@ void TunedBatch::generate_starting_trees(RaxmlInstance &instance, const Options 
     LOG_INFO_TS << "Total batch time after generating starting trees: " << this->wall_time << "ms." << std::endl;
 }
 
-void TunedBatch::optimize(const Options &opts) {
-    this->mark_p_values_dirty();
-
-    LOG_DEBUG_TS << "Optimizing model with (eps: 3.0) for batch [TOPO: " << !this->meta_parameters->keep_top_k_topol << ", MO: " << !this->meta_parameters->skip_model << ", SPR: " <<
-            this->meta_parameters->num_fast_spr << "]" << std::endl;
-    if (this->num_spr_performed == 0) {
-        this->optimize_all_parameters(opts, 3.0, false);
-    }
-
-    // LOG_DEBUG_TS << "Running SPR rounds for batch [BLO: " << !this->greedy_spr << ", MO: " << !this->skip_model << ", SPR: " <<
-            // this->target_num_spr << "] with " << this->num_threads << " threads." << std::endl;
-
-    this->spr_params.ntopol_keep = this->meta_parameters->keep_top_k_topol;
-
-    // compute SPR rounds in parallel
+void TunedBatch::optimize_topology(const Options &opts) {
     if (this->meta_parameters->num_fast_spr > this->num_spr_performed) {
+        this->mark_p_values_dirty();
+
         const auto begin = std::chrono::steady_clock::now();
 
         const auto spr_worker = make_kernel(
@@ -214,6 +202,19 @@ void TunedBatch::optimize(const Options &opts) {
         //  to be changed
         num_spr_performed = this->meta_parameters->num_fast_spr;
     }
+}
+
+void TunedBatch::optimize(const Options &opts) {
+    // update options according to MetaParameters:
+    this->spr_params.ntopol_keep = this->meta_parameters->keep_top_k_topol;
+
+    // do initial model optimization
+    if (this->num_spr_performed == 0) {
+        this->optimize_all_parameters(opts, 3.0, false);
+    }
+
+    // compute all required SPR rounds
+    this->optimize_topology(opts);
 }
 
 unsigned int TunedBatch::perform_au_test(const Options &opts) {
@@ -288,6 +289,8 @@ unsigned int TunedBatch::perform_plausibility_check(const Options &opts) {
 }
 
 void TunedBatch::optimize_all_parameters(const Options &opts, const double epsilon, const bool force) {
+    LOG_DEBUG_TS << "Optimizing model with (eps: 3.0) for batch [TOPO: " << !this->meta_parameters->keep_top_k_topol << ", MO: " << !this->meta_parameters->skip_model << ", SPR: " <<
+            this->meta_parameters->num_fast_spr << "]" << std::endl;
     this->mark_p_values_dirty();
 
     if (!this->meta_parameters->skip_model || force) {
