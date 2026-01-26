@@ -21,14 +21,16 @@ void thread_start_trees(RaxmlInstance &instance, TreeList &tree_list, StartingTr
  */
 class TunedBatch final {
 public:
-    TunedBatch(const unsigned int starting_seed,
+    TunedBatch(const string name,
+               const unsigned int starting_seed,
                const unsigned int batch_size,
                const spr_round_params &spr_params,
                const unsigned int num_threads,
                const unsigned int num_workers,
                const std::shared_ptr<PartitionedMSA> &msa,
                const std::vector<std::vector<doubleVector> > &reference_persite_loglh)
-        : starting_seed(starting_seed),
+        : name(name),
+          starting_seed(starting_seed),
           num_threads(num_threads),
           num_workers(num_workers), batch_start_trees(new TreeList(batch_size)),
           msa(msa),
@@ -130,6 +132,15 @@ public:
     bool start_trees_generated() const;
 
 protected:
+    /**
+     * Name of the batch for outputting debug information.
+     */
+    string name;
+
+    /**
+     * The meta-heuristic parameters for inferring trees. These are not the model parameters, but settings of the
+     * inference heuristics which are being optimized for plausible tree throughput during tree set inference.
+     */
     shared_ptr<MetaParameters> meta_parameters;
 
     /**
@@ -194,7 +205,7 @@ protected:
      * The outer vector is indexed by tree, the inner by in-worker thread id (i.e. if each worker has 4 threads,
      * the inner vectors contain 4 TreeInfo instances).
      */
-    std::vector<std::vector<TreeInfo>> batch_trees{std::vector<std::vector<TreeInfo>>()};
+    std::vector<std::vector<TreeInfo> > batch_trees{std::vector<std::vector<TreeInfo> >()};
 
     /**
      * Backup for the model parameters, such that the model can be restored after changing it in the TreeInfo instances.
@@ -216,7 +227,7 @@ protected:
      * Flag indicating whether the au_test instance is outdated.
      * The class must set the flag to true whenever the per-site log-likelihoods for the batch trees change.
      */
-    bool au_test_dirty { true };
+    bool au_test_dirty{true};
 
     /**
      * Number of plausible trees as determined by the last AU test.
@@ -229,7 +240,7 @@ protected:
      * This mostly excludes time spent on model optimization (MO) because we only do a MO after all SPR rounds are finished.
      * During tuning we do BLO between all SPR rounds though, which would throw off the walltime measurement.
      */
-    unsigned int wall_time { 0 };
+    unsigned int wall_time{0};
 
     /**
      * Get the number of threads per worker

@@ -171,11 +171,13 @@ void TunedBatch::generate_starting_trees(RaxmlInstance &instance, const Options 
         std::chrono::milliseconds>(end - begin).count());
     this->wall_time += elapsed;
 
-    LOG_INFO_TS << "Total batch time after generating starting trees: " << this->wall_time << "ms." << std::endl;
+    LOG_INFO_TS << this->name << ": total batch time after generating starting trees: " << this->wall_time << "ms." << std::endl;
 }
 
 void TunedBatch::optimize_topology(const Options &opts) {
     if (this->meta_parameters->num_fast_spr > this->num_spr_performed) {
+        LOG_INFO_TS << this->name << ": Optimizing topology (" << (meta_parameters->num_fast_spr - num_spr_performed) << " spr rounds)" << std::endl;
+
         this->mark_p_values_dirty();
 
         const auto begin = std::chrono::steady_clock::now();
@@ -196,7 +198,6 @@ void TunedBatch::optimize_topology(const Options &opts) {
         const unsigned int elapsed = static_cast<unsigned int>(std::chrono::duration_cast<
             std::chrono::milliseconds>(end - begin).count());
         this->wall_time += elapsed;
-        LOG_INFO_TS << "Total batch time after round " << this->meta_parameters->num_fast_spr << ": " << this->wall_time << "ms." << std::endl;
 
         // TODO this only works if checkpoints cannot recover tree states. When checkpointing is added, this mechanism needs
         //  to be changed
@@ -215,6 +216,8 @@ void TunedBatch::optimize(const Options &opts) {
 
     // compute all required SPR rounds
     this->optimize_topology(opts);
+
+    LOG_INFO_TS << this->name << ": total batch time after optimization: " << this->wall_time << "ms." << std::endl;
 }
 
 unsigned int TunedBatch::perform_au_test(const Options &opts) {
@@ -289,11 +292,11 @@ unsigned int TunedBatch::perform_plausibility_check(const Options &opts) {
 }
 
 void TunedBatch::optimize_all_parameters(const Options &opts, const double epsilon, const bool force) {
-    LOG_DEBUG_TS << "Optimizing model with (eps: 3.0) for batch [TOPO: " << !this->meta_parameters->keep_top_k_topol << ", MO: " << !this->meta_parameters->skip_model << ", SPR: " <<
-            this->meta_parameters->num_fast_spr << "]" << std::endl;
     this->mark_p_values_dirty();
 
     if (!this->meta_parameters->skip_model || force) {
+        LOG_INFO_TS << this->name << ": Optimizing model (eps: " << epsilon << ")" << std::endl;
+
         // optimize model and branch lengths, such that we get accurate site likelihoods.
         const auto model_worker = make_kernel(
             std::ref(this->coarse_assignments),
@@ -309,6 +312,7 @@ void TunedBatch::optimize_all_parameters(const Options &opts, const double epsil
         restore_model_backup();
     }
 
+    LOG_INFO_TS << this->name << ": Optimizing branches (eps: " << epsilon << ")" << std::endl;
     // optimize branches
     const auto branch_worker = make_kernel(
         std::ref(this->coarse_assignments),
