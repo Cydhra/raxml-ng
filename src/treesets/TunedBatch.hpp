@@ -83,14 +83,14 @@ public:
      *
      * @return The number of plausible trees.
      */
-    unsigned int plausibility_check(const Options &opts);
+    unsigned int perform_plausibility_check(const Options &opts);
 
     /**
-     * Copy the model from a previous instance of TunedBatch, which allows restoring the model instead of
+     * Replace the model parameters with the model parameters of a different batch, which allows restoring the model instead of
      * optimizing it from scratch. The model will be written into this batch's model backup and then directly
      * applied.
      */
-    void inherit_model(const TunedBatch &other);
+    void replace_model(const TunedBatch &other);
 
     /**
      * Compute the total (wall) time spent on inferring the batch, ignoring the parallelization.
