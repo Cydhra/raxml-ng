@@ -57,11 +57,6 @@ public:
     }
 
     /**
-     * @return the number of trees that are inferred in this batch.
-     */
-    unsigned int get_batch_size() const;
-
-    /**
      * Generate parsimony starting trees for this batch, and initialize the tree inference.
      */
     void generate_starting_trees(RaxmlInstance &instance, const Options &opts, LoadBalancer &load_balancer,
@@ -93,10 +88,9 @@ public:
     void replace_model(const TunedBatch &other);
 
     /**
-     * Compute the total (wall) time spent on inferring the batch, ignoring the parallelization.
-     * @return Time spent working on inference in milliseconds.
+     * @return the number of trees that are inferred in this batch.
      */
-    unsigned int elapsed_wall_time() const;
+    unsigned int get_batch_size() const;
 
     /**
      * If an AU test has already been performed, count how many of the batch's trees are plausible.
@@ -106,6 +100,17 @@ public:
      * @return Number of trees with a p-value above 0.05.
      */
     unsigned int get_plausible_tree_count() const;
+
+    /**
+     * Compute the total (wall) time spent on inferring the batch, ignoring the parallelization.
+     * @return Time spent working on inference in milliseconds.
+     */
+    unsigned int elapsed_wall_time() const;
+
+    /**
+     * @return Whether the starting trees have been generated for this batch.
+     */
+    bool start_trees_generated() const;
 
 protected:
     shared_ptr<MetaParameters> meta_parameters;

@@ -140,7 +140,7 @@ void TunedBatch::generate_starting_trees(RaxmlInstance &instance, const Options 
                                   false);
 
     // infer starting trees
-    auto tree_workers = min(this->num_threads, this->get_batch_size());
+    const auto tree_workers = min(this->num_threads, this->get_batch_size());
     ParallelContext::init_pthreads_custom(opts, tree_builder, tree_workers, tree_workers);
     tree_builder();
     ParallelContext::finalize_threads();
@@ -355,4 +355,10 @@ unsigned int TunedBatch::get_plausible_tree_count() const {
     }
 
     throw new RaxmlException("current p-values are dirty");
+}
+
+bool TunedBatch::start_trees_generated() const {
+    // generating the starting trees will initialize the TreeInfo objects in this->batch_trees, which is otherwise empty.
+    // Conversely, the batch_start_trees vector always contains the tree objects, whether they have been generated or not.
+    return this->batch_trees.size() == this->batch_start_trees->size();
 }
