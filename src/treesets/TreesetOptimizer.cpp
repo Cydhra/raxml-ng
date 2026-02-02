@@ -37,7 +37,16 @@ void TreesetOptimizer::prepare_initial_batches(RaxmlInstance &instance, const Op
     }
 }
 
+void TreesetOptimizer::initialize_bandits() {
+    if (this->starting_tree_bandit().get_mean_success() >= 0.9) {
+        LOG_INFO << "Starting trees are so successful, no ML optimization is necessary." << std::endl;
+    } else {
+        // init default bandits
+    }
+}
+
 void TreesetOptimizer::run(RaxmlInstance &instance, Options &opts, LoadBalancer &load_balancer, const IDVector &tip_msa_idmap) {
     this->prepare_initial_batches(instance, opts, load_balancer, tip_msa_idmap);
-    LOG_INFO << "Expected throughput of starting trees: " << (this->starting_tree_bandit().get_mean_throughput() * 1000.0) << " trees per second" << std::endl;
+    LOG_INFO << std::endl;
+    LOG_INFO << "Expected throughput of starting trees: " << (this->starting_tree_bandit().get_mean_throughput() * 1000.0) << " trees per second at a mean success rate of " << (this->starting_tree_bandit().get_mean_success() * 100.0) << "%." << std::endl;
 }
