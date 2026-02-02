@@ -1,7 +1,7 @@
 #ifndef RAXML_TUNEDBATCH_HPP_
 #define RAXML_TUNEDBATCH_HPP_
 
-#include "Bandit.hpp"
+#include "MetaParameters.hpp"
 #include "../loadbalance/LoadBalancer.hpp"
 #include "../loadbalance/CoarseLoadBalancer.hpp"
 #include "../au/AuTest.hpp"
