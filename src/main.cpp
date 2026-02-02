@@ -60,7 +60,7 @@
 #include "adaptive/StoppingCriterion.hpp"
 #include "au/AuTest.hpp"
 #include "modeltest/ModelTest.hpp"
-#include "treesets/TreesetHeuristic.hpp"
+#include "treesets/TreesetOptimizer.hpp"
 
 #ifdef _RAXML_TERRAPHAST
 #include "terraces/TerraceWrapper.hpp"
@@ -149,7 +149,7 @@ struct RaxmlInstance
   unsigned int num_threads_modeltest;
 
   /* Treesets */
-  unique_ptr<TreesetHeuristic> treeset_optimizer;
+  unique_ptr<TreesetOptimizer> treeset_optimizer;
 
   vector<RaxmlWorker> workers;
   RaxmlWorker& get_worker() { return workers.at(ParallelContext::local_group_id()); }
@@ -2386,12 +2386,12 @@ void autoselect_models(RaxmlInstance& instance, CheckpointManager &cm)
   write_binary_msa_file(instance, true);
 }
 
-void init_treeset_optimizer(RaxmlInstance& instance, CheckpointManager& cm) {
+void init_treeset_optimizer(RaxmlInstance &instance) {
   const auto& opts = instance.opts;
   if (opts.command != Command::treeset)
     return;
 
-  instance.treeset_optimizer.reset(new TreesetHeuristic(instance.parted_msa, instance.persite_loglh, instance.tip_msa_idmap));
+  instance.treeset_optimizer.reset(new TreesetOptimizer(300, opts.random_seed + 1, instance.parted_msa, instance.persite_loglh));
 }
 
 unsigned int read_newick_trees_custom(SplitsTree& ref_tree, const std::string& fname,
@@ -4110,7 +4110,7 @@ void master_main(RaxmlInstance& instance, CheckpointManager& cm)
            << threads_per_worker << " thread(s)" << endl << endl;
 
   /* initialize treeset optimizer */
-  init_treeset_optimizer(instance, cm);
+  init_treeset_optimizer(instance);
 
   ParallelContext::init_pthreads(opts, std::bind(thread_main,
                                                 std::ref(instance),
@@ -4177,8 +4177,8 @@ void master_main(RaxmlInstance& instance, CheckpointManager& cm)
   // treeset computation reuses the above treesearch code for the first batch and then switches over to aggressive
   // heuristics
   if (opts.command == Command::treeset) {
-    ParallelContext::finalize_threads();
-    instance.treeset_optimizer->infer_treeset(instance, instance.opts, cm, *instance.load_balancer);
+    ParallelContext::finalize_threads(true);
+    instance.treeset_optimizer->run(instance, instance.opts, *instance.load_balancer, instance.tip_msa_idmap);
   }
 
   if (ParallelContext::master_rank())
