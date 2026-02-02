@@ -24,7 +24,6 @@ public:
     TunedBatch(const string name,
                const unsigned int starting_seed,
                const unsigned int batch_size,
-               const spr_round_params &spr_params,
                const unsigned int num_threads,
                const unsigned int num_workers,
                const std::shared_ptr<PartitionedMSA> &msa,
@@ -32,9 +31,9 @@ public:
         : name(name),
           starting_seed(starting_seed),
           num_threads(num_threads),
-          num_workers(num_workers), batch_start_trees(new TreeList(batch_size)),
+          num_workers(num_workers),
+          batch_start_trees(new TreeList(batch_size)),
           msa(msa),
-          spr_params(spr_params),
           reference_persite_loglh(reference_persite_loglh),
           batch_persite_logh(std::vector<std::vector<doubleVector> >(batch_size)) {
         for (auto &tree_slh: batch_persite_logh) {
@@ -74,7 +73,8 @@ public:
      * @param branches if true, optimize branch lengths
      * @param force if true, model optimization is forced, even if batch tuning parameters turn it off
      */
-    void optimize_parameters(const Options &opts, double epsilon, bool model = true, bool branches = true, bool force = false);
+    void optimize_parameters(const Options &opts, double epsilon, bool model = true, bool branches = true,
+                             bool force = false);
 
     /**
      * Perform SPR rounds up to the target count, with meta-parameters according to the batch settings.
@@ -100,6 +100,17 @@ public:
      * @return The number of plausible trees.
      */
     unsigned int perform_plausibility_check(const Options &opts);
+
+    /**
+     * Update the meta heuristical parameters of the batch, reconfiguring the search parameters from them.
+     *
+     * @param opts Command line options
+     * @param meta_parameters batch treeset inference meta parameters
+     */
+    void update_meta_parameters(const Options &opts, const shared_ptr<MetaParameters> &meta_parameters) {
+        this->meta_parameters = meta_parameters;
+        this->auto_configure(opts);
+    }
 
     /**
      * Replace the model parameters with the model parameters of a different batch, which allows restoring the model instead of
@@ -254,6 +265,20 @@ protected:
      * During tuning we do BLO between all SPR rounds though, which would throw off the walltime measurement.
      */
     unsigned int wall_time{0};
+
+    /**
+     * Update spr_params instance according to the meta_parameters
+     */
+    void auto_configure(const Options &opts) {
+        // update options according to MetaParameters:
+        spr_params.ntopol_keep = this->meta_parameters->keep_top_k_topol;
+        spr_params.subtree_cutoff = opts.spr_cutoff;
+        spr_params.radius_min = 0;
+        spr_params.radius_max = 20;
+        spr_params.thorough = false;
+        spr_params.lh_epsilon_brlen_full = opts.lh_epsilon;
+        spr_params.lh_epsilon_brlen_triplet = opts.lh_epsilon_brlen_triplet;
+    }
 
     /**
      * Get the number of threads per worker
