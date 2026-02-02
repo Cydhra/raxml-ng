@@ -46,9 +46,9 @@ public:
     void take_measurement(const TunedBatch &batch);
 
     /**
-     * @return the mean expected reward of the underlying distribution.
+     * @return the mean expected reward (throughput) of the underlying distribution.
      */
-    double get_mean() const;
+    double get_mean_throughput() const;
 
 protected:
     std::shared_ptr<MetaParameters> parameters;
