@@ -31,3 +31,15 @@ double Bandit::get_mean_success() const {
 
     return success / this->samples.size();
 }
+
+ double Bandit::get_variance() const {
+    const double mean = get_mean_throughput();
+    double variance_sum = 0.0;
+
+    for (auto& sample : this->samples) {
+        const double sample_throughput = static_cast<double>(sample.plausible_trees) / static_cast<double>(sample.time_spent);
+        variance_sum += (mean - sample_throughput) * (mean - sample_throughput);
+    }
+
+    return variance_sum / this->samples.size();
+}

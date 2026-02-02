@@ -53,9 +53,16 @@ public:
     double get_mean_throughput() const;
 
     /**
-     * @return the the mean success rate (between 0 and 1) of yielding a plausible tree under this bandit's parameters.
+     * @return the mean success rate (between 0 and 1) of yielding a plausible tree under this bandit's parameters.
      */
     double get_mean_success() const;
+
+    /**
+     * @return the variance of the reward distribution. Because this is required to be known a priori, the value is
+     * being interpolated between an initial value and the measured value depending on how many measurements are
+     * available.
+     */
+    double get_variance() const;
 
 protected:
     std::shared_ptr<MetaParameters> parameters;
