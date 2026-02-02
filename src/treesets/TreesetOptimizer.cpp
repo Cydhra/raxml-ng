@@ -42,6 +42,7 @@ void TreesetOptimizer::prepare_initial_batches(RaxmlInstance &instance, const Op
 void TreesetOptimizer::initialize_bandits() {
     if (this->starting_tree_bandit().get_mean_success() >= 0.9) {
         LOG_INFO << "Starting trees are so successful, no ML optimization is necessary." << std::endl;
+        this->batch_cursor = this->batches.size();
     } else {
         // init default bandits
         this->bandits.emplace_back(MetaParameters(1, false, 4, false));

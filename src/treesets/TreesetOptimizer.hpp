@@ -46,6 +46,12 @@ protected:
     std::vector<TunedBatch> batches;
 
     /**
+     * Index of the next batch that is supposed to be optimized.
+     * Every batch before the cursor is already finished.
+     */
+    unsigned int batch_cursor = 0;
+
+    /**
      * List of all bandits registered in the current run. Each bandit is considered during inference.
      */
     std::vector<Bandit> bandits;
