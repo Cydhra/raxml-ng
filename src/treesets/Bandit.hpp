@@ -13,13 +13,15 @@
  */
 class Measurement {
 public:
-    Measurement(const unsigned int time_spent, const unsigned int plausible_trees) : time_spent(time_spent),
-        plausible_trees(plausible_trees) {
+    Measurement(const unsigned int time_spent, const unsigned int plausible_trees, const unsigned int batch_size) : time_spent(time_spent),
+        plausible_trees(plausible_trees), batch_size(batch_size) {
     }
 
     const unsigned int time_spent;
 
     const unsigned int plausible_trees;
+
+    const unsigned int batch_size;
 };
 
 /**
@@ -49,6 +51,11 @@ public:
      * @return the mean expected reward (throughput) of the underlying distribution.
      */
     double get_mean_throughput() const;
+
+    /**
+     * @return the the mean success rate (between 0 and 1) of yielding a plausible tree under this bandit's parameters.
+     */
+    double get_mean_success() const;
 
 protected:
     std::shared_ptr<MetaParameters> parameters;
