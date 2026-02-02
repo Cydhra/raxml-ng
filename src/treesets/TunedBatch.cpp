@@ -211,9 +211,6 @@ void TunedBatch::optimize_topology(const Options &opts) {
 }
 
 void TunedBatch::optimize(const Options &opts) {
-    // update options according to MetaParameters:
-    this->spr_params.ntopol_keep = this->meta_parameters->keep_top_k_topol;
-
     // do initial model and branch length optimization
     if (!this->initial_model_optimized) {
         this->optimize_parameters(opts, 3.0);
