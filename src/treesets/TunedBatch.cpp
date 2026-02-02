@@ -166,11 +166,6 @@ void TunedBatch::generate_starting_trees(RaxmlInstance &instance, const Options 
         }
     }
 
-    // step 4, if model optimization is skipped for this batch, load models from the store
-    if (this->meta_parameters->skip_model) {
-        this->load_batch_models();
-    }
-
     const auto end = std::chrono::steady_clock::now();
     const unsigned int elapsed = static_cast<unsigned int>(std::chrono::duration_cast<
         std::chrono::milliseconds>(end - begin).count());
