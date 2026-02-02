@@ -211,6 +211,10 @@ void TunedBatch::optimize_topology(const Options &opts) {
 }
 
 void TunedBatch::optimize(const Options &opts) {
+    if (!meta_parameters_set) {
+        throw RaxmlException("TunedBatch has not been configured with meta heuristics");
+    }
+
     // do initial model and branch length optimization
     if (!this->initial_model_optimized) {
         this->optimize_parameters(opts, 3.0);
