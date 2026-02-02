@@ -209,9 +209,10 @@ void TunedBatch::optimize(const Options &opts) {
     // update options according to MetaParameters:
     this->spr_params.ntopol_keep = this->meta_parameters->keep_top_k_topol;
 
-    // do initial model optimization
-    if (this->num_spr_performed == 0) {
-        this->optimize_all_parameters(opts, 3.0, false);
+    // do initial model and branch length optimization
+    if (!this->initial_model_optimized) {
+        this->optimize_parameters(opts, 3.0);
+        this->initial_model_optimized = true;
     }
 
     // compute all required SPR rounds
@@ -285,16 +286,16 @@ unsigned int TunedBatch::perform_plausibility_check(const Options &opts) {
     // Further, multiple calls to is_plausible must not optimize the hyper-optimized model with low episolon again
     // to avoid numerical oscillation.
     this->save_model_backup();
-    this->optimize_all_parameters(opts, 0.1, true);
+    this->optimize_parameters(opts, 0.1, true, true, true);
     const unsigned int plausible_trees = this->perform_au_test(opts);
     this->restore_model_backup();
     return plausible_trees;
 }
 
-void TunedBatch::optimize_all_parameters(const Options &opts, const double epsilon, const bool force) {
+void TunedBatch::optimize_parameters(const Options &opts, const double epsilon, const bool model, const bool branches, const bool force) {
     this->mark_p_values_dirty();
 
-    if (!this->meta_parameters->skip_model || force) {
+    if (model && (!this->meta_parameters->skip_model || force)) {
         LOG_INFO_TS << this->name << ": Optimizing model (eps: " << epsilon << ")" << std::endl;
 
         // optimize model and branch lengths, such that we get accurate site likelihoods.
@@ -312,18 +313,20 @@ void TunedBatch::optimize_all_parameters(const Options &opts, const double epsil
         restore_model_backup();
     }
 
-    LOG_INFO_TS << this->name << ": Optimizing branches (eps: " << epsilon << ")" << std::endl;
-    // optimize branches
-    const auto branch_worker = make_kernel(
-        std::ref(this->coarse_assignments),
-        std::bind(blo_kernel,
-                  std::ref(this->batch_trees),
-                  epsilon,
-                  _1, _2)
-    );
-    ParallelContext::init_pthreads_custom(opts, branch_worker, num_threads, num_workers);
-    branch_worker();
-    ParallelContext::finalize_threads();
+    if (branches) {
+        LOG_INFO_TS << this->name << ": Optimizing branches (eps: " << epsilon << ")" << std::endl;
+        // optimize branches
+        const auto branch_worker = make_kernel(
+            std::ref(this->coarse_assignments),
+            std::bind(blo_kernel,
+                      std::ref(this->batch_trees),
+                      epsilon,
+                      _1, _2)
+        );
+        ParallelContext::init_pthreads_custom(opts, branch_worker, num_threads, num_workers);
+        branch_worker();
+        ParallelContext::finalize_threads();
+    }
 }
 
 void TunedBatch::save_model_backup() {
