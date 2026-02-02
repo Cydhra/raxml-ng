@@ -60,6 +60,13 @@ protected:
     }
 
     /**
+     * Get the bandit that represents the distribution of plausible trees obtained from accepting starting trees.
+     */
+    Bandit &starting_tree_bandit() {
+        return this->bandits[0];
+    }
+
+    /**
      * Prepare the initial TunedBatch instances we use for inference.
      * Because we have a number of trees we have to infer, we have a minimum number of batches required even if every
      * tree becomes plausible.
@@ -88,6 +95,8 @@ public:
                                                                                current_seed(starting_seed),
                                                                                msa(msa),
                                                                                persite_loglh(persite_loglh) {
+        // place the first bandit that represents the distribution of plausible starting trees
+        this->bandits.emplace_back(MetaParameters(1, false, 0, true));
     }
 
     /**
