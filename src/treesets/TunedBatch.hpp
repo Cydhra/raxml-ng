@@ -109,6 +109,7 @@ public:
      */
     void update_meta_parameters(const Options &opts, const shared_ptr<MetaParameters> &meta_parameters) {
         this->meta_parameters = meta_parameters;
+        this->meta_parameters_set = true;
         this->auto_configure(opts);
     }
 
@@ -239,6 +240,11 @@ protected:
     * AU test instance
     */
     shared_ptr<AuTest> au_test;
+
+    /**
+     * Flag indicating whether the batch has been configured with meta-parameters.
+     */
+    bool meta_parameters_set{false};
 
     /**
      * Flag indicating whether the model has been optimized once (or alternatively, if a pre-optimized model
