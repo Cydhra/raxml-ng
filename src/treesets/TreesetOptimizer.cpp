@@ -27,12 +27,17 @@ void TreesetOptimizer::prepare_initial_batches(RaxmlInstance &instance, const Op
                                    recommended_worker_count(),
                                    msa,
                                    persite_loglh);
+        auto &current_batch = this->batches[this->batches.size() - 1];
 
         // TODO schedule the batches in parallel if enough threads are available
-        this->batches[this->batches.size() - 1].generate_starting_trees(instance, opts, load_balancer, tip_msa_idmap);
+        starting_tree_bandit().apply_parameters(current_batch);
+        current_batch.generate_starting_trees(instance, opts, load_balancer, tip_msa_idmap);
+        current_batch.perform_au_test(opts);
+        starting_tree_bandit().take_measurement(current_batch);
     }
 }
 
 void TreesetOptimizer::run(RaxmlInstance &instance, Options &opts, LoadBalancer &load_balancer, const IDVector &tip_msa_idmap) {
     this->prepare_initial_batches(instance, opts, load_balancer, tip_msa_idmap);
+    LOG_INFO << "Expected throughput of starting trees: " << (this->starting_tree_bandit().get_mean_throughput() * 1000.0) << " trees per second" << std::endl;
 }
