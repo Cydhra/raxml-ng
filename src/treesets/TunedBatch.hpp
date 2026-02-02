@@ -70,9 +70,11 @@ public:
      *
      * @param opts parsed command line options and forced RAxML settings
      * @param epsilon the likelihood threshold when to stop optimizing
-     * @param force if true, model optimization is forced, disregarding batch tuning parameters
+     * @param model if true, optimize model parameters
+     * @param branches if true, optimize branch lengths
+     * @param force if true, model optimization is forced, even if batch tuning parameters turn it off
      */
-    void optimize_all_parameters(const Options &opts, double epsilon, bool force = false);
+    void optimize_parameters(const Options &opts, double epsilon, bool model = true, bool branches = true, bool force = false);
 
     /**
      * Perform SPR rounds up to the target count, with meta-parameters according to the batch settings.
@@ -222,6 +224,13 @@ protected:
     * AU test instance
     */
     shared_ptr<AuTest> au_test;
+
+    /**
+     * Flag indicating whether the model has been optimized once (or alternatively, if a pre-optimized model
+     * has been loaded).
+     * If this is false, the optimize() function needs to perform one model optimization before doing SPR rounds.
+     */
+    bool initial_model_optimized{false};
 
     /**
      * Flag indicating whether the au_test instance is outdated.
