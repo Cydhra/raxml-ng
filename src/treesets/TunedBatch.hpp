@@ -48,7 +48,7 @@ public:
         this->au_test->allocate_test_statistics();
 
         // initialize model maps for storing backups
-        this->batch_model_backup.resize(this->get_batch_size());
+        this->batch_models.resize(this->get_batch_size());
 
         // initialize coarse load balancing (i.e. split trees among workers for inference)
         assert(this->num_workers <= this->get_batch_size());
@@ -106,7 +106,7 @@ public:
      * optimizing it from scratch. The model will be written into this batch's model backup and then directly
      * applied.
      */
-    void replace_model(const TunedBatch &other);
+    void assign_batch_models(const TunedBatch &other);
 
     /**
      * @return the number of trees that are inferred in this batch.
@@ -210,9 +210,13 @@ protected:
     std::vector<std::vector<TreeInfo> > batch_trees{std::vector<std::vector<TreeInfo> >()};
 
     /**
-     * Backup for the model parameters, such that the model can be restored after changing it in the TreeInfo instances.
+     * Backup for the model parameters, such that the model can be restored from fixed parameters at any time.
+     * The model backup is used during AU-Tests to store unoptimized model parameters while the model is optimized for
+     * the current tree.
+     * It is also used to store models that are assigned to the batch from the outside
+     * instead of model parameter optimization.
      */
-    std::vector<ModelMap> batch_model_backup{std::vector<ModelMap>()};
+    std::vector<ModelMap> batch_models{std::vector<ModelMap>()};
 
     /**
      * Per-site log-likelihoods of the trees inferred in this batch. We recalculate these if the tree has changed,
@@ -264,15 +268,15 @@ protected:
     void mark_p_values_dirty();
 
     /**
-     * Store the current model parameters in a backup, such that we can restore them if optimization needs to continue.
-     * The backup can also be obtained from the outside, to allow sharing models across batches.
+     * Store the current model parameters in the batch model store,
+     * such that we can restore them if optimization needs to continue.
      */
-    void save_model_backup();
+    void backup_models();
 
     /**
-     * Restore model parameters from the internal backup.
+     * Restore model parameters from the batch model store.
      */
-    void restore_model_backup();
+    void load_batch_models();
 };
 
 #endif //RAXML_TUNEDBATCH_HPP_

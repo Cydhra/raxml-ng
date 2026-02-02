@@ -166,6 +166,11 @@ void TunedBatch::generate_starting_trees(RaxmlInstance &instance, const Options 
         }
     }
 
+    // step 4, if model optimization is skipped for this batch, load models from the store
+    if (this->meta_parameters->skip_model) {
+        this->load_batch_models();
+    }
+
     const auto end = std::chrono::steady_clock::now();
     const unsigned int elapsed = static_cast<unsigned int>(std::chrono::duration_cast<
         std::chrono::milliseconds>(end - begin).count());
@@ -285,10 +290,10 @@ unsigned int TunedBatch::perform_plausibility_check(const Options &opts) {
     // models to allow for shallower likelihood curves of slightly suboptimal models.
     // Further, multiple calls to is_plausible must not optimize the hyper-optimized model with low episolon again
     // to avoid numerical oscillation.
-    this->save_model_backup();
+    this->backup_models();
     this->optimize_parameters(opts, 0.1, true, true, true);
     const unsigned int plausible_trees = this->perform_au_test(opts);
-    this->restore_model_backup();
+    this->load_batch_models();
     return plausible_trees;
 }
 
@@ -310,7 +315,7 @@ void TunedBatch::optimize_parameters(const Options &opts, const double epsilon, 
         model_worker();
         ParallelContext::finalize_threads();
     } else {
-        restore_model_backup();
+        load_batch_models();
     }
 
     if (branches) {
@@ -329,29 +334,34 @@ void TunedBatch::optimize_parameters(const Options &opts, const double epsilon, 
     }
 }
 
-void TunedBatch::save_model_backup() {
+void TunedBatch::backup_models() {
     for (unsigned int i = 0; i < this->get_batch_size(); ++i) {
         for (size_t part_id = 0; part_id < this->msa->part_count(); ++part_id) {
             // all threads have the same model, so backup from the first thread is sufficient
-            assign(this->batch_model_backup[i][part_id], batch_trees[i][0], part_id);
+            assign(this->batch_models[i][part_id], batch_trees[i][0], part_id);
         }
     }
 }
 
-void TunedBatch::restore_model_backup() {
+void TunedBatch::load_batch_models() {
     for (unsigned int i = 0; i < this->get_batch_size(); ++i) {
         for (unsigned int local_thread_id = 0; local_thread_id < this->num_threads_per_worker(); ++local_thread_id) {
-            assign_models(batch_trees[i][local_thread_id], this->batch_model_backup[i]);
+            assign_models(batch_trees[i][local_thread_id], this->batch_models[i]);
         }
     }
 }
 
-void TunedBatch::replace_model(const TunedBatch &other) {
+void TunedBatch::assign_batch_models(const TunedBatch &other) {
     for (unsigned int i = 0; i < this->get_batch_size(); ++i) {
         for (size_t part_id = 0; part_id < this->msa->part_count(); ++part_id) {
             // all threads have the same model, so backup from the first thread is sufficient
-            assign(this->batch_model_backup[i][part_id], other.batch_trees[i][0], part_id);
+            assign(this->batch_models[i][part_id], other.batch_trees[i][0], part_id);
         }
+    }
+
+    // if the batch trees are already generated, assign them the models
+    if (this->batch_trees.size() > 0) {
+        this->load_batch_models();
     }
 }
 
