@@ -32,6 +32,8 @@ void TreesetOptimizer::prepare_initial_batches(RaxmlInstance &instance, const Op
         // TODO schedule the batches in parallel if enough threads are available
         starting_tree_bandit().apply_parameters(current_batch);
         current_batch.generate_starting_trees(instance, opts, load_balancer, tip_msa_idmap);
+        // TODO: we probably don't need the AU test for all batches, we can save time if we infer it only for enough to
+        //  get acceptable estimates of success and throughput
         current_batch.perform_au_test(opts);
         starting_tree_bandit().take_measurement(current_batch);
     }
@@ -42,6 +44,13 @@ void TreesetOptimizer::initialize_bandits() {
         LOG_INFO << "Starting trees are so successful, no ML optimization is necessary." << std::endl;
     } else {
         // init default bandits
+        this->bandits.emplace_back(MetaParameters(1, false, 4, false));
+        this->bandits.emplace_back(MetaParameters(1, false, 2, false));
+        this->bandits.emplace_back(MetaParameters(1, true, 2, false));
+
+        this->bandits.emplace_back(MetaParameters(20, false, 4, false));
+        this->bandits.emplace_back(MetaParameters(20, false, 2, false));
+        this->bandits.emplace_back(MetaParameters(20, true, 2, false));
     }
 }
 
@@ -49,4 +58,6 @@ void TreesetOptimizer::run(RaxmlInstance &instance, Options &opts, LoadBalancer 
     this->prepare_initial_batches(instance, opts, load_balancer, tip_msa_idmap);
     LOG_INFO << std::endl;
     LOG_INFO << "Expected throughput of starting trees: " << (this->starting_tree_bandit().get_mean_throughput() * 1000.0) << " trees per second at a mean success rate of " << (this->starting_tree_bandit().get_mean_success() * 100.0) << "%." << std::endl;
+
+    this->initialize_bandits();
 }
