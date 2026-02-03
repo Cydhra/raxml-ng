@@ -47,3 +47,7 @@ double Bandit::get_variance() const {
 
     return variance_sum / this->samples.size();
 }
+
+MetaParameters &Bandit::get_parameters() const {
+    return *this->parameters;
+}
