@@ -339,7 +339,7 @@ void TunedBatch::update_meta_parameters(const Options &opts, const shared_ptr<Me
     this->auto_configure(opts);
 }
 
-bool TunedBatch::is_compatible(const shared_ptr<MetaParameters> &new_parameters) const {
+bool TunedBatch::is_compatible(const MetaParameters &new_parameters) const {
     // if the current parameters do the bare minimum, we can always continue with new parameters
     if (this->meta_parameters->accept_starting_trees) {
         return true;
@@ -348,17 +348,17 @@ bool TunedBatch::is_compatible(const shared_ptr<MetaParameters> &new_parameters)
     // if settings of the SPR rounds do not match, and we already completed some SPR rounds,
     // the new parameters cannot replace the current ones
     if (this->num_spr_performed > 0) {
-        if (this->meta_parameters->keep_top_k_topol != new_parameters->keep_top_k_topol) {
+        if (this->meta_parameters->keep_top_k_topol != new_parameters.keep_top_k_topol) {
             return false;
         }
 
-        if (this->meta_parameters->num_fast_spr > new_parameters->num_fast_spr) {
+        if (this->meta_parameters->num_fast_spr > new_parameters.num_fast_spr) {
             return false;
         }
     }
 
     // if the way the model is obtained doesn't match, the new parameters cannot replace the current ones
-    if (this->initial_model_optimized && this->meta_parameters->skip_model != new_parameters->skip_model) {
+    if (this->initial_model_optimized && this->meta_parameters->skip_model != new_parameters.skip_model) {
         return false;
     }
 
