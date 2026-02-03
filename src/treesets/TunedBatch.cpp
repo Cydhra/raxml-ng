@@ -176,7 +176,7 @@ void TunedBatch::generate_starting_trees(RaxmlInstance &instance, const Options 
 
 void TunedBatch::optimize_topology(const Options &opts) {
     if (this->meta_parameters->num_fast_spr > this->num_spr_performed) {
-        LOG_INFO_TS << this->name << ": Optimizing topology (" << (meta_parameters->num_fast_spr - num_spr_performed) << " spr rounds)" << std::endl;
+        LOG_INFO_TS << this->name << ": Optimizing topology (" << (meta_parameters->num_fast_spr - num_spr_performed) << " of " << meta_parameters->num_fast_spr << " total spr rounds)" << std::endl;
 
         this->mark_p_values_dirty();
 

@@ -13,8 +13,9 @@
  */
 class Measurement {
 public:
-    Measurement(const unsigned int time_spent, const unsigned int plausible_trees, const unsigned int batch_size) : time_spent(time_spent),
-        plausible_trees(plausible_trees), batch_size(batch_size) {
+    Measurement(const unsigned int time_spent, const unsigned int plausible_trees,
+                const unsigned int batch_size) : time_spent(time_spent),
+                                                 plausible_trees(plausible_trees), batch_size(batch_size) {
     }
 
     const unsigned int time_spent;
@@ -30,7 +31,9 @@ public:
  */
 class Bandit {
 public:
-    explicit Bandit(MetaParameters parameters) : parameters(std::make_shared<MetaParameters>(parameters)) {
+    explicit Bandit(const std::string &name, MetaParameters parameters) : name(name),
+                                                                   parameters(std::make_shared<MetaParameters>(
+                                                                       parameters)) {
     }
 
     /**
@@ -65,6 +68,14 @@ public:
     double get_variance() const;
 
 protected:
+    /**
+     * Display name of the bandit for debugging
+     */
+    std::string name;
+
+    /**
+     * Heuristics parameters of this bandit
+     */
     std::shared_ptr<MetaParameters> parameters;
 
     /**
