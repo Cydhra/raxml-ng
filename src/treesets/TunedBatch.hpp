@@ -116,7 +116,7 @@ public:
      * @param new_parameters a set of meta parameters that is compared to this batch's parameters
      * @return true, if the batch can continue inference
      */
-    bool is_compatible(const shared_ptr<MetaParameters> &new_parameters) const;
+    bool is_compatible(const MetaParameters &new_parameters) const;
 
     /**
      * Replace the model parameters with the model parameters of a different batch, which allows restoring the model instead of
