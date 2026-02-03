@@ -93,7 +93,6 @@ void TreesetOptimizer::run() {
         auto &current_bandit = this->select_next_bandit();
         auto &current_batch = this->select_next_batch();
 
-        // Todo figure out if current or best batch are supposed to be tested
         current_bandit.apply_parameters(opts, current_batch);
         current_batch.optimize(opts);
         current_batch.perform_au_test(opts);
