@@ -36,7 +36,7 @@ public:
     /**
      * Apply this bandit's parameters to the batch.
      */
-    void apply_parameters(TunedBatch &batch) const;
+    void apply_parameters(const Options &opts, TunedBatch &batch) const;
 
     /**
      * Take the benchmark data of a tuned batch which has previously run its inference with the parameters of this

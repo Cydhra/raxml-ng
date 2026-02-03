@@ -16,7 +16,7 @@ protected:
     /**
      * Reference to the RAxML-ng instance which is required for all optimization steps
      */
-    const RaxmlInstance &instance;
+    RaxmlInstance &instance;
 
     /**
      * Reference to the user options which are required for all optimization steps
@@ -31,7 +31,7 @@ protected:
     /**
      * Reference to the user-configured fine-grained load balancer used by the main RAxML instance.
      */
-    const LoadBalancer &load_balancer;
+    LoadBalancer &load_balancer;
 
     /**
      * The number of plausible trees to infer in total.
@@ -77,6 +77,13 @@ protected:
     std::vector<Bandit> bandits;
 
     /**
+     * Cursor of the bandit that is supposed to be selected next. The bandit may not be selected if its estimated
+     * reward is low. Initialized to 1, since the 0th bandit is the one that generates starting trees without any
+     * optimization.
+     */
+    unsigned int bandit_cursor = 1;
+
+    /**
      * Return the starting seed for generating `num_trees` trees.
      */
     unsigned long generate_seed_for_trees(const unsigned int num_trees) {
@@ -93,13 +100,29 @@ protected:
     }
 
     /**
+     * Select the bandit for the current round according to the cursor position and the current knowledge of the bandit.
+     */
+    Bandit &select_next_bandit();
+
+    /**
+     * Select the TunedBatch instance that should be used for the bandit that was selected by a previous call to
+     * `select_next_bandit`.
+     */
+    TunedBatch &select_next_batch();
+
+    /**
      * Prepare the initial TunedBatch instances we use for inference.
      * Because we have a number of trees we have to infer, we have a minimum number of batches required even if every
      * tree becomes plausible.
      * Those are inferred here, and they are used to infer initial guesses over meta-parameters, like the variance of
      * the underlying distribution of plausible trees.
      */
-    void prepare_initial_batches(RaxmlInstance &instance, const Options &opts, LoadBalancer &load_balancer, const IDVector &tip_msa_idmap);
+    void prepare_initial_batches();
+
+    /**
+     * Push-back `n` batches to the end of the batch vector, and infer starting trees for them.
+     */
+    void generate_batches(unsigned int n);
 
     /**
      * Initialize the bandit algorithms we use during the inference. These depend on the parameters derivded from initial
@@ -117,10 +140,10 @@ public:
      * @param target_tree_count The number of plausible trees to infer
      * @param starting_seed the tree generating seed for the first tree. Subsequent seeds are incremented by one.
      */
-    explicit TreesetOptimizer(const RaxmlInstance &instance,
+    explicit TreesetOptimizer(RaxmlInstance &instance,
                               const Options &opts,
                               const IDVector &tip_msa_idmap,
-                              const LoadBalancer &load_balancer,
+                              LoadBalancer &load_balancer,
                               const unsigned int target_tree_count,
                               const unsigned long long starting_seed,
                               const std::shared_ptr<PartitionedMSA> msa,
@@ -140,7 +163,7 @@ public:
     /**
      * Run the treeset optimizer to infer K plausible trees.
      */
-    void run(RaxmlInstance &instance, Options &opts, LoadBalancer &load_balancer, const IDVector &tip_msa_idmap);
+    void run();
 };
 
 
