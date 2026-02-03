@@ -66,6 +66,11 @@ protected:
     std::vector<TunedBatch> batches;
 
     /**
+     * Number of plausible trees that have been finalized so far.
+     */
+    unsigned int total_plausible_trees = 0;
+
+    /**
      * Index of the next batch that is supposed to be optimized.
      * Every batch before the cursor is already finished.
      */
@@ -108,7 +113,7 @@ protected:
      * Select the TunedBatch instance that should be used for the bandit that was selected by a previous call to
      * `select_next_bandit`.
      */
-    TunedBatch &select_next_batch();
+    TunedBatch &select_next_batch(const Bandit &current_bandit);
 
     /**
      * Prepare the initial TunedBatch instances we use for inference.
