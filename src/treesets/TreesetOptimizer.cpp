@@ -50,12 +50,12 @@ void TreesetOptimizer::initialize_bandits() {
         this->batch_cursor = this->batches.size();
     } else {
         // init default bandits
-        this->bandits.emplace_back("Greedy,DoModel,4spr", MetaParameters(1, false, 4, false));
         this->bandits.emplace_back("Greedy,DoModel,2spr", MetaParameters(1, false, 2, false));
+        this->bandits.emplace_back("Greedy,DoModel,4spr", MetaParameters(1, false, 4, false));
         this->bandits.emplace_back("Greedy,NoModel,2spr", MetaParameters(1, true, 2, false));
 
-        this->bandits.emplace_back("Fast,DoModel,4spr", MetaParameters(20, false, 4, false));
         this->bandits.emplace_back("Fast,DoModel,2spr", MetaParameters(20, false, 2, false));
+        this->bandits.emplace_back("Fast,DoModel,4spr", MetaParameters(20, false, 4, false));
         this->bandits.emplace_back("Fast,NoModel,2spr", MetaParameters(20, true, 2, false));
     }
 }
