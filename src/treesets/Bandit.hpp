@@ -67,6 +67,11 @@ public:
      */
     double get_variance() const;
 
+    /**
+     * @return This bandit's meta parameters
+     */
+    MetaParameters &get_parameters() const;
+
 protected:
     /**
      * Display name of the bandit for debugging
