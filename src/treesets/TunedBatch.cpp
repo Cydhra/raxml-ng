@@ -171,12 +171,14 @@ void TunedBatch::generate_starting_trees(RaxmlInstance &instance, const Options 
         std::chrono::milliseconds>(end - begin).count());
     this->wall_time += elapsed;
 
-    LOG_INFO_TS << this->name << ": total batch time after generating starting trees: " << this->wall_time << "ms." << std::endl;
+    LOG_INFO_TS << this->name << ": total batch time after generating starting trees: " << this->wall_time << "ms." <<
+            std::endl;
 }
 
 void TunedBatch::optimize_topology(const Options &opts) {
     if (this->meta_parameters->num_fast_spr > this->num_spr_performed) {
-        LOG_INFO_TS << this->name << ": Optimizing topology (" << (meta_parameters->num_fast_spr - num_spr_performed) << " of " << meta_parameters->num_fast_spr << " total spr rounds)" << std::endl;
+        LOG_INFO_TS << this->name << ": Optimizing topology (" << (meta_parameters->num_fast_spr - num_spr_performed) <<
+                " of " << meta_parameters->num_fast_spr << " total spr rounds)" << std::endl;
 
         this->mark_p_values_dirty();
 
@@ -293,7 +295,8 @@ unsigned int TunedBatch::perform_plausibility_check(const Options &opts) {
     return plausible_trees;
 }
 
-void TunedBatch::optimize_parameters(const Options &opts, const double epsilon, const bool model, const bool branches, const bool force) {
+void TunedBatch::optimize_parameters(const Options &opts, const double epsilon, const bool model, const bool branches,
+                                     const bool force) {
     this->mark_p_values_dirty();
 
     if (model && (!this->meta_parameters->skip_model || force)) {
@@ -328,6 +331,38 @@ void TunedBatch::optimize_parameters(const Options &opts, const double epsilon, 
         branch_worker();
         ParallelContext::finalize_threads();
     }
+}
+
+void TunedBatch::update_meta_parameters(const Options &opts, const shared_ptr<MetaParameters> &new_parameters) {
+    this->meta_parameters = new_parameters;
+    this->meta_parameters_set = true;
+    this->auto_configure(opts);
+}
+
+bool TunedBatch::is_compatible(const shared_ptr<MetaParameters> &new_parameters) const {
+    // if the current parameters do the bare minimum, we can always continue with new parameters
+    if (this->meta_parameters->accept_starting_trees) {
+        return true;
+    }
+
+    // if settings of the SPR rounds do not match, and we already completed some SPR rounds,
+    // the new parameters cannot replace the current ones
+    if (this->num_spr_performed > 0) {
+        if (this->meta_parameters->keep_top_k_topol != new_parameters->keep_top_k_topol) {
+            return false;
+        }
+
+        if (this->meta_parameters->num_fast_spr > new_parameters->num_fast_spr) {
+            return false;
+        }
+    }
+
+    // if the way the model is obtained doesn't match, the new parameters cannot replace the current ones
+    if (this->initial_model_optimized && this->meta_parameters->skip_model != new_parameters->skip_model) {
+        return false;
+    }
+
+    return true;
 }
 
 void TunedBatch::backup_models() {

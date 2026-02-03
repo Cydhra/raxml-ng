@@ -105,13 +105,18 @@ public:
      * Update the meta heuristical parameters of the batch, reconfiguring the search parameters from them.
      *
      * @param opts Command line options
-     * @param meta_parameters batch treeset inference meta parameters
+     * @param new_parameters batch treeset inference meta parameters
      */
-    void update_meta_parameters(const Options &opts, const shared_ptr<MetaParameters> &meta_parameters) {
-        this->meta_parameters = meta_parameters;
-        this->meta_parameters_set = true;
-        this->auto_configure(opts);
-    }
+    void update_meta_parameters(const Options &opts, const shared_ptr<MetaParameters> &new_parameters);
+
+    /**
+     * Compare the batch's current configuration with a set of new parameters, and check whether the inference can
+     * continue with the new parameters as if the batch had been inferred under the new parameters from the start.
+     *
+     * @param new_parameters a set of meta parameters that is compared to this batch's parameters
+     * @return true, if the batch can continue inference
+     */
+    bool is_compatible(const shared_ptr<MetaParameters> &new_parameters) const;
 
     /**
      * Replace the model parameters with the model parameters of a different batch, which allows restoring the model instead of
