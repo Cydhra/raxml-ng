@@ -70,13 +70,18 @@ Bandit &TreesetOptimizer::select_next_bandit() {
     return this->bandits[current];
 }
 
-TunedBatch &TreesetOptimizer::select_next_batch() {
-    const auto current = this->batch_cursor;
-    // TODO: figure out when to reuse a batch using dependencies between bandits
-    this->batch_cursor += 1;
+TunedBatch &TreesetOptimizer::select_next_batch(const Bandit &current_bandit) {
+    auto current = this->batch_cursor;
 
-    if (this->batches.size() == current) {
-        this->generate_batches(1);
+    // if the current batch is incompatible with the bandit's parameter set, select next batch
+    if (!this->batches[current].is_compatible(current_bandit.get_parameters())) {
+        // finalize the plausible trees of the current batch as we won't touch it again
+        this->total_plausible_trees += this->batches[current].get_plausible_tree_count();
+
+        current = ++this->batch_cursor;
+        if (this->batches.size() == current) {
+            generate_batches(1);
+        }
     }
 
     return this->batches[current];
@@ -91,7 +96,7 @@ void TreesetOptimizer::run() {
 
     while (true) {
         auto &current_bandit = this->select_next_bandit();
-        auto &current_batch = this->select_next_batch();
+        auto &current_batch = this->select_next_batch(current_bandit);
 
         current_bandit.apply_parameters(opts, current_batch);
         current_batch.optimize(opts);
