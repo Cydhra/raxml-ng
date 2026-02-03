@@ -14,6 +14,26 @@ constexpr unsigned int DEFAULT_BATCH_SIZE = 16;
 class TreesetOptimizer {
 protected:
     /**
+     * Reference to the RAxML-ng instance which is required for all optimization steps
+     */
+    const RaxmlInstance &instance;
+
+    /**
+     * Reference to the user options which are required for all optimization steps
+     */
+    const Options &opts;
+
+    /**
+     * Reference to the RAxML-ng instance's tip id-map which is used for starting tree generation.
+     */
+    const IDVector &tip_msa_idmap;
+
+    /**
+     * Reference to the user-configured fine-grained load balancer used by the main RAxML instance.
+     */
+    const LoadBalancer &load_balancer;
+
+    /**
      * The number of plausible trees to infer in total.
      */
     const unsigned int target_tree_count;
@@ -90,17 +110,29 @@ protected:
 public:
     /**
      *
+     * @param instance Reference to the RAxML-ng instance
+     * @param opts Reference to the user options structure
+     * @param tip_msa_idmap Reference to the tip ID mapping of the MSA.
+     * @param load_balancer Reference to the user-configured fine-grained load balancer.
      * @param target_tree_count The number of plausible trees to infer
      * @param starting_seed the tree generating seed for the first tree. Subsequent seeds are incremented by one.
      */
-    explicit TreesetOptimizer(const unsigned int target_tree_count,
+    explicit TreesetOptimizer(const RaxmlInstance &instance,
+                              const Options &opts,
+                              const IDVector &tip_msa_idmap,
+                              const LoadBalancer &load_balancer,
+                              const unsigned int target_tree_count,
                               const unsigned long long starting_seed,
                               const std::shared_ptr<PartitionedMSA> msa,
-                              const std::vector<std::vector<doubleVector> > persite_loglh) : target_tree_count(target_tree_count),
-                                                                               batch_size(DEFAULT_BATCH_SIZE),
-                                                                               current_seed(starting_seed),
-                                                                               msa(msa),
-                                                                               persite_loglh(persite_loglh) {
+                              const std::vector<std::vector<doubleVector> > persite_loglh) : instance(instance),
+        opts(opts),
+        tip_msa_idmap(tip_msa_idmap),
+        load_balancer(load_balancer),
+        target_tree_count(target_tree_count),
+        batch_size(DEFAULT_BATCH_SIZE),
+        current_seed(starting_seed),
+        msa(msa),
+        persite_loglh(persite_loglh) {
         // place the first bandit that represents the distribution of plausible starting trees
         this->bandits.emplace_back(MetaParameters(1, false, 0, true));
     }
