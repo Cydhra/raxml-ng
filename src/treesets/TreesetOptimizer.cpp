@@ -45,7 +45,7 @@ void TreesetOptimizer::generate_batches(const unsigned int n) {
 }
 
 void TreesetOptimizer::initialize_bandits() {
-    if (this->starting_tree_bandit().get_mean_success() >= 0.9) {
+    if (this->starting_tree_bandit().get_expected_tree_rate() >= 0.9) {
         LOG_INFO << "Starting trees are so successful, no ML optimization is necessary." << std::endl;
         this->batch_cursor = this->batches.size();
     } else {
@@ -109,7 +109,7 @@ void TreesetOptimizer::run() {
     LOG_INFO << "Expected throughput of starting trees: " << (
                 this->starting_tree_bandit().get_mean_throughput() * 1000.0) <<
             " trees per second at a mean success rate of "
-            << (this->starting_tree_bandit().get_mean_success() * 100.0) << "%." << std::endl;
+            << (this->starting_tree_bandit().get_expected_tree_rate() * 100.0) << "%." << std::endl;
 
     this->initialize_bandits();
 
