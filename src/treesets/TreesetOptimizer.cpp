@@ -39,7 +39,7 @@ void TreesetOptimizer::generate_batches(const unsigned int n) {
         current_batch.generate_starting_trees(this->instance, opts, load_balancer, tip_msa_idmap);
         // TODO: we probably don't need the AU test for all batches, we can save time if we infer it only for enough to
         //  get acceptable estimates of success and throughput
-        current_batch.perform_au_test(opts);
+        current_batch.perform_plausibility_check(opts);
         starting_tree_bandit().take_measurement(current_batch);
     }
 }
@@ -123,7 +123,7 @@ void TreesetOptimizer::run() {
 
         current_bandit.apply_parameters(opts, current_batch);
         current_batch.optimize(opts);
-        current_batch.perform_au_test(opts);
+        current_batch.perform_plausibility_check(opts);
         current_bandit.take_measurement(current_batch);
         this->total_batches_completed += 1;
 
@@ -158,7 +158,7 @@ void TreesetOptimizer::run() {
                     std::endl << std::endl;
 
             for (auto &bandit: this->bandits) {
-                bandit.initialize_variance(variance, this->bandits.size() - 1);
+                bandit.initialize_variance(variance, INITIAL_VARIANCE_WEIGHT);
             }
         }
 
