@@ -13,6 +13,11 @@ void Bandit::take_measurement(const TunedBatch &batch) {
     this->samples.emplace_back(batch.elapsed_wall_time(), batch.get_plausible_tree_count(), batch.get_batch_size());
 }
 
+void Bandit::initialize_variance(const double variance, const unsigned int weight) {
+    this->estimated_variance = variance;
+    this->estimated_variance_weight = weight;
+}
+
 double Bandit::get_mean_throughput() const {
     double expectation = 0.0;
 

@@ -32,8 +32,8 @@ public:
 class Bandit {
 public:
     explicit Bandit(const std::string &name, MetaParameters parameters) : name(name),
-                                                                   parameters(std::make_shared<MetaParameters>(
-                                                                       parameters)) {
+                                                                          parameters(std::make_shared<MetaParameters>(
+                                                                              parameters)) {
     }
 
     /**
@@ -49,6 +49,21 @@ public:
      * @param batch A tuned batch which has been run on the parameter set of this Bandit instance.
      */
     void take_measurement(const TunedBatch &batch);
+
+    /**
+     * Initialize the bandit distribution estimation with a constant variance. This allows comparing bandits with some
+     * level of confidence regarding the unknown variance. The set variance will account for n samples in the calculation
+     * of the bandit's actual variance, where n is the given weight argument.
+     *
+     * The set variance will be replaced with the variance of actual measurements successively
+     * by replacing the weight of it with actual samples.
+     * That is, when the Bandit has taken n measurements, the set variance will have a weight of 0 in the calculation.
+     *
+     * @param variance the initial estimate of the underlying distribution's variance
+     * @param weight the number of samples this variance accounts for. Each sample measurement the bandit takes reduces
+     * this weight by one in the calculation of the bandit's variance.
+     */
+    void initialize_variance(const double variance, const unsigned int weight);
 
     /**
      * @return the mean expected reward (throughput) of the underlying distribution.
@@ -87,6 +102,18 @@ protected:
      * Samples drawn from the reward distribution.
      */
     std::vector<Measurement> samples = {};
+
+    /**
+     * The set variance will account for n samples in the calculation of the bandit's actual variance (`get_variance()`).
+     * It gets replaced by actual `samples`, where each existing sample reduces the `estimated_variance_weight` by one.
+     */
+    double estimated_variance{0.0};
+
+    /**
+     * Initial weight of the `estimated_variance` in the calculation of the actual variance. Reduced by one for each
+     * existing measurement in `samples`.
+     */
+    unsigned int estimated_variance_weight{0};
 };
 
 
