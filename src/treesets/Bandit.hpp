@@ -66,6 +66,18 @@ public:
     void initialize_variance(const double variance, const unsigned int weight);
 
     /**
+     * Compare two bandit distribution and determine if this one is worse than the `other` bandit.
+     * A bandit is worse if the upper bound of its expected success is below the mean of the expected success
+     * of the other bandit.
+     *
+     * @param other Bandit to compare this one to
+     * @param total_samples total number of batches inferred so far
+     *
+     * @return true if this bandit has worse success rate with high probability.
+     */
+    bool is_worse_than(const Bandit &other, unsigned int total_samples) const;
+
+    /**
      * @return the mean expected reward (throughput) of the underlying distribution.
      */
     double get_mean_throughput() const;
