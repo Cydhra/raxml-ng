@@ -2,6 +2,8 @@
 
 #include "TunedBatch.hpp"
 
+constexpr unsigned int INITIAL_VARIANCE_WEIGHT = 6;
+
 int recommended_thread_count() {
     // TODO add parameters to options containing the max thread count, which we just assign to the single worker per rank
     return 8;
@@ -37,10 +39,12 @@ void TreesetOptimizer::generate_batches(const unsigned int n) {
         // TODO schedule the batches in parallel if enough threads are available
         starting_tree_bandit().apply_parameters(opts, current_batch);
         current_batch.generate_starting_trees(this->instance, opts, load_balancer, tip_msa_idmap);
-        // TODO: we probably don't need the AU test for all batches, we can save time if we infer it only for enough to
-        //  get acceptable estimates of success and throughput
-        current_batch.perform_plausibility_check(opts);
-        starting_tree_bandit().take_measurement(current_batch);
+
+        // take a few measurements, but no more than necessary to have reasonable values for mean and variance
+        if (i < INITIAL_VARIANCE_WEIGHT) {
+            current_batch.perform_plausibility_check(opts);
+            starting_tree_bandit().take_measurement(current_batch);
+        }
     }
 }
 
