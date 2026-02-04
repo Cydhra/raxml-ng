@@ -42,7 +42,13 @@ double Bandit::get_mean_success() const {
 
 double Bandit::get_variance() const {
     const double mean = get_mean_throughput();
-    double variance_sum = 0.0;
+    double variance_sum = this->estimated_variance;
+
+    // calculate participation of the estimator, gradually replacing it with actual measurements
+    const auto weight = this->estimated_variance_weight - min(this->estimated_variance_weight,
+                                                        static_cast<unsigned int>(this->samples.size()));
+
+    variance_sum *= weight;
 
     for (auto &sample: this->samples) {
         const double sample_throughput = static_cast<double>(sample.plausible_trees) / static_cast<double>(sample.
@@ -50,7 +56,7 @@ double Bandit::get_variance() const {
         variance_sum += (mean - sample_throughput) * (mean - sample_throughput);
     }
 
-    return variance_sum / this->samples.size();
+    return variance_sum / (this->samples.size() + weight);
 }
 
 MetaParameters &Bandit::get_parameters() const {
