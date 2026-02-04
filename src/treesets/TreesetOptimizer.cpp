@@ -61,13 +61,12 @@ void TreesetOptimizer::initialize_bandits() {
 }
 
 Bandit &TreesetOptimizer::select_next_bandit() {
-    const auto current = this->bandit_cursor;
-
     this->bandit_cursor += 1;
     this->bandit_cursor %= this->bandits.size();
 
-    // TODO select best bandit if the current bandit is definitely worse.
-    return this->bandits[current];
+    auto &selected_bandit = this->bandits[this->bandit_cursor];
+
+    return selected_bandit;
 }
 
 TunedBatch &TreesetOptimizer::select_next_batch(const Bandit &current_bandit) {
@@ -89,16 +88,20 @@ TunedBatch &TreesetOptimizer::select_next_batch(const Bandit &current_bandit) {
 
 void TreesetOptimizer::run() {
     LOG_INFO << std::endl;
-    LOG_INFO_TS << "Treeset: Inferring at least " << this->target_tree_count << " plausible trees while optimizing throughput." << std::endl;
+    LOG_INFO_TS << "Treeset: Inferring at least " << this->target_tree_count <<
+            " plausible trees while optimizing throughput." << std::endl;
 
     this->prepare_initial_batches();
     LOG_INFO << std::endl;
-    LOG_INFO << "Expected throughput of starting trees: " << (this->starting_tree_bandit().get_mean_throughput() * 1000.0) << " trees per second at a mean success rate of " << (this->starting_tree_bandit().get_mean_success() * 100.0) << "%." << std::endl;
+    LOG_INFO << "Expected throughput of starting trees: " << (
+                this->starting_tree_bandit().get_mean_throughput() * 1000.0) <<
+            " trees per second at a mean success rate of "
+            << (this->starting_tree_bandit().get_mean_success() * 100.0) << "%." << std::endl;
 
     this->initialize_bandits();
 
     // run through the bandits once (i.e. until the bandit cursor is 0 again) to collect initial measurements
-    while (bandit_cursor) {
+    do {
         auto &current_bandit = this->select_next_bandit();
         auto &current_batch = this->select_next_batch(current_bandit);
 
@@ -112,7 +115,7 @@ void TreesetOptimizer::run() {
             this->batch_cursor += 1;
             break;
         }
-    }
+    } while (bandit_cursor);
 
     // collect variances
     double mean = 0.0;
@@ -130,7 +133,10 @@ void TreesetOptimizer::run() {
     const auto standard_deviation = sqrt(variance);
 
     LOG_INFO << std::endl;
-    LOG_INFO << "Mean throughput is " << (mean * 1000.0) << " trees per second with the standard deviation over all bandits being " << (standard_deviation * 1000.0) << std::endl;
+    LOG_INFO << "Mean throughput is " << (mean * 1000.0) <<
+            " trees per second with the standard deviation over all bandits being " << (standard_deviation * 1000.0) <<
+            std::endl;
 
-    LOG_INFO_TS << "Inferred " << this->total_plausible_trees << " plausible trees in " << this->batch_cursor << " batches." << std::endl;
+    LOG_INFO_TS << "Inferred " << this->total_plausible_trees << " plausible trees in " << this->batch_cursor <<
+            " batches." << std::endl;
 }
