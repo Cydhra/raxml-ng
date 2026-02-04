@@ -34,6 +34,17 @@ public:
                                                  num_fast_spr(num_fast_spr),
                                                  accept_starting_trees(accept_starting_trees) {
     }
+
+    friend bool operator==(const MetaParameters &lhs, const MetaParameters &rhs) {
+        return lhs.keep_top_k_topol == rhs.keep_top_k_topol
+               && lhs.skip_model == rhs.skip_model
+               && lhs.num_fast_spr == rhs.num_fast_spr
+               && lhs.accept_starting_trees == rhs.accept_starting_trees;
+    }
+
+    friend bool operator!=(const MetaParameters &lhs, const MetaParameters &rhs) {
+        return !(lhs == rhs);
+    }
 };
 
 #endif //RAXML_METAPARAMETERS_HPP_
