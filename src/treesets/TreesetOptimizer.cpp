@@ -133,7 +133,7 @@ void TreesetOptimizer::run() {
 
         // if the current bandit is not the best one, check if the best one has to be updated
         if (current_bandit.get_parameters() != this->bandits[best_known_bandit].get_parameters()) {
-            if (current_bandit.get_mean_throughput() < this->bandits[best_known_bandit].get_mean_throughput()) {
+            if (current_bandit.get_mean_throughput() > this->bandits[best_known_bandit].get_mean_throughput()) {
                 best_known_bandit = bandit_cursor;
             }
         }
