@@ -67,7 +67,8 @@ Bandit &TreesetOptimizer::select_next_bandit() {
     auto &selected_bandit = this->bandits[this->bandit_cursor];
     auto &best_bandit = this->bandits[this->best_known_bandit];
 
-    if (this->bandit_cursor != this->best_known_bandit && selected_bandit.is_worse_than(best_bandit, this->total_batches_completed)) {
+    if (this->bandit_cursor != this->best_known_bandit && selected_bandit.is_worse_than(
+            best_bandit, this->total_batches_completed)) {
         LOG_INFO << "Bandit " << selected_bandit.get_name() << " was not selected because its expected success ("
                 << (selected_bandit.get_mean_success() * 1000.0) <<
                 " trees per second) is far less than the expected success of "
@@ -75,6 +76,8 @@ Bandit &TreesetOptimizer::select_next_bandit() {
 
         return best_bandit;
     }
+
+    LOG_INFO << "Selecting bandit " << selected_bandit.get_name() << "." << std::endl;
 
     return selected_bandit;
 }
@@ -128,32 +131,40 @@ void TreesetOptimizer::run() {
             }
         }
 
+        // once all bandits have been selected once, assign variances to the bandits
+        if (total_batches_completed == this->bandits.size() - 1) {
+            // collect variances
+            double mean = 0.0;
+            for (unsigned int i = 1; i < bandits.size(); i++) {
+                mean += bandits[i].get_mean_throughput();
+            }
+            mean /= static_cast<double>(bandits.size() - 1);
+
+            double variance = 0.0;
+            for (unsigned int i = 1; i < bandits.size(); i++) {
+                variance += (mean - bandits[i].get_mean_throughput()) * (mean - bandits[i].get_mean_throughput());
+            }
+            variance /= static_cast<double>(bandits.size() - 1);
+
+            const auto standard_deviation = sqrt(variance);
+
+            LOG_INFO << std::endl;
+            LOG_INFO << "Mean throughput is " << (mean * 1000.0) <<
+                    " trees per second with the standard deviation over all bandits being " << (
+                        standard_deviation * 1000.0) <<
+                    std::endl << std::endl;
+
+            for (auto &bandit: this->bandits) {
+                bandit.initialize_variance(variance, this->bandits.size() - 1);
+            }
+        }
+
         if (this->total_plausible_trees + current_batch.get_plausible_tree_count() > this->target_tree_count) {
             this->total_plausible_trees += current_batch.get_plausible_tree_count();
             this->batch_cursor += 1;
             break;
         }
-    } while (bandit_cursor);
-
-    // collect variances
-    double mean = 0.0;
-    for (unsigned int i = 1; i < bandits.size(); i++) {
-        mean += bandits[i].get_mean_throughput();
-    }
-    mean /= static_cast<double>(bandits.size() - 1);
-
-    double variance = 0.0;
-    for (unsigned int i = 1; i < bandits.size(); i++) {
-        variance += (mean - bandits[i].get_mean_throughput()) * (mean - bandits[i].get_mean_throughput());
-    }
-    variance /= static_cast<double>(bandits.size() - 1);
-
-    const auto standard_deviation = sqrt(variance);
-
-    LOG_INFO << std::endl;
-    LOG_INFO << "Mean throughput is " << (mean * 1000.0) <<
-            " trees per second with the standard deviation over all bandits being " << (standard_deviation * 1000.0) <<
-            std::endl;
+    } while (true);
 
     LOG_INFO_TS << "Inferred " << this->total_plausible_trees << " plausible trees in " << this->batch_cursor <<
             " batches." << std::endl;
