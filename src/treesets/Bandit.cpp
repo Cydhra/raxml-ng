@@ -18,6 +18,22 @@ void Bandit::initialize_variance(const double variance, const unsigned int weigh
     this->estimated_variance_weight = weight;
 }
 
+bool Bandit::is_worse_than(const Bandit &other, const unsigned int total_samples) const {
+    // each bandit needs to be sampled at least once
+    if (this->samples.empty() || other.samples.empty()) {
+        return false;
+    }
+
+    const auto mean_success = this->get_mean_success();
+    const auto variance = this->get_variance();
+
+    // as defined by 10.1016/0196-8858(85)90002-8, formula 4.13 with the choice of `a_(n,i)` = `(log n) / i`,
+    // where `n` is the total number of samples, and `i` is the number of samples drawn for this bandit
+    const auto upper_confidence = mean_success + variance * sqrt(2.0 * log(static_cast<double>(total_samples)) / static_cast<double>(this->samples.size()));
+
+    return other.get_mean_success() > upper_confidence;
+}
+
 double Bandit::get_mean_throughput() const {
     double expectation = 0.0;
 
