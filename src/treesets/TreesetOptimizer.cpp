@@ -88,13 +88,17 @@ TunedBatch &TreesetOptimizer::select_next_batch(const Bandit &current_bandit) {
 }
 
 void TreesetOptimizer::run() {
+    LOG_INFO << std::endl;
+    LOG_INFO_TS << "Treeset: Inferring at least " << this->target_tree_count << " plausible trees while optimizing throughput." << std::endl;
+
     this->prepare_initial_batches();
     LOG_INFO << std::endl;
     LOG_INFO << "Expected throughput of starting trees: " << (this->starting_tree_bandit().get_mean_throughput() * 1000.0) << " trees per second at a mean success rate of " << (this->starting_tree_bandit().get_mean_success() * 100.0) << "%." << std::endl;
 
     this->initialize_bandits();
 
-    while (true) {
+    // run through the bandits once (i.e. until the bandit cursor is 0 again) to collect initial measurements
+    while (bandit_cursor) {
         auto &current_bandit = this->select_next_bandit();
         auto &current_batch = this->select_next_batch(current_bandit);
 
@@ -103,11 +107,30 @@ void TreesetOptimizer::run() {
         current_batch.perform_au_test(opts);
         current_bandit.take_measurement(current_batch);
 
-        // TODO currently we break after the first round. Instead we should obviously break only when we have enough
-        //  plausible trees. Keep in mind, that reusing a batch means we arent getting all the plausible trees from the
-        //  batch's previous run.
-        if (this->bandit_cursor == 0) {
+        if (this->total_plausible_trees + current_batch.get_plausible_tree_count() > this->target_tree_count) {
+            this->total_plausible_trees += current_batch.get_plausible_tree_count();
+            this->batch_cursor += 1;
             break;
         }
     }
+
+    // collect variances
+    double mean = 0.0;
+    for (unsigned int i = 1; i < bandits.size(); i++) {
+        mean += bandits[i].get_mean_throughput();
+    }
+    mean /= static_cast<double>(bandits.size() - 1);
+
+    double variance = 0.0;
+    for (unsigned int i = 1; i < bandits.size(); i++) {
+        variance += (mean - bandits[i].get_mean_throughput()) * (mean - bandits[i].get_mean_throughput());
+    }
+    variance /= static_cast<double>(bandits.size() - 1);
+
+    const auto standard_deviation = sqrt(variance);
+
+    LOG_INFO << std::endl;
+    LOG_INFO << "Mean throughput is " << (mean * 1000.0) << " trees per second with the standard deviation over all bandits being " << (standard_deviation * 1000.0) << std::endl;
+
+    LOG_INFO_TS << "Inferred " << this->total_plausible_trees << " plausible trees in " << this->batch_cursor << " batches." << std::endl;
 }
