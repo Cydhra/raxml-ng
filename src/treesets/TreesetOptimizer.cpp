@@ -65,6 +65,16 @@ Bandit &TreesetOptimizer::select_next_bandit() {
     this->bandit_cursor %= this->bandits.size();
 
     auto &selected_bandit = this->bandits[this->bandit_cursor];
+    auto &best_bandit = this->bandits[this->best_known_bandit];
+
+    if (this->bandit_cursor != this->best_known_bandit && selected_bandit.is_worse_than(best_bandit, this->total_batches_completed)) {
+        LOG_INFO << "Bandit " << selected_bandit.get_name() << " was not selected because its expected success ("
+                << (selected_bandit.get_mean_success() * 1000.0) <<
+                " trees per second) is far less than the expected success of "
+                << best_bandit.get_name() << " (" << (best_bandit.get_mean_success() * 1000.0) << ")." << std::endl;
+
+        return best_bandit;
+    }
 
     return selected_bandit;
 }
@@ -109,6 +119,14 @@ void TreesetOptimizer::run() {
         current_batch.optimize(opts);
         current_batch.perform_au_test(opts);
         current_bandit.take_measurement(current_batch);
+        this->total_batches_completed += 1;
+
+        // if the current bandit is not the best one, check if the best one has to be updated
+        if (current_bandit.get_parameters() != this->bandits[best_known_bandit].get_parameters()) {
+            if (current_bandit.get_mean_success() < this->bandits[best_known_bandit].get_mean_success()) {
+                best_known_bandit = bandit_cursor;
+            }
+        }
 
         if (this->total_plausible_trees + current_batch.get_plausible_tree_count() > this->target_tree_count) {
             this->total_plausible_trees += current_batch.get_plausible_tree_count();

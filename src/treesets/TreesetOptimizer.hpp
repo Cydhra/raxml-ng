@@ -77,6 +77,13 @@ protected:
     unsigned int batch_cursor = 0;
 
     /**
+     * Number of batches that were drawn from bandits. This can differ from the batch_cursor if batches were reused
+     * (which happens if a bandit's configuration is compatible with the previous bandit's configuration).
+     * Then only one batch exists, but two samples were drawn from the bandits.
+     */
+    unsigned int total_batches_completed = 0;
+
+    /**
      * List of all bandits registered in the current run. Each bandit is considered during inference.
      */
     std::vector<Bandit> bandits;
