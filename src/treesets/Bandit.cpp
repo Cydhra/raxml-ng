@@ -40,7 +40,7 @@ double Bandit::get_mean_throughput() const {
     return expectation / this->samples.size();
 }
 
-double Bandit::get_mean_success() const {
+double Bandit::get_expected_tree_rate() const {
     double success = 0.0;
     for (auto &sample: this->samples) {
         success += static_cast<double>(sample.plausible_trees) / static_cast<double>(sample.batch_size);

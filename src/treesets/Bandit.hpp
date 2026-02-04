@@ -85,7 +85,7 @@ public:
     /**
      * @return the mean success rate (between 0 and 1) of yielding a plausible tree under this bandit's parameters.
      */
-    double get_mean_success() const;
+    double get_expected_tree_rate() const;
 
     /**
      * @return the variance of the reward distribution. Because this is required to be known a priori, the value is
