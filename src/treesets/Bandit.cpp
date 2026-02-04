@@ -24,7 +24,7 @@ bool Bandit::is_worse_than(const Bandit &other, const unsigned int total_samples
         return false;
     }
 
-    return other.get_mean_success() > this->get_upper_confidence(total_samples);
+    return other.get_mean_throughput() > this->get_upper_confidence(total_samples);
 }
 
 double Bandit::get_mean_throughput() const {
@@ -69,12 +69,12 @@ double Bandit::get_variance() const {
 }
 
 double Bandit::get_upper_confidence(const unsigned int total_samples) const {
-    const auto mean_success = this->get_mean_success();
+    const auto mean_throughput = this->get_mean_throughput();
     const auto variance = this->get_variance();
 
     // as defined by 10.1016/0196-8858(85)90002-8, formula 4.13 with the choice of `a_(n,i)` = `(log n) / i`,
     // where `n` is the total number of samples, and `i` is the number of samples drawn for this bandit
-    return mean_success + variance * sqrt(2.0 * log(static_cast<double>(total_samples)) / static_cast<double>(this->samples.size()));
+    return mean_throughput + variance * sqrt(2.0 * log(static_cast<double>(total_samples)) / static_cast<double>(this->samples.size()));
 }
 
 MetaParameters &Bandit::get_parameters() const {
