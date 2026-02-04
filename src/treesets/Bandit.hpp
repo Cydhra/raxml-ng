@@ -99,6 +99,11 @@ public:
      */
     MetaParameters &get_parameters() const;
 
+    /**
+     * @return Bandit name for debug output
+     */
+    string get_name() const;
+
 protected:
     /**
      * Display name of the bandit for debugging

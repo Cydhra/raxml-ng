@@ -78,3 +78,7 @@ double Bandit::get_variance() const {
 MetaParameters &Bandit::get_parameters() const {
     return *this->parameters;
 }
+
+string Bandit::get_name() const {
+    return this->name;
+}
