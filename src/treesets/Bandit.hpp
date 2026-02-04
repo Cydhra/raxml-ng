@@ -95,6 +95,16 @@ public:
     double get_variance() const;
 
     /**
+     * Calculate the upper confident limit on the mean expected success of this bandit. This depends on the total
+     * number of samples drawn so far, as well as the number of samples drawn for this bandit.
+     *
+     * @param total_samples the number of total samples from all bandits that have been drawn so far
+     *
+     * @return the upper bound on the mean expected success that can be determined with high confidence.
+     */
+    double get_upper_confidence(unsigned int total_samples) const;
+
+    /**
      * @return This bandit's meta parameters
      */
     MetaParameters &get_parameters() const;
