@@ -82,11 +82,19 @@ protected:
     std::vector<Bandit> bandits;
 
     /**
-     * Cursor of the bandit that is supposed to be selected next. The bandit may not be selected if its estimated
-     * reward is low. Initialized to 1, since the 0th bandit is the one that generates starting trees without any
-     * optimization.
+     * Cursor of the bandit that is supposed to be selected at the moment. The bandit may not be selected if its estimated
+     * reward is lower than the best known bandit. Initialized to 0, which is not selected first because
+     * `select_next_bandit` increments the cursor before selecting.
+     * This is correct because the 0th bandit is the one that generates starting trees, which is forcibly selected
+     * when preparing the initial batches, so it need not be the first bandit in the actual loop.
      */
-    unsigned int bandit_cursor = 1;
+    unsigned int bandit_cursor = 0;
+
+    /**
+     * Index of the best known bandit. Initialized at 0, the bandit that just generates starting trees. Updated
+     * by `run()` whenever a measurement is taken.
+     */
+    unsigned int best_known_bandit = 0;
 
     /**
      * Return the starting seed for generating `num_trees` trees.
