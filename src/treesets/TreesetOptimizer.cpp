@@ -41,7 +41,7 @@ void TreesetOptimizer::generate_batches(const unsigned int n) {
         current_batch.generate_starting_trees(this->instance, opts, load_balancer, tip_msa_idmap);
 
         // take a few measurements, but no more than necessary to have reasonable values for mean and variance
-        if (i < INITIAL_VARIANCE_WEIGHT) {
+        if (batches.size() <= INITIAL_VARIANCE_WEIGHT) {
             current_batch.perform_plausibility_check(opts);
             starting_tree_bandit().take_measurement(current_batch);
         }
