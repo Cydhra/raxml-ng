@@ -7,12 +7,6 @@
  */
 constexpr unsigned int INITIAL_VARIANCE_WEIGHT = 6;
 
-/**
- * Multiply the initial variance measured between bandits with this to ensure we over-estimate the initial variance
- * of all distributions.
- */
-constexpr double VARIANCE_OVERESTIMATION = 2.0;
-
 int recommended_thread_count() {
     // TODO add parameters to options containing the max thread count, which we just assign to the single worker per rank
     return 8;
@@ -177,7 +171,7 @@ void TreesetOptimizer::run() {
                     std::endl << std::endl;
 
             for (auto &bandit: this->bandits) {
-                bandit.initialize_variance(variance * VARIANCE_OVERESTIMATION, INITIAL_VARIANCE_WEIGHT);
+                bandit.initialize_variance(variance, INITIAL_VARIANCE_WEIGHT);
             }
         }
 
