@@ -92,8 +92,10 @@ Bandit &TreesetOptimizer::select_next_bandit() {
 TunedBatch &TreesetOptimizer::select_next_batch(const Bandit &current_bandit) {
     auto current = this->batch_cursor;
 
-    // if the current batch is incompatible with the bandit's parameter set, select next batch
-    if (!this->batches[current].is_compatible(current_bandit.get_parameters())) {
+    // to speed up the initial round of computation where all bandits are executed once,
+    // we want to reuse batches. If the total rounds is already higher than the bandit count, we don't do that,
+    // so we actually make progress.
+    if (this->total_batches_completed > this->bandits.size() || !this->batches[current].is_compatible(current_bandit.get_parameters())) {
         // finalize the plausible trees of the current batch as we won't touch it again
         this->total_plausible_trees += this->batches[current].get_plausible_tree_count();
 
@@ -170,6 +172,8 @@ void TreesetOptimizer::run() {
             this->total_plausible_trees += current_batch.get_plausible_tree_count();
             this->batch_cursor += 1;
             break;
+        } else {
+            LOG_INFO_TS << "Progress: " << this->total_plausible_trees << " / " << this->target_tree_count << " plausible trees." << std::endl;
         }
     } while (true);
 
