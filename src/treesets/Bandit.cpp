@@ -73,8 +73,9 @@ double Bandit::get_upper_confidence(const unsigned int total_samples) const {
     const auto variance = this->get_variance();
 
     // as defined by 10.1016/0196-8858(85)90002-8, formula 4.13 with the choice of `a_(n,i)` = `(log n) / i`,
-    // where `n` is the total number of samples, and `i` is the number of samples drawn for this bandit
-    return mean_throughput + variance * sqrt(2.0 * log(static_cast<double>(total_samples)) / static_cast<double>(this->samples.size()));
+    // where `n` is the total number of samples, and `i` is the number of samples drawn for this bandit.
+    // do note that the formula contains the standard deviation, not the variance, so we move the variance into the root.
+    return mean_throughput + sqrt(variance * 2.0 * log(static_cast<double>(total_samples)) / static_cast<double>(this->samples.size()));
 }
 
 MetaParameters &Bandit::get_parameters() const {
