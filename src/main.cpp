@@ -977,7 +977,8 @@ void check_options_early(Options& opts)
   /* disable pythia if command cannot use difficulty score */
   opts.use_pythia &= (opts.command == Command::parse || opts.command == Command::search ||
                       opts.command == Command::bootstrap || opts.command == Command::all ||
-                      opts.command == Command::pythia || opts.command == Command::start);
+                      opts.command == Command::pythia || opts.command == Command::start ||
+                      opts.command == Command::treeset);
 
   if (opts.use_pythia && !opts.use_pattern_compression)
   {
