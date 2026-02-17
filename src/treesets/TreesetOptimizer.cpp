@@ -118,74 +118,39 @@ TunedBatch &TreesetOptimizer::select_next_batch(const Bandit &current_bandit) {
 }
 
 void TreesetOptimizer::run() {
+    const auto NUM = 500;
     LOG_INFO << std::endl;
-    LOG_INFO_TS << "Treeset: Inferring at least " << this->target_tree_count <<
-            " plausible trees while optimizing throughput." << std::endl;
+    LOG_INFO_TS << "Treeset: Inferring " << NUM << " starting trees and benchmark their potential." << std::endl;
 
-    this->prepare_initial_batches();
-    LOG_INFO << std::endl;
-    LOG_INFO << "Expected throughput of starting trees: " << (
-                this->starting_tree_bandit().get_mean_throughput() * 1000.0) <<
-            " trees per second at a mean success rate of "
-            << (this->starting_tree_bandit().get_expected_tree_rate() * 100.0) << "%." << std::endl;
+    // generate 100 parsimony trees
+    auto batch = TunedBatch("TestTrees",
+                               1000,
+                               NUM,
+                               recommended_thread_count(),
+                               recommended_worker_count(),
+                               msa,
+                               persite_loglh);
 
-    this->initialize_bandits();
+    const auto pseudo_bandit = Bandit("pseudo", MetaParameters(20, false, 1, false));
+    pseudo_bandit.apply_parameters(opts, batch);
 
-    // run through the bandits once (i.e. until the bandit cursor is 0 again) to collect initial measurements
-    do {
-        auto &current_bandit = this->select_next_bandit();
-        auto &current_batch = this->select_next_batch(current_bandit);
+    batch.generate_starting_trees(this->instance, opts, load_balancer, tip_msa_idmap);
+    batch.optimize_parameters(opts, 3.0);
 
-        current_bandit.apply_parameters(opts, current_batch);
-        current_batch.optimize(opts);
-        current_batch.perform_plausibility_check(opts);
-        current_bandit.take_measurement(current_batch);
-        this->total_batches_completed += 1;
+    batch.perform_plausibility_check(opts);
 
-        // if the current bandit is not the best one, check if the best one has to be updated
-        if (current_bandit.get_parameters() != this->bandits[best_known_bandit].get_parameters()) {
-            if (current_bandit.get_mean_throughput() > this->bandits[best_known_bandit].get_mean_throughput()) {
-                best_known_bandit = bandit_cursor;
-            }
-        }
+    auto initial_loglh = batch.get_tree_likelihoods();
+    auto initial_p_values = batch.get_p_values();
 
-        // once all bandits have been selected once, assign variances to the bandits
-        if (total_batches_completed == this->bandits.size() - 1) {
-            // collect variances
-            double mean = 0.0;
-            for (unsigned int i = 0; i < bandits.size(); i++) {
-                mean += bandits[i].get_mean_throughput();
-            }
-            mean /= static_cast<double>(bandits.size());
+    batch.optimize_topology(opts);
+    batch.perform_plausibility_check(opts);
 
-            double variance = 0.0;
-            for (unsigned int i = 0; i < bandits.size(); i++) {
-                variance += (mean - bandits[i].get_mean_throughput()) * (mean - bandits[i].get_mean_throughput());
-            }
-            variance /= static_cast<double>(bandits.size());
+    auto optimized_loglh = batch.get_tree_likelihoods();
+    auto optimized_p_values = batch.get_p_values();
 
-            const auto standard_deviation = sqrt(variance);
+    for (unsigned int i = 0; i < initial_loglh.size(); i++) {
+        LOG_INFO << i << "\t" << initial_loglh[i] << "\t"  << initial_p_values[i] << "\t" << optimized_loglh[i] << "\t"  << optimized_p_values[i] << std::endl;
+    }
 
-            LOG_INFO << std::endl;
-            LOG_INFO << "Mean throughput is " << (mean * 1000.0) <<
-                    " trees per second with the standard deviation over all bandits being " << (
-                        standard_deviation * 1000.0) <<
-                    std::endl << std::endl;
-
-            for (auto &bandit: this->bandits) {
-                bandit.initialize_variance(variance, INITIAL_VARIANCE_WEIGHT);
-            }
-        }
-
-        if (this->total_plausible_trees + current_batch.get_plausible_tree_count() > this->target_tree_count) {
-            this->total_plausible_trees += current_batch.get_plausible_tree_count();
-            this->batch_cursor += 1;
-            break;
-        } else {
-            LOG_INFO_TS << "Progress: " << this->total_plausible_trees << " / " << this->target_tree_count << " plausible trees." << std::endl;
-        }
-    } while (true);
-
-    LOG_INFO_TS << "Inferred " << this->total_plausible_trees << " plausible trees in " << this->batch_cursor <<
-            " batches." << std::endl;
+    LOG_INFO_TS << "Analyzed " << NUM << " starting trees." << std::endl;
 }
