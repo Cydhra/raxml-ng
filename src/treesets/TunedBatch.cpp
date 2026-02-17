@@ -457,3 +457,21 @@ bool TunedBatch::start_trees_generated() const {
 Tree TunedBatch::get_tree(const unsigned int index) const {
     return this->batch_trees.at(index).at(0).tree();
 }
+
+std::vector<double> TunedBatch::get_tree_likelihoods() {
+    auto result = std::vector<double>(this->batch_trees.size());
+
+    for (unsigned int i = 0; i < this->batch_trees.size(); i++) {
+        auto loglh = 0.0;
+        for (auto &part: this->batch_trees[i]) {
+            loglh += part.loglh();
+        }
+        result[i] = loglh;
+    }
+
+    return result;
+}
+
+std::vector<double> &TunedBatch::get_p_values() const {
+    return this->au_test->get_p_values();
+}
