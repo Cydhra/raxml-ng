@@ -159,6 +159,16 @@ public:
      */
     Tree get_tree(unsigned int index) const;
 
+    /**
+     * @return the log-likelihoods of all trees in order of the trees
+     */
+    std::vector<double> get_tree_likelihoods();
+
+    /**
+     * @return the p-values of the last performed AU-Test
+     */
+    std::vector<double> &get_p_values() const;
+
 protected:
     /**
      * Name of the batch for outputting debug information.
