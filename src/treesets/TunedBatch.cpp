@@ -176,20 +176,31 @@ void TunedBatch::generate_starting_trees(RaxmlInstance &instance, const Options 
 }
 
 void TunedBatch::optimize_topology(const Options &opts) {
-    if (this->meta_parameters->num_fast_spr > this->num_spr_performed) {
-        LOG_INFO_TS << this->name << ": Optimizing topology (" << (meta_parameters->num_fast_spr - num_spr_performed) <<
-                " of " << meta_parameters->num_fast_spr << " total spr rounds)" << std::endl;
+    while (this->meta_parameters->num_fast_spr > this->num_fast_spr_performed || this->meta_parameters->num_slow_spr >
+           this->num_slow_spr_performed) {
+        const auto fast = this->meta_parameters->num_fast_spr > this->num_fast_spr_performed;
+        auto num_rounds = fast
+                              ? meta_parameters->num_fast_spr - num_fast_spr_performed
+                              : meta_parameters->num_slow_spr - num_slow_spr_performed;
+        auto total_rounds = fast ? meta_parameters->num_fast_spr : meta_parameters->num_slow_spr;
+        auto round_name = fast ? "FAST" : "SLOW";
 
+        LOG_INFO_TS << this->name << ": Optimizing topology (" << num_rounds << " of " << total_rounds << " total " <<
+                round_name << " spr rounds)" << std::endl;
+
+        // make sure the spr-params are set correctly for fast/slow rounds
+        this->auto_configure(opts);
+
+        // make sure the AU test is invalidated
         this->mark_p_values_dirty();
 
         const auto begin = std::chrono::steady_clock::now();
-
         const auto spr_worker = make_kernel(
             std::ref(this->coarse_assignments),
             std::bind(spr_kernel,
                       std::ref(this->batch_trees),
                       std::ref(this->spr_params),
-                      this->num_spr_performed,
+                      this->num_fast_spr_performed,
                       this->meta_parameters->num_fast_spr,
                       _1, _2));
         ParallelContext::init_pthreads_custom(opts, spr_worker, num_threads, num_workers);
@@ -203,7 +214,11 @@ void TunedBatch::optimize_topology(const Options &opts) {
 
         // TODO this only works if checkpoints cannot recover tree states. When checkpointing is added, this mechanism needs
         //  to be changed
-        num_spr_performed = this->meta_parameters->num_fast_spr;
+        if (fast) {
+            num_fast_spr_performed = this->meta_parameters->num_fast_spr;
+        } else {
+            num_slow_spr_performed = this->meta_parameters->num_slow_spr;
+        }
     }
 }
 
@@ -347,12 +362,28 @@ bool TunedBatch::is_compatible(const MetaParameters &new_parameters) const {
 
     // if settings of the SPR rounds do not match, and we already completed some SPR rounds,
     // the new parameters cannot replace the current ones
-    if (this->num_spr_performed > 0) {
+    if (this->num_fast_spr_performed > 0) {
         if (this->meta_parameters->keep_top_k_topol != new_parameters.keep_top_k_topol) {
             return false;
         }
 
         if (this->meta_parameters->num_fast_spr > new_parameters.num_fast_spr) {
+            return false;
+        }
+    }
+
+    if (this->num_slow_spr_performed > 0) {
+        if (this->meta_parameters->keep_top_k_topol != new_parameters.keep_top_k_topol) {
+            return false;
+        }
+
+        // if we already completed some slow rounds, but the other parameter wants to do more fast rounds,
+        // we reject, because order matters
+        if (this->meta_parameters->num_fast_spr != new_parameters.num_fast_spr) {
+            return false;
+        }
+
+        if (this->meta_parameters->num_slow_spr > new_parameters.num_slow_spr) {
             return false;
         }
     }
