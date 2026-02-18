@@ -25,14 +25,20 @@ public:
     const unsigned int num_fast_spr;
 
     /**
+     * How many slow SPR rounds to perform for each tree search
+     */
+    const unsigned int num_slow_spr;
+
+    /**
      * If true, skip all model optimization and simply accept parsimony starting trees as the final resulting topology.
      */
     const bool accept_starting_trees;
 
     MetaParameters(const unsigned int keep_top_k_topol, const bool skip_model, const unsigned int num_fast_spr,
+                   const unsigned int num_slow_spr,
                    const bool accept_starting_trees) : keep_top_k_topol(keep_top_k_topol), skip_model(skip_model),
-                                                 num_fast_spr(num_fast_spr),
-                                                 accept_starting_trees(accept_starting_trees) {
+                                                       num_fast_spr(num_fast_spr), num_slow_spr(num_slow_spr),
+                                                       accept_starting_trees(accept_starting_trees) {
     }
 
     friend bool operator==(const MetaParameters &lhs, const MetaParameters &rhs) {
