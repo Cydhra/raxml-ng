@@ -196,10 +196,16 @@ protected:
     spr_round_params spr_params;
 
     /**
-     * Number of SPR rounds that have already been performed on the tree. This is increased by the `infer_batch`
+     * Number of fast SPR rounds that have already been performed on the tree. This is increased by the `infer_batch`
      * method.
      */
-    unsigned int num_spr_performed{0};
+    unsigned int num_fast_spr_performed{0};
+
+    /**
+     * Number of slow SPR rounds that have already been performed on the tree. This is increased by the `infer_batch`
+     * method.
+     */
+    unsigned int num_slow_spr_performed{0};
 
     /**
      * Per-site log-likelihoods of the reference trees already inferred before the treeset heuristic kicked in.
@@ -286,7 +292,8 @@ protected:
         spr_params.subtree_cutoff = opts.spr_cutoff;
         spr_params.radius_min = 0;
         spr_params.radius_max = 20;
-        spr_params.thorough = false;
+        // if all fast spr rounds have been performed, set thorough to true, so further spr rounds are slow
+        spr_params.thorough = this->num_fast_spr_performed >= this->meta_parameters->num_fast_spr;
         spr_params.lh_epsilon_brlen_full = opts.lh_epsilon;
         spr_params.lh_epsilon_brlen_triplet = opts.lh_epsilon_brlen_triplet;
     }
