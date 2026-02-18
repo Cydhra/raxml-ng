@@ -79,14 +79,14 @@ Bandit &TreesetOptimizer::select_next_bandit() {
         LOG_INFO << std::endl << "Switching to best bandit " << best_bandit.get_name() << " because its mean expected success ("
                 << (best_bandit.get_mean_throughput() * 1000.0) <<
                 " t/s) exceeds the largest reasonable success of "
-                << selected_bandit.get_name() << " (" << (selected_bandit.get_upper_confidence(this->total_plausible_trees) * 1000.0) << " t/s)." << std::endl;
+                << selected_bandit.get_name() << " (" << (selected_bandit.get_upper_confidence(this->total_batches_completed) * 1000.0) << " t/s)." << std::endl;
 
         return best_bandit;
     }
 
-    if (!std::isnan(selected_bandit.get_upper_confidence(this->total_plausible_trees))) {
+    if (!std::isnan(selected_bandit.get_upper_confidence(this->total_batches_completed))) {
         LOG_INFO << std::endl << "Selecting bandit " << selected_bandit.get_name() << " because its largest reasonable success ("
-            << (selected_bandit.get_upper_confidence(this->total_plausible_trees) * 1000.0) <<
+            << (selected_bandit.get_upper_confidence(this->total_batches_completed) * 1000.0) <<
             " t/s) exceeds the mean expected success of current best bandit "
             << best_bandit.get_name() << " (" << (best_bandit.get_mean_throughput() * 1000.0) << " t/s)." << std::endl;
     } else {
