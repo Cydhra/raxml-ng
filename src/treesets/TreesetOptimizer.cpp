@@ -54,7 +54,8 @@ void TreesetOptimizer::generate_batches(const unsigned int n) {
 void TreesetOptimizer::initialize_bandits() {
     if (this->starting_tree_bandit().get_expected_tree_rate() >= 0.9) {
         LOG_INFO << "Starting trees are so successful, no ML optimization is necessary." << std::endl;
-        this->batch_cursor = this->batches.size();
+        this->batch_cursor = this->batches.size() - 1; // select_next_batch will advance by one
+        this->total_batches_completed = this->batches.size();
     } else {
         // init default bandits
         this->bandits.emplace_back("Greedy,DoModel,2spr", MetaParameters(1, false, 2, 0, false));
@@ -98,6 +99,7 @@ Bandit &TreesetOptimizer::select_next_bandit() {
 
 TunedBatch &TreesetOptimizer::select_next_batch(const Bandit &current_bandit) {
     auto current = this->batch_cursor;
+    LOG_DEBUG << "Batch cursor: " << this->batch_cursor << std::endl;
 
     // to speed up the initial round of computation where all bandits are executed once,
     // we want to reuse batches. If the total rounds is already higher than the bandit count, we don't do that,
