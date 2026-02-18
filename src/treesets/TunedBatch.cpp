@@ -176,6 +176,15 @@ void TunedBatch::generate_starting_trees(RaxmlInstance &instance, const Options 
 }
 
 void TunedBatch::optimize_topology(const Options &opts) {
+    // make sure debug outputs are initialized
+    unsigned long int total_moves, increasing_moves;
+
+    // escaping doesn't matter because SPR params are only ever used in this function, and are always overwritten
+    // ReSharper disable CppDFALocalValueEscapesFunction
+    this->spr_params.total_moves = &total_moves;
+    this->spr_params.increasing_moves = &increasing_moves;
+    // ReSharper restore CppDFALocalValueEscapesFunction
+
     while (this->meta_parameters->num_fast_spr > this->num_fast_spr_performed || this->meta_parameters->num_slow_spr >
            this->num_slow_spr_performed) {
         const auto fast = this->meta_parameters->num_fast_spr > this->num_fast_spr_performed;
