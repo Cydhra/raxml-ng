@@ -111,6 +111,9 @@ static struct option long_options[] =
   {"mutmap",             optional_argument, 0, 0 },  /*  78 */
   {"au-test",            no_argument,       0, 0 },  /*  79 */
   {"treeset",            no_argument,       0, 0 },  /*  80 */
+  {"thorough",           no_argument,       0, 0 },  /*  81 */
+  {"ktop",               required_argument, 0, 0 },  /*  82 */
+  {"spr",                required_argument, 0, 0 },  /*  83 */
 
   { 0, 0, 0, 0 }
 };
@@ -242,7 +245,7 @@ void CommandLineParser::check_options(Options &opts)
         "but the current command does not perform bootstrapping.\n"
         "Did you forget --all option?");
   }
-    
+
   if (opts.write_bs_msa && opts.command != Command::bsmsa &&
       opts.command != Command::bootstrap && opts.command != Command::all)
   {
@@ -608,7 +611,7 @@ void CommandLineParser::parse_options(int argc, char** argv, Options &opts)
 
   /* use new split-based constraint checking method -> slightly slower, but more reliable */
   opts.use_old_constraint = false;
-  
+
   /* enable incremental CLV updates across pruned subtrees in SPR rounds */
   opts.use_spr_fastclv = true;
 
@@ -1391,14 +1394,14 @@ void CommandLineParser::parse_options(int argc, char** argv, Options &opts)
       case 57: /* write bootstrap alignments*/
         opts.write_bs_msa = true;
         break;
-      
+
       case 58: /* LH epsilon triplet */
         if(sscanf(optarg, "%lf", &opts.lh_epsilon_brlen_triplet) != 1 || opts.lh_epsilon_brlen_triplet < 0.)
           throw InvalidOptionValueException("Invalid triplet LH epsilon parameter value: " +
                                             string(optarg) +
                                             ", please provide a positive real number.");
         break;
-      
+
       case 59: /* Adaptive RAxML-ng analysis with difficulty prediction */
         if (!optarg || (strcasecmp(optarg, "on") == 0))
         {
@@ -1424,9 +1427,9 @@ void CommandLineParser::parse_options(int argc, char** argv, Options &opts)
           throw InvalidOptionValueException("Invalid --adaptive  mode: " + string(optarg));
         }
         break;
-      
+
       case 60: /* Number of parsimony trees in difficulty prediction */
-        
+
         if (sscanf(optarg, "%d", &opts.diff_pred_pars_trees) != 1 || opts.diff_pred_pars_trees <= 0)
         {
           throw InvalidOptionValueException("Invalid number of parsimony trees for Pythia difficulty prediction: " +
@@ -1441,7 +1444,7 @@ void CommandLineParser::parse_options(int argc, char** argv, Options &opts)
                                             ", please provide a positive real number!\n");
         }
         break;
-      
+
       case 62: /* NNI epsilon */
         if(sscanf(optarg, "%lf", &opts.nni_epsilon) != 1 || opts.nni_epsilon <= 0.)
         {
@@ -1507,11 +1510,11 @@ void CommandLineParser::parse_options(int argc, char** argv, Options &opts)
           opts.topology_opt_method = TopologyOptMethod::adafast;
           opts.stopping_rule = StoppingRule::kh_mult;
           opts.use_pythia = true;
-        } 
+        }
         else
           throw InvalidOptionValueException("Unknown topology optimization method: " + string(optarg));
         break;
-      
+
       case 69: /* Stopping criterion */
         if (strcasecmp(optarg, "sn-rell") == 0) {
           opts.stopping_rule = StoppingRule::sn_rell;
@@ -1527,13 +1530,13 @@ void CommandLineParser::parse_options(int argc, char** argv, Options &opts)
           throw InvalidOptionValueException("Invalid stopping criterion: " + string(optarg) +
                                             ", please provide one of the following options: \n" +
                                             "- sn-rell : Sampling Noise RELL apporach\n" +
-                                            "- sn-normal : Sampling Noise Normal apporach\n" + 
+                                            "- sn-normal : Sampling Noise Normal apporach\n" +
                                             "- KH : KH test\n" +
                                             "- KH-mult : KH test with multiple correction\n"  +
                                             "- off : To turn off stopping rules\n");
         }
         break;
-      
+
       case 70: /* ebg: use educated bootstrap guesser to estimate branch support */
         opts.command = Command::all;
         opts.bs_metrics.clear();
@@ -1613,6 +1616,20 @@ void CommandLineParser::parse_options(int argc, char** argv, Options &opts)
         }
 
         num_commands++;
+        break;
+      case 81: // thorough
+        opts.thorough = true;
+        num_commands++;
+        break;
+      case 82: // ktop
+        if (sscanf(optarg, "%u", &opts.ktop) != 1) {
+          throw InvalidOptionValueException("Number of top topologies to keep (ktop) must be an unsigned integer");
+        }
+        break;
+      case 83: // num spr
+        if (sscanf(optarg, "%u", &opts.num_spr) != 1) {
+          throw InvalidOptionValueException("Number of SPR rounds to perform must be an unsigned integer");
+        }
         break;
       default:
         throw  OptionException("Internal error in option parsing");

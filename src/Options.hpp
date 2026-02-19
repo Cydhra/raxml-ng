@@ -172,6 +172,10 @@ public:
   RHASHeuristicMode modeltest_rhas_heuristic_mode;
   std::vector<std::string> modeltest_subst_models;
 
+  /* treeset benchmark */
+  bool thorough {false};
+  unsigned int num_spr {0};
+  unsigned int ktop {1};
 
   bool coarse() const { return num_workers > 1; };
   bool auto_model() const {
