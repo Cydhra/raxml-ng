@@ -131,7 +131,7 @@ void TreesetOptimizer::run() {
                                msa,
                                persite_loglh);
 
-    const auto pseudo_bandit = Bandit("pseudo", MetaParameters(20, false, 1, 0, false));
+    const auto pseudo_bandit = Bandit("pseudo", MetaParameters(opts.ktop, false, opts.thorough ? 0 : opts.num_spr, opts.thorough ? opts.num_spr : 0, false));
     pseudo_bandit.apply_parameters(opts, batch);
 
     batch.generate_starting_trees(this->instance, opts, load_balancer, tip_msa_idmap);
@@ -139,8 +139,8 @@ void TreesetOptimizer::run() {
 
     batch.perform_plausibility_check(opts);
 
-    auto initial_loglh = batch.get_tree_likelihoods();
-    auto initial_p_values = batch.get_p_values();
+    const auto initial_loglh = batch.get_tree_likelihoods();
+    const auto initial_p_values = batch.get_p_values();
 
     batch.optimize_topology(opts);
     batch.perform_plausibility_check(opts);
