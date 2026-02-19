@@ -145,12 +145,17 @@ void TreesetOptimizer::run() {
     batch.optimize_topology(opts);
     batch.perform_plausibility_check(opts);
 
-    auto optimized_loglh = batch.get_tree_likelihoods();
-    auto optimized_p_values = batch.get_p_values();
+    const auto optimized_loglh = batch.get_tree_likelihoods();
+    const auto optimized_p_values = batch.get_p_values();
+
+    ofstream BENCHMARK;
+    BENCHMARK.open (opts.benchmark_output, ios::out);
 
     for (unsigned int i = 0; i < initial_loglh.size(); i++) {
-        LOG_INFO << i << "\t" << initial_loglh[i] << "\t"  << initial_p_values[i] << "\t" << optimized_loglh[i] << "\t"  << optimized_p_values[i] << std::endl;
+        BENCHMARK << i << "\t" << initial_loglh[i] << "\t"  << initial_p_values[i] << "\t" << optimized_loglh[i] << "\t"  << optimized_p_values[i] << std::endl;
     }
+
+    BENCHMARK.close();
 
     LOG_INFO_TS << "Analyzed " << NUM << " starting trees." << std::endl;
 }
