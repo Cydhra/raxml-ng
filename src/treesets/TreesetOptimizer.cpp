@@ -131,7 +131,7 @@ void TreesetOptimizer::run() {
                                msa,
                                persite_loglh);
 
-    const auto pseudo_bandit = Bandit("pseudo", MetaParameters(20, false, 1, false));
+    const auto pseudo_bandit = Bandit("pseudo", MetaParameters(20, false, 1, 0, false));
     pseudo_bandit.apply_parameters(opts, batch);
 
     batch.generate_starting_trees(this->instance, opts, load_balancer, tip_msa_idmap);
