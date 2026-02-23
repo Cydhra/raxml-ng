@@ -150,6 +150,15 @@ public:
      */
     bool start_trees_generated() const;
 
+    /**
+     * Compute the output tree of the `index`-th tree of this batch.
+     *
+     * @param index the index of the tree within the batch's trees
+     *
+     * @return a tree object generated from the information in all partitions of the TreeInfo object
+     */
+    Tree get_tree(unsigned int index) const;
+
 protected:
     /**
      * Name of the batch for outputting debug information.

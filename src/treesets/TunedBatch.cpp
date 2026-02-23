@@ -453,3 +453,7 @@ bool TunedBatch::start_trees_generated() const {
     // Conversely, the batch_start_trees vector always contains the tree objects, whether they have been generated or not.
     return this->batch_trees.size() == this->batch_start_trees->size();
 }
+
+Tree TunedBatch::get_tree(const unsigned int index) const {
+    return this->batch_trees.at(index).at(0).tree();
+}
