@@ -176,7 +176,6 @@ public:
   bool thorough {false};
   unsigned int num_spr {0};
   unsigned int ktop {1};
-  string benchmark_output;
 
   bool coarse() const { return num_workers > 1; };
   bool auto_model() const {
