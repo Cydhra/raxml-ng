@@ -1,6 +1,7 @@
 #include "TreesetOptimizer.hpp"
 
 #include "TunedBatch.hpp"
+#include "../io/file_io.hpp"
 
 /**
  * How many samples the initial variance measurement replaces in the bandits.
@@ -77,19 +78,24 @@ Bandit &TreesetOptimizer::select_next_bandit() {
 
     if (this->bandit_cursor != this->best_known_bandit && selected_bandit.is_worse_than(
             best_bandit, this->total_batches_completed)) {
-        LOG_INFO << std::endl << "Switching to best bandit " << best_bandit.get_name() << " because its mean expected success ("
+        LOG_INFO << std::endl << "Switching to best bandit " << best_bandit.get_name() <<
+                " because its mean expected success ("
                 << (best_bandit.get_mean_throughput() * 1000.0) <<
                 " t/s) exceeds the largest reasonable success of "
-                << selected_bandit.get_name() << " (" << (selected_bandit.get_upper_confidence(this->total_batches_completed) * 1000.0) << " t/s)." << std::endl;
+                << selected_bandit.get_name() << " (" << (
+                    selected_bandit.get_upper_confidence(this->total_batches_completed) * 1000.0) << " t/s)." <<
+                std::endl;
 
         return best_bandit;
     }
 
     if (!std::isnan(selected_bandit.get_upper_confidence(this->total_batches_completed))) {
-        LOG_INFO << std::endl << "Selecting bandit " << selected_bandit.get_name() << " because its largest reasonable success ("
-            << (selected_bandit.get_upper_confidence(this->total_batches_completed) * 1000.0) <<
-            " t/s) exceeds the mean expected success of current best bandit "
-            << best_bandit.get_name() << " (" << (best_bandit.get_mean_throughput() * 1000.0) << " t/s)." << std::endl;
+        LOG_INFO << std::endl << "Selecting bandit " << selected_bandit.get_name() <<
+                " because its largest reasonable success ("
+                << (selected_bandit.get_upper_confidence(this->total_batches_completed) * 1000.0) <<
+                " t/s) exceeds the mean expected success of current best bandit "
+                << best_bandit.get_name() << " (" << (best_bandit.get_mean_throughput() * 1000.0) << " t/s)." <<
+                std::endl;
     } else {
         LOG_INFO << std::endl << "Initial estimation of " << selected_bandit.get_name() << "." << std::endl;
     }
@@ -104,7 +110,8 @@ TunedBatch &TreesetOptimizer::select_next_batch(const Bandit &current_bandit) {
     // to speed up the initial round of computation where all bandits are executed once,
     // we want to reuse batches. If the total rounds is already higher than the bandit count, we don't do that,
     // so we actually make progress.
-    if (this->total_batches_completed > this->bandits.size() || !this->batches[current].is_compatible(current_bandit.get_parameters())) {
+    if (this->total_batches_completed > this->bandits.size() || !this->batches[current].is_compatible(
+            current_bandit.get_parameters())) {
         // finalize the plausible trees of the current batch as we won't touch it again
         this->total_plausible_trees += this->batches[current].get_plausible_tree_count();
 
@@ -124,18 +131,29 @@ void TreesetOptimizer::run() {
 
     // generate 100 parsimony trees
     auto batch = TunedBatch("TestTrees",
-                               1000,
-                               NUM,
-                               recommended_thread_count(),
-                               recommended_worker_count(),
-                               msa,
-                               persite_loglh);
+                            1000,
+                            NUM,
+                            recommended_thread_count(),
+                            recommended_worker_count(),
+                            msa,
+                            persite_loglh);
 
-    const auto pseudo_bandit = Bandit("pseudo", MetaParameters(opts.ktop, false, opts.thorough ? 0 : opts.num_spr, opts.thorough ? opts.num_spr : 0, false));
+    const auto pseudo_bandit = Bandit("pseudo", MetaParameters(opts.ktop, false, opts.thorough ? 0 : opts.num_spr,
+                                                               opts.thorough ? opts.num_spr : 0, false));
     pseudo_bandit.apply_parameters(opts, batch);
 
     batch.generate_starting_trees(this->instance, opts, load_balancer, tip_msa_idmap);
     batch.optimize_parameters(opts, 3.0);
+
+    auto file_name = opts.outfile_prefix;
+    file_name.append(".benchmark.startTrees");
+    NewickStream START_TREES(file_name, ios::out);
+
+    for (unsigned int i = 0; i < NUM; i++) {
+        START_TREES << batch.get_tree(i);
+    }
+
+    START_TREES.close();
 
     batch.perform_plausibility_check(opts);
 
@@ -145,12 +163,26 @@ void TreesetOptimizer::run() {
     batch.optimize_topology(opts);
     batch.perform_plausibility_check(opts);
 
-    auto optimized_loglh = batch.get_tree_likelihoods();
-    auto optimized_p_values = batch.get_p_values();
+    const auto optimized_loglh = batch.get_tree_likelihoods();
+    const auto optimized_p_values = batch.get_p_values();
 
+    file_name = opts.outfile_prefix;
+    file_name.append(".benchmark.tsv");
+    ofstream BENCHMARK;
+    BENCHMARK.open(file_name, ios::out);
     for (unsigned int i = 0; i < initial_loglh.size(); i++) {
-        LOG_INFO << i << "\t" << initial_loglh[i] << "\t"  << initial_p_values[i] << "\t" << optimized_loglh[i] << "\t"  << optimized_p_values[i] << std::endl;
+        BENCHMARK << i << "\t" << initial_loglh[i] << "\t" << initial_p_values[i] << "\t" << optimized_loglh[i] << "\t"
+                << optimized_p_values[i] << std::endl;
     }
+    BENCHMARK.close();
+
+    file_name = opts.outfile_prefix;
+    file_name.append(".benchmark.optTrees");
+    NewickStream OPT_TREES(file_name, ios::out);
+    for (unsigned int i = 0; i < NUM; i++) {
+        OPT_TREES << batch.get_tree(i);
+    }
+    OPT_TREES.close();
 
     LOG_INFO_TS << "Analyzed " << NUM << " starting trees." << std::endl;
 }
