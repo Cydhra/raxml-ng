@@ -1619,7 +1619,6 @@ void CommandLineParser::parse_options(int argc, char** argv, Options &opts)
         break;
       case 81: // thorough
         opts.thorough = true;
-        num_commands++;
         break;
       case 82: // ktop
         if (sscanf(optarg, "%u", &opts.ktop) != 1) {
