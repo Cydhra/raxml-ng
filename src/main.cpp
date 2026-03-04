@@ -2915,13 +2915,15 @@ void command_au_test(RaxmlInstance& instance)
                                                  std::ref(instance),
                                                  std::ref(*instance.au_test)));
   au_test_thread_main(instance, *instance.au_test);
+  // TODO why do we need to force here? All threads definitely arrive at the barrier, even
+  //  in cases where the finalization call never returns.
+  ParallelContext::finalize_threads(true);
 
   // master computes AU values
   instance.au_test->finalize_test_statistics();
   instance.au_test->calculate_p_values();
 
   LOG_INFO_TS << "AU Test finished" << endl;
-  ParallelContext::finalize_threads();
 }
 
 void check_terrace(const RaxmlInstance& instance, const Tree& tree)
