@@ -24,7 +24,7 @@ void parallel_au_bootstrap(AuTest &tester, const CoarseAssignmentList &assignmen
     const auto slice_start = *tree_ids.begin();
 
     tester.run_bootstrap(tree_ids.size(), slice_start);
-    ParallelContext::global_barrier();
+    ParallelContext::barrier();
 }
 
 /**

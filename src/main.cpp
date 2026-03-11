@@ -4178,7 +4178,7 @@ void master_main(RaxmlInstance& instance, CheckpointManager& cm)
   // treeset computation reuses the above treesearch code for the first batch and then switches over to aggressive
   // heuristics
   if (opts.command == Command::treeset) {
-    ParallelContext::finalize_threads(true);
+    ParallelContext::finalize_threads();
     instance.treeset_optimizer->run();
   }
 
