@@ -2857,7 +2857,7 @@ void au_test_thread_main(RaxmlInstance& instance, AuTest& tester) {
   const auto slice_start = *worker.start_trees.begin();
 
   tester.run_bootstrap(worker.start_trees.size(), slice_start);
-  ParallelContext::global_barrier();
+  ParallelContext::barrier();
 }
 
 void command_au_test(RaxmlInstance& instance)
@@ -2889,9 +2889,7 @@ void command_au_test(RaxmlInstance& instance)
                                                  std::ref(instance),
                                                  std::ref(*instance.au_test)));
   au_test_thread_main(instance, *instance.au_test);
-  // TODO why do we need to force here? All threads definitely arrive at the barrier, even
-  //  in cases where the finalization call never returns.
-  ParallelContext::finalize_threads(true);
+  ParallelContext::finalize_threads();
 
   // master computes AU values
   instance.au_test->finalize_test_statistics();
