@@ -298,7 +298,7 @@ unsigned int TunedBatch::perform_au_test(const Options &opts) {
     this->plausible_tree_count = 0;
     auto first = this->au_test->get_p_values().begin() + reference_persite_loglh.size();
     for (const auto last = this->au_test->get_p_values().end(); first != last; ++first) {
-        if (*first > 0.05) {
+        if (*first > SIGNIFICANCE_LEVEL) {
             this->plausible_tree_count += 1;
         }
     }

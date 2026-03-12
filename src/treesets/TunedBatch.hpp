@@ -7,6 +7,13 @@
 #include "../au/AuTest.hpp"
 #include "../Checkpoint.hpp"
 
+/**
+ * Probability to reject a tree even if it is plausible.
+ * For reference: we reject the null-hypothesis (trees are equally plausible) if the p-value is equal or smaller than
+ * the significance level, so a tree is plausible if its p-value is strictly larger than the significance level).
+ */
+constexpr double SIGNIFICANCE_LEVEL = 0.05;
+
 // forward declaration of RaxmlInstance
 struct RaxmlInstance;
 

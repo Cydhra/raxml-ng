@@ -197,7 +197,7 @@ std::vector<Tree> TreesetOptimizer::get_tree_set() const {
         auto &batch = this->batches[batch_id];
         auto &p_values = batch.get_p_values();
         for (unsigned int tree_id = 0; tree_id < batch.get_batch_size(); ++tree_id) {
-            if (p_values[tree_id + 16] >= 0.05) {
+            if (p_values[tree_id + 16] > SIGNIFICANCE_LEVEL) {
                 plausible_set.push_back(batch.get_tree(tree_id));
             }
         }
