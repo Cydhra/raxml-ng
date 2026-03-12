@@ -182,6 +182,7 @@ void TreesetOptimizer::run() {
 
         if (this->total_plausible_trees + current_batch.get_plausible_tree_count() > this->target_tree_count) {
             this->total_plausible_trees += current_batch.get_plausible_tree_count();
+            this->batches[this->batch_cursor].finalize();
             this->batch_cursor += 1;
             break;
         } else {
