@@ -439,6 +439,13 @@ void TunedBatch::assign_batch_models(const TunedBatch &other) {
 void TunedBatch::finalize() {
     LOG_DEBUG << "Finalized " << name << "." << std::endl;
     this->au_test->free_test_statistics();
+
+    for (auto &batch_tree : this->batch_trees) {
+        this->tree_topologies.push_back(batch_tree.at(0).tree());
+    }
+
+    // delete corax allocations
+    this->batch_trees.clear();
 }
 
 unsigned int TunedBatch::elapsed_wall_time() const {
@@ -460,7 +467,11 @@ bool TunedBatch::start_trees_generated() const {
 }
 
 Tree TunedBatch::get_tree(const unsigned int index) const {
-    return this->batch_trees.at(index).at(0).tree();
+    if (this->tree_topologies.empty()) {
+        throw RaxmlException("cannot obtain trees from non-finalized batch");
+    }
+
+    return this->tree_topologies[index];
 }
 
 std::vector<double> TunedBatch::get_tree_likelihoods() {

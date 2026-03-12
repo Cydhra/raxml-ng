@@ -258,6 +258,11 @@ protected:
     PartitionAssignmentList part_assignments;
 
     /**
+     * The final tree topologies. This vector is populated by a call to `finalize()` and is otherwise empty.
+     */
+    std::vector<Tree> tree_topologies{};
+
+    /**
      * Treeinfo objects for the trees inferred in this batch. These objects are updated by the inference algorithm.
      * The outer vector is indexed by tree, the inner by in-worker thread id (i.e. if each worker has 4 threads,
      * the inner vectors contain 4 TreeInfo instances).
