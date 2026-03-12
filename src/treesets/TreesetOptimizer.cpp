@@ -29,7 +29,7 @@ void TreesetOptimizer::generate_batches(const unsigned int n) {
     const std::string name_prefix = "Batch";
 
     for (size_t i = 0; i < n; i++) {
-        std::string batch_name = name_prefix + std::to_string(i);
+        std::string batch_name = name_prefix + std::to_string(this->batch_cursor + i);
         this->batches.emplace_back(batch_name,
                                    generate_seed_for_trees(this->batch_size),
                                    this->batch_size,
