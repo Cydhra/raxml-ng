@@ -4151,9 +4151,6 @@ void master_main(RaxmlInstance& instance, CheckpointManager& cm)
   LOG_INFO << "Parallelization scheme: " << opts.num_workers << " worker(s) x "
            << threads_per_worker << " thread(s)" << endl << endl;
 
-  /* initialize treeset optimizer */
-  init_treeset_optimizer(instance);
-
   ParallelContext::init_pthreads(opts, std::bind(thread_main,
                                                 std::ref(instance),
                                                 std::ref(cm)));
@@ -4219,6 +4216,9 @@ void master_main(RaxmlInstance& instance, CheckpointManager& cm)
   // treeset computation reuses the above treesearch code for the first batch and then switches over to aggressive
   // heuristics
   if (opts.command == Command::treeset) {
+    /* initialize treeset optimizer here, after the persite lnl are already calculated */
+    init_treeset_optimizer(instance);
+
     ParallelContext::finalize_threads();
     instance.treeset_optimizer->run();
   }
