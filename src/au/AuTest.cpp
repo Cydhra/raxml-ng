@@ -31,6 +31,10 @@ void AuTest::allocate_test_statistics(bool inplace) {
 
 
 void AuTest::run_bootstrap(const size_t num_rows, const size_t offset) {
+    if (!test_statistics) {
+        throw RaxmlException("AU test statistics were not allocated");
+    }
+
     // reset random state to ensure reproducibility independent of previous events
     const auto rstate = corax_random_create(seed);
 
@@ -131,6 +135,29 @@ void AuTest::calculate_p_values() {
 
     // mark p values as finished
     finished = true;
+}
+
+void AuTest::free_test_statistics() {
+    if (test_statistics) {
+        // free individual matrices
+        for (unsigned int i = 0; i < scales.size(); i++) {
+            if (!test_statistics[i]) continue;
+            free(test_statistics[i]);
+        }
+        free(test_statistics);
+    }
+
+    // if we have normalized statistics that are different from test statistics
+    if (normalized_statistics && normalized_statistics != test_statistics) {
+        for (unsigned int i = 0; i < scales.size(); i++) {
+            if (!normalized_statistics[i]) continue;
+            free(normalized_statistics[i]);
+        }
+        free(normalized_statistics);
+    }
+
+    test_statistics = nullptr;
+    normalized_statistics = nullptr;
 }
 
 void AuTest::reset_test_statistics() {

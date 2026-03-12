@@ -66,23 +66,7 @@ public:
 
 
     virtual ~AuTest() {
-        if (test_statistics) {
-            // free individual matrices
-            for (unsigned int i = 0; i < scales.size(); i++) {
-                if (!test_statistics[i]) continue;
-                free(test_statistics[i]);
-            }
-            free(test_statistics);
-        }
-
-        // if we have normalized statistics that are different from test statistics
-        if (normalized_statistics && normalized_statistics != test_statistics) {
-            for (unsigned int i = 0; i < scales.size(); i++) {
-                if (!normalized_statistics[i]) continue;
-                free(normalized_statistics[i]);
-            }
-            free(normalized_statistics);
-        }
+        free_test_statistics();
     }
 
     // disable copy-construction and assignment, since we are guarding a C-style allocation
@@ -123,6 +107,12 @@ public:
      * broadcasted to other workers.
      */
     void calculate_p_values();
+
+    /**
+     * Free the allocated statistics without freeing the AuTest instance.
+     * If the AuTest instance is freed, this function is called automatically, so it is not mandatory to call it.
+     */
+    void free_test_statistics();
 
     /**
      * Get the finished p-values after calling `calculate_p_values`.
