@@ -112,6 +112,9 @@ TunedBatch &TreesetOptimizer::select_next_batch(const Bandit &current_bandit) {
         if (this->batches.size() == current) {
             generate_batches(1);
         }
+
+        // if we advanced the batch cursor, finalize the previous batch to free resources
+        this->batches[current - 1].finalize();
     }
 
     return this->batches[current];

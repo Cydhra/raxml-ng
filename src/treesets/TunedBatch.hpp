@@ -133,6 +133,12 @@ public:
     void assign_batch_models(const TunedBatch &other);
 
     /**
+     * Free resources used during inference that will not be used again. The batch data stays valid but further
+     * inference will not be possible.
+     */
+    void finalize();
+
+    /**
      * @return the number of trees that are inferred in this batch.
      */
     unsigned int get_batch_size() const;

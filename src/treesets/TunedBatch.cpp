@@ -436,6 +436,11 @@ void TunedBatch::assign_batch_models(const TunedBatch &other) {
     }
 }
 
+void TunedBatch::finalize() {
+    LOG_DEBUG << "Finalized " << name << "." << std::endl;
+    this->au_test->free_test_statistics();
+}
+
 unsigned int TunedBatch::elapsed_wall_time() const {
     return this->wall_time;
 }
