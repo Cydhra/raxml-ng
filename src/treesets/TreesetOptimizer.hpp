@@ -184,6 +184,13 @@ public:
      * Run the treeset optimizer to infer K plausible trees.
      */
     void run();
+
+    /**
+     * Obtain all plausible trees into a common vector and return the vector.
+     *
+     * @return A new vector instance containing all plausible tree topologies.
+     */
+    std::vector<Tree> get_tree_set() const;
 };
 
 

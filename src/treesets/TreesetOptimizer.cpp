@@ -189,3 +189,19 @@ void TreesetOptimizer::run() {
     LOG_INFO_TS << "Inferred " << this->total_plausible_trees << " plausible trees in " << this->batch_cursor <<
             " batches." << std::endl;
 }
+
+std::vector<Tree> TreesetOptimizer::get_tree_set() const {
+    auto plausible_set = std::vector<Tree>();
+
+    for (unsigned int batch_id = 0; batch_id < this->batch_cursor; ++batch_id) {
+        auto &batch = this->batches[batch_id];
+        auto &p_values = batch.get_p_values();
+        for (unsigned int tree_id = 0; tree_id < batch.get_batch_size(); ++tree_id) {
+            if (p_values[tree_id + 16] >= 0.05) {
+                plausible_set.push_back(batch.get_tree(tree_id));
+            }
+        }
+    }
+
+    return plausible_set;
+}
