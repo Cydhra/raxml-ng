@@ -93,7 +93,7 @@ void AuTest::finalize_test_statistics() {
 
 
 void AuTest::calculate_p_values() {
-    LOG_DEBUG_TS << "Calculating p-values" << std::endl;
+    LOG_DEBUG_TS << "Calculating " << num_trees << " p-values" << std::endl;
     // TODO handle fine-grained parallelization: after all workers have generated their bootstrap replicates, we need
     //  to collect them on a master-worker of all worker groups and add them there, and the master will do the AU test
 
