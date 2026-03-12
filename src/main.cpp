@@ -3012,6 +3012,24 @@ void save_ml_trees(const RaxmlInstance& instance, const CheckpointFile& checkp)
     postprocess_tree(instance, ml_tree);
     nw << ml_tree;
   }
+
+  if (instance.opts.command == Command::treeset) {
+    // all trees from the treeset
+    auto all_trees = instance.treeset_optimizer->get_all_trees();
+    for (auto& topol : all_trees) {
+      postprocess_tree(instance, topol);
+      nw << topol;
+    }
+
+    // plausible treeset only
+    // TODO add plausible reference trees
+    NewickStream nw(instance.opts.plausible_trees_file(), std::ios::out);
+    auto plausible_trees = instance.treeset_optimizer->get_plausible_trees();
+    for (auto& topol : plausible_trees) {
+      postprocess_tree(instance, topol);
+      nw << topol;
+    }
+  }
 }
 
 void print_ic_scores(const RaxmlInstance& instance, double loglh)

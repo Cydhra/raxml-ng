@@ -194,7 +194,21 @@ void TreesetOptimizer::run() {
             " batches." << std::endl;
 }
 
-std::vector<Tree> TreesetOptimizer::get_tree_set() const {
+std::vector<Tree> TreesetOptimizer::get_all_trees() const {
+    auto full_set = std::vector<Tree>();
+
+    for (unsigned int batch_id = 0; batch_id < this->batch_cursor; ++batch_id) {
+        auto &batch = this->batches[batch_id];
+        for (unsigned int tree_id = 0; tree_id < batch.get_batch_size(); ++tree_id) {
+            full_set.push_back(batch.get_tree(tree_id));
+        }
+    }
+
+    return full_set;
+}
+
+
+std::vector<Tree> TreesetOptimizer::get_plausible_trees() const {
     auto plausible_set = std::vector<Tree>();
 
     for (unsigned int batch_id = 0; batch_id < this->batch_cursor; ++batch_id) {

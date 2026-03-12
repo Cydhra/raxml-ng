@@ -113,6 +113,7 @@ void Options::set_default_outfiles()
   set_default_outfile(outfile_names.best_model, "bestModel");
   set_default_outfile(outfile_names.partition_trees, "bestPartitionTrees");
   set_default_outfile(outfile_names.ml_trees, "mlTrees");
+  set_default_outfile(outfile_names.plausible_trees, "plausibleTrees");
   set_default_outfile(outfile_names.bootstrap_trees, "bootstraps");
   set_default_outfile(outfile_names.support_tree, "support");
   set_default_outfile(outfile_names.fbp_support_tree, "supportFBP");

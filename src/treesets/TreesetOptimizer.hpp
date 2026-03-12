@@ -186,11 +186,21 @@ public:
     void run();
 
     /**
+     * Obtain all trees (plausible and rejected) inferred during the treeset optimization into a common vector and
+     * return the vector.
+     * This does not include the reference trees.
+     *
+     * @return A new vector instance containing all tree topologies.
+     */
+    std::vector<Tree> get_all_trees() const;
+
+    /**
      * Obtain all plausible trees into a common vector and return the vector.
+     * This does not include the reference trees.
      *
      * @return A new vector instance containing all plausible tree topologies.
      */
-    std::vector<Tree> get_tree_set() const;
+    std::vector<Tree> get_plausible_trees() const;
 };
 
 
