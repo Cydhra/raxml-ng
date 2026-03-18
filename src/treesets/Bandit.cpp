@@ -65,7 +65,10 @@ double Bandit::get_variance() const {
         variance_sum += (mean - sample_throughput) * (mean - sample_throughput);
     }
 
-    return variance_sum / (this->samples.size() + weight);
+    // bessel correction because the population variance is much more important than the sample variance
+    // this likely overestimates the variance because of low sample sizes, but relying less on the estimated variance
+    // and thus do a little bit more exploration rarely hurts.
+    return variance_sum / (this->samples.size() + weight - 1);
 }
 
 double Bandit::get_upper_confidence(const unsigned int total_samples) const {
