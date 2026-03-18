@@ -156,14 +156,14 @@ void TreesetOptimizer::run() {
         if (total_batches_completed == this->bandits.size() - 1) {
             // collect variances
             double mean = 0.0;
-            for (unsigned int i = 0; i < bandits.size(); i++) {
-                mean += bandits[i].get_mean_throughput();
+            for (const auto & bandit : bandits) {
+                mean += bandit.get_mean_throughput();
             }
             mean /= static_cast<double>(bandits.size());
 
             double variance = 0.0;
-            for (unsigned int i = 0; i < bandits.size(); i++) {
-                variance += (mean - bandits[i].get_mean_throughput()) * (mean - bandits[i].get_mean_throughput());
+            for (const auto & bandit : bandits) {
+                variance += (mean - bandit.get_mean_throughput()) * (mean - bandit.get_mean_throughput());
             }
             variance /= static_cast<double>(bandits.size());
 
