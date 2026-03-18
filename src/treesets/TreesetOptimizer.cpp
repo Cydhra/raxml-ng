@@ -67,6 +67,11 @@ void TreesetOptimizer::initialize_bandits() {
 }
 
 Bandit &TreesetOptimizer::select_next_bandit() {
+    // shortcut if we forced the selection of only one bandit, to keep the logs clean
+    if (this->bandits.size() == 1) {
+        return this->bandits[0];
+    }
+
     this->bandit_cursor += 1;
     this->bandit_cursor %= this->bandits.size();
 
