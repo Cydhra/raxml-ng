@@ -18,8 +18,7 @@ int recommended_worker_count() {
 }
 
 void TreesetOptimizer::prepare_initial_batches() {
-    const auto minimum_batches = (this->target_tree_count + this->batch_size - 1) / this->batch_size;
-    this->generate_batches(minimum_batches);
+    this->generate_batches(INITIAL_VARIANCE_WEIGHT);
 }
 
 /**
