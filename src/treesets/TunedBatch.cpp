@@ -308,6 +308,10 @@ unsigned int TunedBatch::perform_au_test(const Options &opts) {
 }
 
 unsigned int TunedBatch::perform_plausibility_check(const Options &opts) {
+    if (!this->au_test_dirty) {
+        return this->plausible_tree_count;
+    }
+
     // we need to save the model backup, for two reasons: we do not want to perform tree search on hyper-optimized
     // models to allow for shallower likelihood curves of slightly suboptimal models.
     // Further, multiple calls to is_plausible must not optimize the hyper-optimized model with low episolon again
