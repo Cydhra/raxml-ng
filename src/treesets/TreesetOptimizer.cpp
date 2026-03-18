@@ -122,7 +122,7 @@ TunedBatch &TreesetOptimizer::select_next_batch(const Bandit &current_bandit) {
         }
     }
 
-    LOG_INFO << "Batch cursor: " << this->batch_cursor << std::endl;
+    LOG_DEBUG << "Batch cursor: " << this->batch_cursor << std::endl;
     return this->batches[this->batch_cursor];
 }
 
