@@ -168,8 +168,7 @@ void TreesetOptimizer::run() {
 
     this->initialize_bandits();
 
-    // run through the bandits once (i.e. until the bandit cursor is 0 again) to collect initial measurements
-    do {
+    while (this->total_plausible_trees < this->target_tree_count) {
         auto &current_bandit = this->select_next_bandit();
         auto &current_batch = this->select_next_batch(current_bandit);
 
@@ -214,12 +213,13 @@ void TreesetOptimizer::run() {
             }
         }
 
+        // check if we would exceed the final tree count if we finalized the current batch immediately
         if (this->total_plausible_trees + current_batch.get_plausible_tree_count() > this->target_tree_count) {
             // finalize last batch
             advance_batch_cursor(1);
             break;
         }
-    } while (true);
+    }
 
     LOG_INFO_TS << "Inferred " << this->total_plausible_trees << " plausible trees in " << this->batch_cursor <<
             " batches." << std::endl;
