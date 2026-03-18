@@ -76,19 +76,24 @@ Bandit &TreesetOptimizer::select_next_bandit() {
 
     if (this->bandit_cursor != this->best_known_bandit && selected_bandit.is_worse_than(
             best_bandit, this->total_batches_completed)) {
-        LOG_INFO << std::endl << "Switching to best bandit " << best_bandit.get_name() << " because its mean expected success ("
+        LOG_INFO << std::endl << "Switching to best bandit " << best_bandit.get_name() <<
+                " because its mean expected success ("
                 << (best_bandit.get_mean_throughput() * 1000.0) <<
                 " t/s) exceeds the largest reasonable success of "
-                << selected_bandit.get_name() << " (" << (selected_bandit.get_upper_confidence(this->total_batches_completed) * 1000.0) << " t/s)." << std::endl;
+                << selected_bandit.get_name() << " (" << (
+                    selected_bandit.get_upper_confidence(this->total_batches_completed) * 1000.0) << " t/s)." <<
+                std::endl;
 
         return best_bandit;
     }
 
     if (!std::isnan(selected_bandit.get_upper_confidence(this->total_batches_completed))) {
-        LOG_INFO << std::endl << "Selecting bandit " << selected_bandit.get_name() << " because its largest reasonable success ("
-            << (selected_bandit.get_upper_confidence(this->total_batches_completed) * 1000.0) <<
-            " t/s) exceeds the mean expected success of current best bandit "
-            << best_bandit.get_name() << " (" << (best_bandit.get_mean_throughput() * 1000.0) << " t/s)." << std::endl;
+        LOG_INFO << std::endl << "Selecting bandit " << selected_bandit.get_name() <<
+                " because its largest reasonable success ("
+                << (selected_bandit.get_upper_confidence(this->total_batches_completed) * 1000.0) <<
+                " t/s) exceeds the mean expected success of current best bandit "
+                << best_bandit.get_name() << " (" << (best_bandit.get_mean_throughput() * 1000.0) << " t/s)." <<
+                std::endl;
     } else {
         LOG_INFO << std::endl << "Initial estimation of " << selected_bandit.get_name() << "." << std::endl;
     }
@@ -100,7 +105,8 @@ TunedBatch &TreesetOptimizer::select_next_batch(const Bandit &current_bandit) {
     // to speed up the initial round of computation where all bandits are executed once,
     // we want to reuse batches. If the total rounds is already higher than the bandit count, we don't do that,
     // so we actually make progress.
-    if (this->total_batches_completed > this->bandits.size() || !this->batches[this->batch_cursor].is_compatible(current_bandit.get_parameters())) {
+    if (this->total_batches_completed > this->bandits.size() || !this->batches[this->batch_cursor].is_compatible(
+            current_bandit.get_parameters())) {
         advance_batch_cursor(1);
     }
 
@@ -112,7 +118,11 @@ TunedBatch &TreesetOptimizer::select_next_batch(const Bandit &current_bandit) {
 void TreesetOptimizer::advance_batch_cursor(const unsigned int n) {
     const auto target_index = this->batch_cursor + n;
 
+    // if we have not enough batches to move the cursor to that index, generate the missing ones
     if (this->batches.size() < target_index) {
+        LOG_DEBUG << "Warning: cursor moved " << (target_index - this->batches.size()) <<
+                " batches past the end of the queue. Why are we generating batches that we will finalize instantly?" <<
+                std::endl;
         generate_batches(target_index - this->batches.size());
     }
 
@@ -126,7 +136,8 @@ void TreesetOptimizer::advance_batch_cursor(const unsigned int n) {
         this->batches[batch].finalize();
     }
 
-    LOG_INFO_TS << "Progress: " << this->total_plausible_trees << " / " << this->target_tree_count << " plausible trees." << std::endl;
+    LOG_INFO_TS << "Progress: " << this->total_plausible_trees << " / " << this->target_tree_count <<
+            " plausible trees." << std::endl;
     this->batch_cursor += n;
     assert(this->batch_cursor <= this->batches.size());
 }
@@ -167,13 +178,13 @@ void TreesetOptimizer::run() {
         if (total_batches_completed == this->bandits.size() - 1) {
             // collect variances
             double mean = 0.0;
-            for (const auto & bandit : bandits) {
+            for (const auto &bandit: bandits) {
                 mean += bandit.get_mean_throughput();
             }
             mean /= static_cast<double>(bandits.size());
 
             double variance = 0.0;
-            for (const auto & bandit : bandits) {
+            for (const auto &bandit: bandits) {
                 variance += (mean - bandit.get_mean_throughput()) * (mean - bandit.get_mean_throughput());
             }
             variance /= static_cast<double>(bandits.size());
