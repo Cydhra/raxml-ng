@@ -21,9 +21,6 @@ void TreesetOptimizer::prepare_initial_batches() {
     this->generate_batches(INITIAL_VARIANCE_WEIGHT);
 }
 
-/**
- *
- */
 void TreesetOptimizer::generate_batches(const unsigned int n) {
     const std::string name_prefix = "Batch";
 
@@ -63,6 +60,10 @@ void TreesetOptimizer::initialize_bandits() {
         this->bandits.emplace_back("Fast,DoModel,2spr", MetaParameters(20, false, 2, 0, false));
         this->bandits.emplace_back("Fast,DoModel,4spr", MetaParameters(20, false, 4, 0, false));
         this->bandits.emplace_back("Fast,NoModel,2spr", MetaParameters(20, true, 2, 0, false));
+
+        // experimental thorough bandits
+        this->bandits.emplace_back("Slow,2spr", MetaParameters(20, false, 0, 2, false));
+        this->bandits.emplace_back("Mixed,4spr", MetaParameters(20, false, 2, 2, false));
     }
 }
 
