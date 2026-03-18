@@ -96,11 +96,6 @@ public:
     void optimize(const Options &opts);
 
     /**
-     * Perform the AU test on the trees in the batch, as well as the supplied reference trees.
-     */
-    unsigned int perform_au_test(const Options &opts);
-
-    /**
      * Perform the AU test on the trees in the batch, as well as the supplied reference trees,
      * but backup the model before, optimize the model fully, and then restore the original model.
      *
@@ -341,6 +336,11 @@ protected:
     unsigned int num_threads_per_worker() const {
         return num_threads / num_workers;
     }
+
+    /**
+     * Perform the AU test on the trees in the batch, as well as the supplied reference trees.
+     */
+    unsigned int perform_au_test(const Options &opts);
 
     /**
      * Called when the per-site log-likelihoods change, overriding the results of the AU-test

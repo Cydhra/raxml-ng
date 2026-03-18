@@ -119,7 +119,7 @@ void TreesetOptimizer::advance_batch_cursor(const unsigned int n) {
     for (unsigned int batch = this->batch_cursor; batch < target_index; ++batch) {
         // perform AU test to get plausible tree count. If the AU test was already executed, it will transparently
         // return the result of the previous run and not do any work
-        const auto batch_plausible_trees = this->batches[batch].perform_au_test(this->opts);
+        const auto batch_plausible_trees = this->batches[batch].perform_plausibility_check(this->opts);
         this->total_plausible_trees += batch_plausible_trees;
 
         // finalize batch
