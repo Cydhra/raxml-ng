@@ -97,8 +97,6 @@ Bandit &TreesetOptimizer::select_next_bandit() {
 }
 
 TunedBatch &TreesetOptimizer::select_next_batch(const Bandit &current_bandit) {
-    LOG_DEBUG << "Batch cursor: " << this->batch_cursor << std::endl;
-
     // to speed up the initial round of computation where all bandits are executed once,
     // we want to reuse batches. If the total rounds is already higher than the bandit count, we don't do that,
     // so we actually make progress.
@@ -106,14 +104,16 @@ TunedBatch &TreesetOptimizer::select_next_batch(const Bandit &current_bandit) {
         advance_batch_cursor(1);
     }
 
+    LOG_INFO << "Batch cursor: " << this->batch_cursor << std::endl;
+
     return this->batches[this->batch_cursor];
 }
 
 void TreesetOptimizer::advance_batch_cursor(const unsigned int n) {
     const auto target_index = this->batch_cursor + n;
 
-    if (this->batches.size() <= target_index) {
-        generate_batches(target_index + 1 - this->batches.size());
+    if (this->batches.size() < target_index) {
+        generate_batches(target_index - this->batches.size());
     }
 
     for (unsigned int batch = this->batch_cursor; batch < target_index; ++batch) {
@@ -128,7 +128,7 @@ void TreesetOptimizer::advance_batch_cursor(const unsigned int n) {
 
     LOG_INFO_TS << "Progress: " << this->total_plausible_trees << " / " << this->target_tree_count << " plausible trees." << std::endl;
     this->batch_cursor += n;
-    assert(this->batch_cursor < this->batches.size());
+    assert(this->batch_cursor <= this->batches.size());
 }
 
 void TreesetOptimizer::run() {
