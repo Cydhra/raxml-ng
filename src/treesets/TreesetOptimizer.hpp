@@ -185,7 +185,7 @@ public:
         msa(msa),
         persite_loglh(persite_loglh) {
         // place the first bandit that represents the distribution of plausible starting trees
-        this->bandits.emplace_back("Parsimony", MetaParameters(1, false, 0, 0, true));
+        this->bandits.emplace_back("Parsimony", MetaParameters(1, true, 0, 0, true));
     }
 
     /**
