@@ -54,8 +54,7 @@ void TreesetOptimizer::generate_batches(const unsigned int n) {
 void TreesetOptimizer::initialize_bandits() {
     if (this->starting_tree_bandit().get_expected_tree_rate() >= 0.9) {
         LOG_INFO << "Starting trees are so successful, no ML optimization is necessary." << std::endl;
-        this->batch_cursor = this->batches.size() - 1; // select_next_batch will advance by one
-        this->total_batches_completed = this->batches.size();
+        advance_batch_cursor(this->batches.size() - this->batch_cursor);
     } else {
         // init default bandits
         this->bandits.emplace_back("Greedy,DoModel,2spr", MetaParameters(1, false, 2, 0, false));
@@ -98,26 +97,38 @@ Bandit &TreesetOptimizer::select_next_bandit() {
 }
 
 TunedBatch &TreesetOptimizer::select_next_batch(const Bandit &current_bandit) {
-    auto current = this->batch_cursor;
     LOG_DEBUG << "Batch cursor: " << this->batch_cursor << std::endl;
 
     // to speed up the initial round of computation where all bandits are executed once,
     // we want to reuse batches. If the total rounds is already higher than the bandit count, we don't do that,
     // so we actually make progress.
-    if (this->total_batches_completed > this->bandits.size() || !this->batches[current].is_compatible(current_bandit.get_parameters())) {
-        // finalize the plausible trees of the current batch as we won't touch it again
-        this->total_plausible_trees += this->batches[current].get_plausible_tree_count();
-
-        current = ++this->batch_cursor;
-        if (this->batches.size() == current) {
-            generate_batches(1);
-        }
-
-        // if we advanced the batch cursor, finalize the previous batch to free resources
-        this->batches[current - 1].finalize();
+    if (this->total_batches_completed > this->bandits.size() || !this->batches[this->batch_cursor].is_compatible(current_bandit.get_parameters())) {
+        advance_batch_cursor(1);
     }
 
-    return this->batches[current];
+    return this->batches[this->batch_cursor];
+}
+
+void TreesetOptimizer::advance_batch_cursor(const unsigned int n) {
+    const auto target_index = this->batch_cursor + n;
+
+    if (this->batches.size() <= target_index) {
+        generate_batches(target_index + 1 - this->batches.size());
+    }
+
+    for (unsigned int batch = this->batch_cursor; batch < target_index; ++batch) {
+        // perform AU test to get plausible tree count. If the AU test was already executed, it will transparently
+        // return the result of the previous run and not do any work
+        const auto batch_plausible_trees = this->batches[batch].perform_au_test(this->opts);
+        this->total_plausible_trees += batch_plausible_trees;
+
+        // finalize batch
+        this->batches[batch].finalize();
+    }
+
+    LOG_INFO_TS << "Progress: " << this->total_plausible_trees << " / " << this->target_tree_count << " plausible trees." << std::endl;
+    this->batch_cursor += n;
+    assert(this->batch_cursor < this->batches.size());
 }
 
 void TreesetOptimizer::run() {
@@ -181,12 +192,9 @@ void TreesetOptimizer::run() {
         }
 
         if (this->total_plausible_trees + current_batch.get_plausible_tree_count() > this->target_tree_count) {
-            this->total_plausible_trees += current_batch.get_plausible_tree_count();
-            this->batches[this->batch_cursor].finalize();
-            this->batch_cursor += 1;
+            // finalize last batch
+            advance_batch_cursor(1);
             break;
-        } else {
-            LOG_INFO_TS << "Progress: " << this->total_plausible_trees << " / " << this->target_tree_count << " plausible trees." << std::endl;
         }
     } while (true);
 

@@ -131,6 +131,14 @@ protected:
     TunedBatch &select_next_batch(const Bandit &current_bandit);
 
     /**
+     * Advance the batch cursor by n steps, finalizing all batches that are passed on the way, and generating a new
+     * batch if necessary.
+     *
+     * @param n how many batches to finalize
+     */
+    void advance_batch_cursor(unsigned int n);
+
+    /**
      * Prepare the initial TunedBatch instances we use for inference.
      * Because we have a number of trees we have to infer, we have a minimum number of batches required even if every
      * tree becomes plausible.
