@@ -199,10 +199,10 @@ void TunedBatch::optimize_topology(const Options &opts) {
     while (this->meta_parameters->num_fast_spr > this->num_fast_spr_performed || this->meta_parameters->num_slow_spr >
            this->num_slow_spr_performed) {
         const auto fast = this->meta_parameters->num_fast_spr > this->num_fast_spr_performed;
-        auto num_rounds = fast
-                              ? meta_parameters->num_fast_spr - num_fast_spr_performed
-                              : meta_parameters->num_slow_spr - num_slow_spr_performed;
+        auto rounds_performed = fast ? num_fast_spr_performed : num_slow_spr_performed;
         auto total_rounds = fast ? meta_parameters->num_fast_spr : meta_parameters->num_slow_spr;
+        auto num_rounds = total_rounds - rounds_performed;
+
         auto round_name = fast ? "FAST" : "SLOW";
 
         LOG_INFO_TS << this->name << ": Optimizing topology (" << num_rounds << " of " << total_rounds << " total " <<
@@ -220,8 +220,8 @@ void TunedBatch::optimize_topology(const Options &opts) {
             std::bind(spr_kernel,
                       std::ref(this->batch_trees),
                       std::ref(this->spr_params),
-                      this->num_fast_spr_performed,
-                      this->meta_parameters->num_fast_spr,
+                      rounds_performed,
+                      total_rounds,
                       _1, _2));
         ParallelContext::init_pthreads_custom(opts, spr_worker, num_threads, num_workers);
         spr_worker();
