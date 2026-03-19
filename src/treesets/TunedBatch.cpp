@@ -231,6 +231,44 @@ void TunedBatch::optimize_topology(const Options &opts) {
     }
 }
 
+void TunedBatch::optimize_parameters(const Options &opts, const double epsilon, const bool model, const bool branches,
+                                     const bool force) {
+    this->mark_p_values_dirty();
+
+    if (model && (!this->meta_parameters->skip_model || force)) {
+        LOG_INFO_TS << this->name << ": Optimizing model (eps: " << epsilon << ")" << std::endl;
+
+        // optimize model and branch lengths, such that we get accurate site likelihoods.
+        const auto model_worker = make_kernel(
+            std::ref(this->coarse_assignments),
+            std::bind(model_opt_kernel,
+                      std::ref(this->batch_trees),
+                      epsilon,
+                      _1, _2)
+        );
+        ParallelContext::init_pthreads_custom(opts, model_worker, num_threads, num_workers);
+        model_worker();
+        ParallelContext::finalize_threads();
+    } else {
+        load_batch_models();
+    }
+
+    if (branches) {
+        LOG_INFO_TS << this->name << ": Optimizing branches (eps: " << epsilon << ")" << std::endl;
+        // optimize branches
+        const auto branch_worker = make_kernel(
+            std::ref(this->coarse_assignments),
+            std::bind(blo_kernel,
+                      std::ref(this->batch_trees),
+                      epsilon,
+                      _1, _2)
+        );
+        ParallelContext::init_pthreads_custom(opts, branch_worker, num_threads, num_workers);
+        branch_worker();
+        ParallelContext::finalize_threads();
+    }
+}
+
 void TunedBatch::optimize(const Options &opts) {
     if (!meta_parameters_set) {
         throw RaxmlException("TunedBatch has not been configured with meta heuristics");
@@ -321,44 +359,6 @@ unsigned int TunedBatch::perform_plausibility_check(const Options &opts) {
     const unsigned int plausible_trees = this->perform_au_test(opts);
     this->load_batch_models();
     return plausible_trees;
-}
-
-void TunedBatch::optimize_parameters(const Options &opts, const double epsilon, const bool model, const bool branches,
-                                     const bool force) {
-    this->mark_p_values_dirty();
-
-    if (model && (!this->meta_parameters->skip_model || force)) {
-        LOG_INFO_TS << this->name << ": Optimizing model (eps: " << epsilon << ")" << std::endl;
-
-        // optimize model and branch lengths, such that we get accurate site likelihoods.
-        const auto model_worker = make_kernel(
-            std::ref(this->coarse_assignments),
-            std::bind(model_opt_kernel,
-                      std::ref(this->batch_trees),
-                      epsilon,
-                      _1, _2)
-        );
-        ParallelContext::init_pthreads_custom(opts, model_worker, num_threads, num_workers);
-        model_worker();
-        ParallelContext::finalize_threads();
-    } else {
-        load_batch_models();
-    }
-
-    if (branches) {
-        LOG_INFO_TS << this->name << ": Optimizing branches (eps: " << epsilon << ")" << std::endl;
-        // optimize branches
-        const auto branch_worker = make_kernel(
-            std::ref(this->coarse_assignments),
-            std::bind(blo_kernel,
-                      std::ref(this->batch_trees),
-                      epsilon,
-                      _1, _2)
-        );
-        ParallelContext::init_pthreads_custom(opts, branch_worker, num_threads, num_workers);
-        branch_worker();
-        ParallelContext::finalize_threads();
-    }
 }
 
 void TunedBatch::update_meta_parameters(const Options &opts, const shared_ptr<MetaParameters> &new_parameters) {
