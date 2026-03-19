@@ -27,6 +27,16 @@ bool Bandit::is_worse_than(const Bandit &other, const unsigned int total_samples
     return other.get_mean_throughput() > this->get_upper_confidence(total_samples);
 }
 
+bool Bandit::is_hopeless(const Bandit &other, const unsigned int total_samples) const {
+    // if either bandit is not sampled enough to allow a good estimate of the variance, return false
+    if (this->samples.size() < 3 || other.samples.size() < 3) {
+        return false;
+    }
+
+    return other.get_mean_throughput() > this->get_upmost_confidence(total_samples);
+}
+
+
 double Bandit::get_mean_throughput() const {
     double expectation = 0.0;
 
@@ -79,6 +89,14 @@ double Bandit::get_upper_confidence(const unsigned int total_samples) const {
     // where `n` is the total number of samples, and `i` is the number of samples drawn for this bandit.
     // do note that the formula contains the standard deviation, not the variance, so we move the variance into the root.
     return mean_throughput + sqrt(variance * 2.0 * log(static_cast<double>(total_samples)) / static_cast<double>(this->samples.size()));
+}
+
+double Bandit::get_upmost_confidence(const unsigned int total_samples) const {
+    const auto mean_throughput = this->get_mean_throughput();
+    const auto variance = this->get_variance();
+
+    // see get_upper_confidence
+    return mean_throughput + sqrt(4.0 * variance * 2.0 * log(static_cast<double>(total_samples)) / static_cast<double>(this->samples.size()));
 }
 
 MetaParameters &Bandit::get_parameters() const {

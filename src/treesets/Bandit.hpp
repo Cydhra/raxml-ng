@@ -37,6 +37,11 @@ public:
     }
 
     /**
+     * Whether this bandit is participating in the multiarmed bandit algorithm.
+     */
+    bool participating{true};
+
+    /**
      * Apply this bandit's parameters to the batch.
      */
     void apply_parameters(const Options &opts, TunedBatch &batch) const;
@@ -66,7 +71,7 @@ public:
     void initialize_variance(const double variance, const unsigned int weight);
 
     /**
-     * Compare two bandit distribution and determine if this one is worse than the `other` bandit.
+     * Compare two bandit distributions and determine if this one is worse than the `other` bandit.
      * A bandit is worse if the upper bound of its expected success is below the mean of the expected success
      * of the other bandit.
      *
@@ -76,6 +81,17 @@ public:
      * @return true if this bandit has worse success rate with high probability.
      */
     bool is_worse_than(const Bandit &other, unsigned int total_samples) const;
+
+    /**
+    * Compare two bandit distributions and determine if this one is hopeless when compared to the other.
+    * This way we can exclude it from the algorithm, speeding up the decision on other bandits.
+    *
+    * @param other Bandit to compare this one to
+    * @param total_samples total number of batches inferred so far
+    *
+    * @return true if this bandit has no conceivable chance of becoming relevant in the algorithm again.
+    */
+    bool is_hopeless(const Bandit &other, unsigned int total_samples) const;
 
     /**
      * @return the mean expected reward (throughput) of the underlying distribution.
@@ -95,7 +111,7 @@ public:
     double get_variance() const;
 
     /**
-     * Calculate the upper confident limit on the mean expected success of this bandit. This depends on the total
+     * Calculate the upper confident limit of the mean expected success of this bandit. This depends on the total
      * number of samples drawn so far, as well as the number of samples drawn for this bandit.
      *
      * @param total_samples the number of total samples from all bandits that have been drawn so far
@@ -103,6 +119,23 @@ public:
      * @return the upper bound on the mean expected success that can be determined with high confidence.
      */
     double get_upper_confidence(unsigned int total_samples) const;
+
+    /**
+     * The upper confidence limit of the mean expected success is one standard-deviation above the sample mean,
+     * corrected by the number of samples available (more samples means we increase the confidence interval because we
+     * do not have enough data).
+     * This method, however, returns the upper limit at two standard deviations away from the sample mean.
+     * This can be used to reasonably exclude bandits that are so bad that they will not become relevant even with a
+     * high number of total samples.
+     *
+     * This still takes into account the sample ratio (total samples versus samples for this bandit) to estimate how
+     * uncertain the confidence is.
+     *
+     * @param total_samples the number of total samples from all bandits that have been drawn so far
+     *
+     * @return the expected success two standard deviations higher than the mean.
+     */
+    double get_upmost_confidence(unsigned int total_samples) const;
 
     /**
      * @return This bandit's meta parameters

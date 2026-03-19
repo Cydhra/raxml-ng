@@ -72,8 +72,11 @@ Bandit &TreesetOptimizer::select_next_bandit() {
         return this->bandits[0];
     }
 
-    this->bandit_cursor += 1;
-    this->bandit_cursor %= this->bandits.size();
+    // select next participating bandit
+    do {
+        this->bandit_cursor += 1;
+        this->bandit_cursor %= this->bandits.size();
+    } while (!bandits[this->bandit_cursor].participating);
 
     auto &selected_bandit = this->bandits[this->bandit_cursor];
     auto &best_bandit = this->bandits[this->best_known_bandit];
@@ -87,6 +90,13 @@ Bandit &TreesetOptimizer::select_next_bandit() {
                 << selected_bandit.get_name() << " (" << (
                     selected_bandit.get_upper_confidence(this->total_batches_completed) * 1000.0) << " t/s)." <<
                 std::endl;
+
+        // check if the selected bandit is so bad that we can just delete it from the round-robin
+        // because this requires both trees to have been selected thrice, this likely only ever excludes parsimony
+        if (selected_bandit.is_hopeless(best_bandit, this->total_batches_completed)) {
+            LOG_INFO << "Excluding bandit " << selected_bandit.get_name() << " from algorithm because it is much worse than the others." << std::endl;
+            selected_bandit.participating = false;
+        }
 
         return best_bandit;
     }
