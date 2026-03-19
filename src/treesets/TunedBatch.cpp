@@ -114,6 +114,17 @@ void blo_kernel(std::vector<std::vector<TreeInfo> > &batch_trees,
     batch_trees[tree_id][thread_id].optimize_params(CORAX_OPT_PARAM_BRANCHES_ITERATIVE, epsilon);
 }
 
+/**
+ * Parallel kernel for branch length optimization, given to make_kernel to create a pthread-main
+ */
+void param_opt_kernel(std::vector<std::vector<TreeInfo> > &batch_trees,
+                const double epsilon,
+                const unsigned int thread_id,
+                const unsigned int tree_id) {
+    batch_trees[tree_id][thread_id].optimize_params(CORAX_OPT_PARAM_ALL, epsilon);
+}
+
+
 void TunedBatch::mark_p_values_dirty() {
     this->au_test_dirty = true;
 }
@@ -235,7 +246,23 @@ void TunedBatch::optimize_parameters(const Options &opts, const double epsilon, 
                                      const bool force) {
     this->mark_p_values_dirty();
 
-    if (model && (!this->meta_parameters->skip_model || force)) {
+    const auto opt_model = model && (!this->meta_parameters->skip_model || force);
+    const auto opt_branches = branches;
+
+    if (opt_model && opt_branches) {
+        LOG_INFO_TS << this->name << ": Optimizing all params (eps: " << epsilon << ")" << std::endl;
+        // optimize model and branch lengths, such that we get accurate site likelihoods.
+        const auto opt_worker = make_kernel(
+            std::ref(this->coarse_assignments),
+            std::bind(param_opt_kernel,
+                      std::ref(this->batch_trees),
+                      epsilon,
+                      _1, _2)
+        );
+        ParallelContext::init_pthreads_custom(opts, opt_worker, num_threads, num_workers);
+        opt_worker();
+        ParallelContext::finalize_threads();
+    } else if (opt_model) {
         LOG_INFO_TS << this->name << ": Optimizing model (eps: " << epsilon << ")" << std::endl;
 
         // optimize model and branch lengths, such that we get accurate site likelihoods.
@@ -249,11 +276,7 @@ void TunedBatch::optimize_parameters(const Options &opts, const double epsilon, 
         ParallelContext::init_pthreads_custom(opts, model_worker, num_threads, num_workers);
         model_worker();
         ParallelContext::finalize_threads();
-    } else {
-        load_batch_models();
-    }
-
-    if (branches) {
+    } else if (branches) {
         LOG_INFO_TS << this->name << ": Optimizing branches (eps: " << epsilon << ")" << std::endl;
         // optimize branches
         const auto branch_worker = make_kernel(
@@ -266,6 +289,10 @@ void TunedBatch::optimize_parameters(const Options &opts, const double epsilon, 
         ParallelContext::init_pthreads_custom(opts, branch_worker, num_threads, num_workers);
         branch_worker();
         ParallelContext::finalize_threads();
+    }
+
+    if (this->meta_parameters->skip_model) {
+        load_batch_models();
     }
 }
 
