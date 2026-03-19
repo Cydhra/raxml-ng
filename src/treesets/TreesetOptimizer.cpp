@@ -63,7 +63,6 @@ void TreesetOptimizer::initialize_bandits() {
 
         // experimental thorough bandits
         this->bandits.emplace_back("Slow,2spr", MetaParameters(20, false, 0, 2, false));
-        this->bandits.emplace_back("Mixed,4spr", MetaParameters(20, false, 2, 2, false));
     }
 }
 
