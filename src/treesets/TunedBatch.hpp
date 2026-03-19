@@ -322,7 +322,7 @@ protected:
         // update options according to MetaParameters:
         spr_params.ntopol_keep = this->meta_parameters->keep_top_k_topol;
         spr_params.subtree_cutoff = opts.spr_cutoff;
-        spr_params.radius_min = 0;
+        spr_params.radius_min = 1;
         spr_params.radius_max = 20;
         // if all fast spr rounds have been performed, set thorough to true, so further spr rounds are slow
         spr_params.thorough = this->num_fast_spr_performed >= this->meta_parameters->num_fast_spr;
