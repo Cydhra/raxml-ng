@@ -291,7 +291,7 @@ void TunedBatch::optimize_parameters(const Options &opts, const double epsilon, 
         ParallelContext::finalize_threads();
     }
 
-    if (this->meta_parameters->skip_model) {
+    if (this->meta_parameters->skip_model && !force) {
         load_batch_models();
     }
 }
