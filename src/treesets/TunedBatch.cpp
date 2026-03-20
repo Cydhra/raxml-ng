@@ -381,10 +381,12 @@ unsigned int TunedBatch::perform_plausibility_check(const Options &opts) {
     // models to allow for shallower likelihood curves of slightly suboptimal models.
     // Further, multiple calls to is_plausible must not optimize the hyper-optimized model with low episolon again
     // to avoid numerical oscillation.
-    this->backup_models();
+
+    // TODO should we backup the less optimized model or just accept that we overspecify the model
+    // this->backup_models();
     this->optimize_parameters(opts, 0.1, true, true, true);
     const unsigned int plausible_trees = this->perform_au_test(opts);
-    this->load_batch_models();
+    // this->load_batch_models();
     return plausible_trees;
 }
 
