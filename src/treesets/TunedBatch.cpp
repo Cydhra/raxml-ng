@@ -459,7 +459,7 @@ void TunedBatch::assign_batch_models(const TunedBatch &other) {
     for (unsigned int i = 0; i < this->get_batch_size(); ++i) {
         for (size_t part_id = 0; part_id < this->msa->part_count(); ++part_id) {
             // all threads have the same model, so backup from the first thread is sufficient
-            assign(this->batch_models[i][part_id], other.batch_trees[i][0], part_id);
+            assign(this->batch_models[i][part_id], other.batch_trees[i][part_id], part_id);
         }
     }
 

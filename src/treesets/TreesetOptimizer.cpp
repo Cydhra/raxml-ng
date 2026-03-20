@@ -39,6 +39,12 @@ void TreesetOptimizer::generate_batches(const unsigned int n) {
         starting_tree_bandit().apply_parameters(opts, current_batch);
         current_batch.generate_starting_trees(this->instance, opts, load_balancer, tip_msa_idmap);
 
+        // if this isn't the very first tree, inherit model parameters from previous trees. Since we run the AU test
+        // on the first tree, we have parameters optimized once
+        if (this->batches.size() > 1) {
+            current_batch.assign_batch_models(this->batches[this->batches.size() - 2]);
+        }
+
         // take a few measurements, but no more than necessary to have reasonable values for mean and variance
         if (batches.size() <= INITIAL_VARIANCE_WEIGHT) {
             current_batch.perform_plausibility_check(opts);
