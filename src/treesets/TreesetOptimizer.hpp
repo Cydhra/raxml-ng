@@ -103,6 +103,8 @@ protected:
      */
     unsigned int best_known_bandit = 0;
 
+    std::unique_ptr<ModelMap> backup_model = unique_ptr<ModelMap>(new ModelMap());
+
     /**
      * Return the starting seed for generating `num_trees` trees.
      */

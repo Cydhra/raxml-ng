@@ -118,9 +118,9 @@ void blo_kernel(std::vector<std::vector<TreeInfo> > &batch_trees,
  * Parallel kernel for branch length optimization, given to make_kernel to create a pthread-main
  */
 void param_opt_kernel(std::vector<std::vector<TreeInfo> > &batch_trees,
-                const double epsilon,
-                const unsigned int thread_id,
-                const unsigned int tree_id) {
+                      const double epsilon,
+                      const unsigned int thread_id,
+                      const unsigned int tree_id) {
     batch_trees[tree_id][thread_id].optimize_params(CORAX_OPT_PARAM_ALL, epsilon);
 }
 
@@ -290,10 +290,6 @@ void TunedBatch::optimize_parameters(const Options &opts, const double epsilon, 
         branch_worker();
         ParallelContext::finalize_threads();
     }
-
-    if (this->meta_parameters->skip_model && !force) {
-        load_batch_models();
-    }
 }
 
 void TunedBatch::optimize(const Options &opts) {
@@ -377,16 +373,9 @@ unsigned int TunedBatch::perform_plausibility_check(const Options &opts) {
         return this->plausible_tree_count;
     }
 
-    // we need to save the model backup, for two reasons: we do not want to perform tree search on hyper-optimized
-    // models to allow for shallower likelihood curves of slightly suboptimal models.
-    // Further, multiple calls to is_plausible must not optimize the hyper-optimized model with low episolon again
-    // to avoid numerical oscillation.
-
     // TODO should we backup the less optimized model or just accept that we overspecify the model
-    // this->backup_models();
     this->optimize_parameters(opts, 0.1, true, true, true);
     const unsigned int plausible_trees = this->perform_au_test(opts);
-    // this->load_batch_models();
     return plausible_trees;
 }
 
@@ -438,34 +427,18 @@ bool TunedBatch::is_compatible(const MetaParameters &new_parameters) const {
     return true;
 }
 
-void TunedBatch::backup_models() {
-    for (unsigned int i = 0; i < this->get_batch_size(); ++i) {
-        for (size_t part_id = 0; part_id < this->msa->part_count(); ++part_id) {
-            // all threads have the same model, so backup from the first thread is sufficient
-            assign(this->batch_models[i][part_id], batch_trees[i][0], part_id);
-        }
+void TunedBatch::backup_models(ModelMap &target) const {
+    for (size_t part_id = 0; part_id < this->msa->part_count(); ++part_id) {
+        // all threads have the same model, so backup from the first thread is sufficient
+        assign(target[part_id], this->batch_trees[0][part_id], part_id);
     }
 }
 
-void TunedBatch::load_batch_models() {
+void TunedBatch::assign_batch_models(const ModelMap &other) {
     for (unsigned int i = 0; i < this->get_batch_size(); ++i) {
         for (unsigned int local_thread_id = 0; local_thread_id < this->num_threads_per_worker(); ++local_thread_id) {
-            assign_models(batch_trees[i][local_thread_id], this->batch_models[i]);
+            assign_models(batch_trees[i][local_thread_id], other);
         }
-    }
-}
-
-void TunedBatch::assign_batch_models(const TunedBatch &other) {
-    for (unsigned int i = 0; i < this->get_batch_size(); ++i) {
-        for (size_t part_id = 0; part_id < this->msa->part_count(); ++part_id) {
-            // all threads have the same model, so backup from the first thread is sufficient
-            assign(this->batch_models[i][part_id], other.batch_trees[i][part_id], part_id);
-        }
-    }
-
-    // if the batch trees are already generated, assign them the models
-    if (this->batch_trees.size() > 0) {
-        this->load_batch_models();
     }
 }
 
@@ -473,7 +446,7 @@ void TunedBatch::finalize() {
     LOG_DEBUG << "Finalized " << name << "." << std::endl;
     this->au_test->free_test_statistics();
 
-    for (auto &batch_tree : this->batch_trees) {
+    for (auto &batch_tree: this->batch_trees) {
         this->tree_topologies.push_back(batch_tree.at(0).tree());
     }
 
