@@ -140,12 +140,17 @@ public:
     /**
      * @return This bandit's meta parameters
      */
-    MetaParameters &get_parameters() const;
+    MetaParameters &get_parameters() const {
+        return *this->parameters;
+    }
 
     /**
      * @return Bandit name for debug output
      */
-    string get_name() const;
+    string get_name() const {
+        return this->name;
+    }
+
 
 protected:
     /**

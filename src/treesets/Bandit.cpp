@@ -98,11 +98,3 @@ double Bandit::get_upmost_confidence(const unsigned int total_samples) const {
     // see get_upper_confidence
     return mean_throughput + sqrt(4.0 * variance * 2.0 * log(static_cast<double>(total_samples)) / static_cast<double>(this->samples.size()));
 }
-
-MetaParameters &Bandit::get_parameters() const {
-    return *this->parameters;
-}
-
-string Bandit::get_name() const {
-    return this->name;
-}
