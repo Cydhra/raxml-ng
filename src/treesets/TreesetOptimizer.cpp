@@ -30,7 +30,7 @@ void TreesetOptimizer::generate_batches(const unsigned int n) {
         auto &current_batch = this->batches[this->batches.size() - 1];
 
         // TODO schedule the batches in parallel if enough threads are available
-        starting_tree_bandit().apply_parameters(opts, current_batch);
+        current_batch.update_meta_parameters(opts, starting_tree_bandit().get_parameters());
         current_batch.generate_starting_trees(this->instance, opts, load_balancer, tip_msa_idmap);
 
         // if this isn't the very first tree, inherit model parameters from previous trees. Since we run the AU test
@@ -71,11 +71,7 @@ void TreesetOptimizer::initialize_bandits() {
     }
 }
 
-Bandit &TreesetOptimizer::select_next_bandit() {
-    return this->mab.select_next_bandit();
-}
-
-TunedBatch &TreesetOptimizer::select_next_batch(const Bandit &current_bandit) {
+TunedBatch &TreesetOptimizer::select_next_batch(const Bandit<MetaParameters> &current_bandit) {
     if (this->batch_cursor == this->batches.size()) {
         // generate a new batch because we need it right now.
         generate_batches(1);
@@ -87,8 +83,8 @@ TunedBatch &TreesetOptimizer::select_next_batch(const Bandit &current_bandit) {
     // to speed up the initial round of computation where all bandits are executed once,
     // we want to reuse batches. If the total rounds is already higher than the bandit count, we don't do that,
     // so we actually make progress.
-    if (this->mab.num_iterations_completed() > this->mab.num_bandits() || !this->batches[this->batch_cursor].is_compatible(
-            current_bandit.get_parameters())) {
+    if (this->mab.num_iterations_completed() > this->mab.num_bandits() || !this->batches[this->batch_cursor].
+        is_compatible(*current_bandit.get_parameters())) {
         advance_batch_cursor(1);
 
         // if the cursor now surpasses the queue, fill it up
@@ -128,6 +124,10 @@ void TreesetOptimizer::advance_batch_cursor(const unsigned int n) {
     assert(this->batch_cursor <= this->batches.size());
 }
 
+Bandit<MetaParameters> &TreesetOptimizer::select_next_bandit() {
+    return this->mab.select_next_bandit();
+}
+
 void TreesetOptimizer::run() {
     LOG_INFO << std::endl;
     LOG_INFO_TS << "Treeset: Inferring at least " << this->target_tree_count <<
@@ -146,7 +146,7 @@ void TreesetOptimizer::run() {
         auto &current_bandit = this->select_next_bandit();
         auto &current_batch = this->select_next_batch(current_bandit);
 
-        current_bandit.apply_parameters(opts, current_batch);
+        current_batch.update_meta_parameters(opts, current_bandit.get_parameters());
         current_batch.optimize(opts);
         current_batch.perform_plausibility_check(opts);
         this->mab.take_measurement(current_bandit, current_batch, true);

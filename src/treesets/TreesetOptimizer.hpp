@@ -80,7 +80,7 @@ protected:
     /**
      * The multi-armed bandit instance that tracks which bandit should be selected in each iteration
      */
-    MultiArmedBandit mab = MultiArmedBandit{};
+    MultiArmedBandit<MetaParameters> mab = MultiArmedBandit<MetaParameters>{};
 
     std::unique_ptr<ModelMap> backup_model = unique_ptr<ModelMap>(new ModelMap());
 
@@ -96,20 +96,20 @@ protected:
     /**
      * Get the bandit that represents the distribution of plausible trees obtained from accepting starting trees.
      */
-    Bandit &starting_tree_bandit() {
+    Bandit<MetaParameters> &starting_tree_bandit() {
         return this->mab.get_bandit(0);
     }
 
     /**
      * Select the bandit for the current round according to the cursor position and the current knowledge of the bandit.
      */
-    Bandit &select_next_bandit();
+    Bandit<MetaParameters> &select_next_bandit();
 
     /**
      * Select the TunedBatch instance that should be used for the bandit that was selected by a previous call to
      * `select_next_bandit`.
      */
-    TunedBatch &select_next_batch(const Bandit &current_bandit);
+    TunedBatch &select_next_batch(const Bandit<MetaParameters> &current_bandit);
 
     /**
      * Advance the batch cursor by n steps, finalizing all batches that are passed on the way, and generating a new

@@ -106,7 +106,7 @@ public:
      * @param opts Command line options
      * @param new_parameters batch treeset inference meta parameters
      */
-    void update_meta_parameters(const Options &opts, const shared_ptr<MetaParameters> &new_parameters);
+    void update_meta_parameters(const Options &opts, const shared_ptr<MetaParameters> new_parameters);
 
     /**
      * Compare the batch's current configuration with a set of new parameters, and check whether the inference can

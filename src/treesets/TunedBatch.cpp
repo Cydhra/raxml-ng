@@ -383,7 +383,7 @@ unsigned int TunedBatch::perform_plausibility_check(const Options &opts) {
     return plausible_trees;
 }
 
-void TunedBatch::update_meta_parameters(const Options &opts, const shared_ptr<MetaParameters> &new_parameters) {
+void TunedBatch::update_meta_parameters(const Options &opts, const shared_ptr<MetaParameters> new_parameters) {
     this->meta_parameters = new_parameters;
     this->meta_parameters_set = true;
     this->auto_configure(opts);
