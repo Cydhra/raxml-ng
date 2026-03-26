@@ -3,6 +3,7 @@
 
 #include <vector>
 #include "Bandit.hpp"
+#include "MultiArmedBandit.hpp"
 #include "../loadbalance/LoadBalancer.hpp"
 #include "../Checkpoint.hpp"
 
@@ -77,31 +78,9 @@ protected:
     unsigned int batch_cursor = 0;
 
     /**
-     * Number of batches that were drawn from bandits. This can differ from the batch_cursor if batches were reused
-     * (which happens if a bandit's configuration is compatible with the previous bandit's configuration).
-     * Then only one batch exists, but two samples were drawn from the bandits.
+     * The multi-armed bandit instance that tracks which bandit should be selected in each iteration
      */
-    unsigned int total_batches_completed = 0;
-
-    /**
-     * List of all bandits registered in the current run. Each bandit is considered during inference.
-     */
-    std::vector<Bandit> bandits;
-
-    /**
-     * Cursor of the bandit that is supposed to be selected at the moment. The bandit may not be selected if its estimated
-     * reward is lower than the best known bandit. Initialized to 0, which is not selected first because
-     * `select_next_bandit` increments the cursor before selecting.
-     * This is correct because the 0th bandit is the one that generates starting trees, which is forcibly selected
-     * when preparing the initial batches, so it need not be the first bandit in the actual loop.
-     */
-    unsigned int bandit_cursor = 0;
-
-    /**
-     * Index of the best known bandit. Initialized at 0, the bandit that just generates starting trees. Updated
-     * by `run()` whenever a measurement is taken.
-     */
-    unsigned int best_known_bandit = 0;
+    MultiArmedBandit mab = MultiArmedBandit{};
 
     std::unique_ptr<ModelMap> backup_model = unique_ptr<ModelMap>(new ModelMap());
 
@@ -118,7 +97,7 @@ protected:
      * Get the bandit that represents the distribution of plausible trees obtained from accepting starting trees.
      */
     Bandit &starting_tree_bandit() {
-        return this->bandits[0];
+        return this->mab.get_bandit(0);
     }
 
     /**
@@ -187,7 +166,7 @@ public:
         msa(msa),
         persite_loglh(persite_loglh) {
         // place the first bandit that represents the distribution of plausible starting trees
-        this->bandits.emplace_back("Parsimony", MetaParameters(1, true, 0, 0, true));
+        this->mab.emplace_back("Parsimony", MetaParameters(1, true, 0, 0, true));
     }
 
     /**

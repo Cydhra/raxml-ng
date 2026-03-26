@@ -1,11 +1,5 @@
 #include "TreesetOptimizer.hpp"
-
 #include "TunedBatch.hpp"
-
-/**
- * How many samples the initial variance measurement replaces in the bandits.
- */
-constexpr unsigned int INITIAL_VARIANCE_WEIGHT = 6;
 
 int recommended_thread_count() {
     // TODO add parameters to options containing the max thread count, which we just assign to the single worker per rank
@@ -64,71 +58,21 @@ void TreesetOptimizer::initialize_bandits() {
         advance_batch_cursor(this->batches.size() - this->batch_cursor);
     } else {
         // init default bandits
-        this->bandits.emplace_back("Greedy,DoModel,2spr", MetaParameters(1, false, 2, 0, false));
-        this->bandits.emplace_back("Greedy,DoModel,4spr", MetaParameters(1, false, 4, 0, false));
-        this->bandits.emplace_back("Greedy,NoModel,2spr", MetaParameters(1, true, 2, 0, false));
+        this->mab.emplace_back("Greedy,DoModel,2spr", MetaParameters(1, false, 2, 0, false));
+        this->mab.emplace_back("Greedy,DoModel,4spr", MetaParameters(1, false, 4, 0, false));
+        this->mab.emplace_back("Greedy,NoModel,2spr", MetaParameters(1, true, 2, 0, false));
 
-        this->bandits.emplace_back("Fast,DoModel,2spr", MetaParameters(20, false, 2, 0, false));
-        this->bandits.emplace_back("Fast,DoModel,4spr", MetaParameters(20, false, 4, 0, false));
-        this->bandits.emplace_back("Fast,NoModel,2spr", MetaParameters(20, true, 2, 0, false));
+        this->mab.emplace_back("Fast,DoModel,2spr", MetaParameters(20, false, 2, 0, false));
+        this->mab.emplace_back("Fast,DoModel,4spr", MetaParameters(20, false, 4, 0, false));
+        this->mab.emplace_back("Fast,NoModel,2spr", MetaParameters(20, true, 2, 0, false));
 
         // experimental thorough bandits
-        this->bandits.emplace_back("Slow,2spr", MetaParameters(20, false, 0, 2, false));
+        this->mab.emplace_back("Slow,2spr", MetaParameters(20, false, 0, 2, false));
     }
 }
 
 Bandit &TreesetOptimizer::select_next_bandit() {
-    // shortcut if we forced the selection of only one bandit, to keep the logs clean
-    if (this->bandits.size() == 1) {
-        return this->bandits[0];
-    }
-
-    // select next participating bandit
-    do {
-        this->bandit_cursor += 1;
-        this->bandit_cursor %= this->bandits.size();
-    } while (!bandits[this->bandit_cursor].participating);
-
-    auto &selected_bandit = this->bandits[this->bandit_cursor];
-    auto &best_bandit = this->bandits[this->best_known_bandit];
-
-    if (this->bandit_cursor != this->best_known_bandit && selected_bandit.is_worse_than(
-            best_bandit, this->total_batches_completed)) {
-        LOG_INFO << std::endl << "Switching to best bandit " << best_bandit.get_name() <<
-                " because its mean expected success ("
-                << (best_bandit.get_mean_throughput() * 1000.0) <<
-                " t/s) exceeds the largest reasonable success of "
-                << selected_bandit.get_name() << " (" << (
-                    selected_bandit.get_upper_confidence(this->total_batches_completed) * 1000.0) << " t/s)." <<
-                std::endl;
-
-        // check if the selected bandit is so bad that we can just delete it from the round-robin
-        // because this requires both trees to have been selected thrice, this likely only ever excludes parsimony
-        if (selected_bandit.is_hopeless(best_bandit, this->total_batches_completed)) {
-            LOG_INFO << "Excluding bandit " << selected_bandit.get_name() << " from algorithm because it is much worse than the others." << std::endl;
-            selected_bandit.participating = false;
-        }
-
-        return best_bandit;
-    }
-
-    if (!std::isnan(selected_bandit.get_upper_confidence(this->total_batches_completed))) {
-        if (this->bandit_cursor != this->best_known_bandit) {
-            LOG_INFO << std::endl << "Selecting bandit " << selected_bandit.get_name() <<
-                    " because its largest reasonable success ("
-                    << (selected_bandit.get_upper_confidence(this->total_batches_completed) * 1000.0) <<
-                    " t/s) exceeds the mean expected success of current best bandit "
-                    << best_bandit.get_name() << " (" << (best_bandit.get_mean_throughput() * 1000.0) << " t/s)." <<
-                    std::endl;
-        } else {
-            LOG_INFO << std::endl << "Selecting bandit " << selected_bandit.get_name() << " (mean: " << (
-                best_bandit.get_mean_throughput() * 1000.0) << " t/s)." << std::endl;
-        }
-    } else {
-        LOG_INFO << std::endl << "Initial estimation of " << selected_bandit.get_name() << "." << std::endl;
-    }
-
-    return selected_bandit;
+    return this->mab.select_next_bandit();
 }
 
 TunedBatch &TreesetOptimizer::select_next_batch(const Bandit &current_bandit) {
@@ -143,7 +87,7 @@ TunedBatch &TreesetOptimizer::select_next_batch(const Bandit &current_bandit) {
     // to speed up the initial round of computation where all bandits are executed once,
     // we want to reuse batches. If the total rounds is already higher than the bandit count, we don't do that,
     // so we actually make progress.
-    if (this->total_batches_completed > this->bandits.size() || !this->batches[this->batch_cursor].is_compatible(
+    if (this->mab.num_iterations_completed() > this->mab.num_bandits() || !this->batches[this->batch_cursor].is_compatible(
             current_bandit.get_parameters())) {
         advance_batch_cursor(1);
 
@@ -205,43 +149,7 @@ void TreesetOptimizer::run() {
         current_bandit.apply_parameters(opts, current_batch);
         current_batch.optimize(opts);
         current_batch.perform_plausibility_check(opts);
-        current_bandit.take_measurement(current_batch);
-        this->total_batches_completed += 1;
-
-        // if the current bandit is not the best one, check if the best one has to be updated
-        if (current_bandit.get_parameters() != this->bandits[best_known_bandit].get_parameters()) {
-            if (current_bandit.get_mean_throughput() > this->bandits[best_known_bandit].get_mean_throughput()) {
-                best_known_bandit = bandit_cursor;
-            }
-        }
-
-        // once all bandits have been selected once, assign variances to the bandits
-        if (total_batches_completed == this->bandits.size() - 1) {
-            // collect variances
-            double mean = 0.0;
-            for (const auto &bandit: bandits) {
-                mean += bandit.get_mean_throughput();
-            }
-            mean /= static_cast<double>(bandits.size());
-
-            double variance = 0.0;
-            for (const auto &bandit: bandits) {
-                variance += (mean - bandit.get_mean_throughput()) * (mean - bandit.get_mean_throughput());
-            }
-            variance /= static_cast<double>(bandits.size());
-
-            const auto standard_deviation = sqrt(variance);
-
-            LOG_INFO << std::endl;
-            LOG_INFO << "Mean throughput is " << (mean * 1000.0) <<
-                    " trees per second with the standard deviation over all bandits being " << (
-                        standard_deviation * 1000.0) <<
-                    std::endl << std::endl;
-
-            for (auto &bandit: this->bandits) {
-                bandit.initialize_variance(variance, INITIAL_VARIANCE_WEIGHT);
-            }
-        }
+        this->mab.take_measurement(current_bandit, current_batch);
 
         // check if we would exceed the final tree count if we finalized the current batch immediately
         if (this->total_plausible_trees + current_batch.get_plausible_tree_count() > this->target_tree_count) {
