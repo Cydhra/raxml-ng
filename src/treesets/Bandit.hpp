@@ -36,6 +36,9 @@ public:
                                                                               parameters)) {
     }
 
+    // grant MAB access to protected members, specifically "take_measurement"
+    friend class MultiArmedBandit;
+
     /**
      * Whether this bandit is participating in the multiarmed bandit algorithm.
      */
@@ -45,15 +48,6 @@ public:
      * Apply this bandit's parameters to the batch.
      */
     void apply_parameters(const Options &opts, TunedBatch &batch) const;
-
-    /**
-     * Take the benchmark data of a tuned batch which has previously run its inference with the parameters of this
-     * bandit.
-     * The measurement is stored and updates the expected mean reward of this bandit.
-     *
-     * @param batch A tuned batch which has been run on the parameter set of this Bandit instance.
-     */
-    void take_measurement(const TunedBatch &batch);
 
     /**
      * Initialize the bandit distribution estimation with a constant variance. This allows comparing bandits with some
@@ -179,6 +173,15 @@ protected:
      * existing measurement in `samples`.
      */
     unsigned int estimated_variance_weight{0};
+
+    /**
+     * Take the benchmark data of a tuned batch which has previously run its inference with the parameters of this
+     * bandit.
+     * The measurement is stored and updates the expected mean reward of this bandit.
+     *
+     * @param batch A tuned batch which has been run on the parameter set of this Bandit instance.
+     */
+    void take_measurement(const TunedBatch &batch);
 };
 
 

@@ -47,7 +47,7 @@ void TreesetOptimizer::generate_batches(const unsigned int n) {
                 current_batch.backup_models(*this->backup_model);
             }
 
-            starting_tree_bandit().take_measurement(current_batch);
+            mab.take_measurement(starting_tree_bandit(), current_batch);
         }
     }
 }
