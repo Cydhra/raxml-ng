@@ -47,7 +47,7 @@ void TreesetOptimizer::generate_batches(const unsigned int n) {
                 current_batch.backup_models(*this->backup_model);
             }
 
-            mab.take_measurement(starting_tree_bandit(), current_batch, false);
+            this->light_mab->take_measurement(starting_tree_bandit(), current_batch, false);
         }
     }
 }
@@ -58,16 +58,22 @@ void TreesetOptimizer::initialize_bandits() {
         advance_batch_cursor(this->batches.size() - this->batch_cursor);
     } else {
         // init default bandits
-        this->mab.emplace_back("Greedy,DoModel,2spr", MetaParameters(1, false, 2, 0, false));
-        this->mab.emplace_back("Greedy,DoModel,4spr", MetaParameters(1, false, 4, 0, false));
-        this->mab.emplace_back("Greedy,NoModel,2spr", MetaParameters(1, true, 2, 0, false));
+        this->light_mab->emplace_back("Greedy,DoModel,2spr", MetaParameters(1, false, 2, 0, false));
+        this->light_mab->emplace_back("Greedy,DoModel,4spr", MetaParameters(1, false, 4, 0, false));
+        this->light_mab->emplace_back("Greedy,NoModel,2spr", MetaParameters(1, true, 2, 0, false));
 
-        this->mab.emplace_back("Fast,DoModel,2spr", MetaParameters(20, false, 2, 0, false));
-        this->mab.emplace_back("Fast,DoModel,4spr", MetaParameters(20, false, 4, 0, false));
-        this->mab.emplace_back("Fast,NoModel,2spr", MetaParameters(20, true, 2, 0, false));
+        this->light_mab->emplace_back("Fast,DoModel,2spr", MetaParameters(20, false, 2, 0, false));
+        this->light_mab->emplace_back("Fast,DoModel,4spr", MetaParameters(20, false, 4, 0, false));
+        this->light_mab->emplace_back("Fast,NoModel,2spr", MetaParameters(20, true, 2, 0, false));
 
-        // experimental thorough bandits
-        this->mab.emplace_back("Slow,2spr", MetaParameters(20, false, 0, 2, false));
+        // heavy heuristics
+        this->heavy_mab->emplace_back("Slow,2spr", MetaParameters(20, false, 0, 2, false));
+        this->heavy_mab->emplace_back("Mixed,2+2spr", MetaParameters(20, false, 2, 2, false));
+        this->heavy_mab->emplace_back("Mixed,4+2spr", MetaParameters(20, false, 4, 2, false));
+
+        // second-level MAB
+        this->hierarchical_mab.emplace_back("Light", this->light_mab);
+        this->hierarchical_mab.emplace_back("Heavy", this->heavy_mab);
     }
 }
 
@@ -83,15 +89,16 @@ TunedBatch &TreesetOptimizer::select_next_batch(const Bandit<MetaParameters> &cu
     // to speed up the initial round of computation where all bandits are executed once,
     // we want to reuse batches. If the total rounds is already higher than the bandit count, we don't do that,
     // so we actually make progress.
-    if (this->mab.num_iterations_completed() > this->mab.num_bandits() || !this->batches[this->batch_cursor].
-        is_compatible(*current_bandit.get_parameters())) {
+    // TODO fix the reuse of batches for the hierarchical mab setup
+    // if (this->light_mab->num_iterations_completed() > this->light_mab->num_bandits() || !this->batches[this->batch_cursor].
+        // is_compatible(*current_bandit.get_parameters())) {
         advance_batch_cursor(1);
 
         // if the cursor now surpasses the queue, fill it up
         if (this->batch_cursor == this->batches.size()) {
             generate_batches(1);
         }
-    }
+    // }
 
     LOG_DEBUG << "Batch cursor: " << this->batch_cursor << std::endl;
     return this->batches[this->batch_cursor];
@@ -124,10 +131,6 @@ void TreesetOptimizer::advance_batch_cursor(const unsigned int n) {
     assert(this->batch_cursor <= this->batches.size());
 }
 
-Bandit<MetaParameters> &TreesetOptimizer::select_next_bandit() {
-    return this->mab.select_next_bandit();
-}
-
 void TreesetOptimizer::run() {
     LOG_INFO << std::endl;
     LOG_INFO_TS << "Treeset: Inferring at least " << this->target_tree_count <<
@@ -143,13 +146,15 @@ void TreesetOptimizer::run() {
     this->initialize_bandits();
 
     while (this->total_plausible_trees < this->target_tree_count) {
-        auto &current_bandit = this->select_next_bandit();
+        auto &mab = this->hierarchical_mab.select_next_bandit();
+        auto &current_bandit = mab.get_parameters().get()->get()->select_next_bandit();
         auto &current_batch = this->select_next_batch(current_bandit);
 
         current_batch.update_meta_parameters(opts, current_bandit.get_parameters());
         current_batch.optimize(opts);
         current_batch.perform_plausibility_check(opts);
-        this->mab.take_measurement(current_bandit, current_batch, true);
+        mab.get_parameters()->get()->take_measurement(current_bandit, current_batch, true);
+        this->hierarchical_mab.take_measurement(mab, current_batch, true);
 
         // check if we would exceed the final tree count if we finalized the current batch immediately
         if (this->total_plausible_trees + current_batch.get_plausible_tree_count() > this->target_tree_count) {

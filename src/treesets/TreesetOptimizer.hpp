@@ -77,10 +77,17 @@ protected:
      */
     unsigned int batch_cursor = 0;
 
+    MultiArmedBandit<std::shared_ptr<MultiArmedBandit<MetaParameters>>> hierarchical_mab = MultiArmedBandit<std::shared_ptr<MultiArmedBandit<MetaParameters>>>{};
+
     /**
-     * The multi-armed bandit instance that tracks which bandit should be selected in each iteration
+     * The multi-armed bandit instance that contains aggressive heuristics
      */
-    MultiArmedBandit<MetaParameters> mab = MultiArmedBandit<MetaParameters>{};
+    std::shared_ptr<MultiArmedBandit<MetaParameters>> light_mab = std::make_shared<MultiArmedBandit<MetaParameters>>(MultiArmedBandit<MetaParameters>{});
+
+    /**
+    * The multi-armed bandit instance that contains slower heuristics
+    */
+    std::shared_ptr<MultiArmedBandit<MetaParameters>> heavy_mab = std::make_shared<MultiArmedBandit<MetaParameters>>(MultiArmedBandit<MetaParameters>{});
 
     std::unique_ptr<ModelMap> backup_model = unique_ptr<ModelMap>(new ModelMap());
 
@@ -97,13 +104,8 @@ protected:
      * Get the bandit that represents the distribution of plausible trees obtained from accepting starting trees.
      */
     Bandit<MetaParameters> &starting_tree_bandit() {
-        return this->mab.get_bandit(0);
+        return this->light_mab->get_bandit(0);
     }
-
-    /**
-     * Select the bandit for the current round according to the cursor position and the current knowledge of the bandit.
-     */
-    Bandit<MetaParameters> &select_next_bandit();
 
     /**
      * Select the TunedBatch instance that should be used for the bandit that was selected by a previous call to
@@ -166,7 +168,7 @@ public:
         msa(msa),
         persite_loglh(persite_loglh) {
         // place the first bandit that represents the distribution of plausible starting trees
-        this->mab.emplace_back("Parsimony", MetaParameters(1, true, 0, 0, true));
+        this->light_mab->emplace_back("Parsimony", MetaParameters(1, true, 0, 0, true));
     }
 
     /**

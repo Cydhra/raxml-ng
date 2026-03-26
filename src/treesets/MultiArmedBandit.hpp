@@ -34,7 +34,7 @@ public:
      * @param name bandit's name
      * @param parameters the bandit's meta-parameters
      */
-    void emplace_back(std::string name, MetaParameters parameters) {
+    void emplace_back(std::string name, Heuristic parameters) {
         this->bandits.emplace_back(name, parameters);
     }
 
