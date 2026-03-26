@@ -47,7 +47,7 @@ void TreesetOptimizer::generate_batches(const unsigned int n) {
                 current_batch.backup_models(*this->backup_model);
             }
 
-            mab.take_measurement(starting_tree_bandit(), current_batch);
+            mab.take_measurement(starting_tree_bandit(), current_batch, false);
         }
     }
 }
@@ -149,7 +149,7 @@ void TreesetOptimizer::run() {
         current_bandit.apply_parameters(opts, current_batch);
         current_batch.optimize(opts);
         current_batch.perform_plausibility_check(opts);
-        this->mab.take_measurement(current_bandit, current_batch);
+        this->mab.take_measurement(current_bandit, current_batch, true);
 
         // check if we would exceed the final tree count if we finalized the current batch immediately
         if (this->total_plausible_trees + current_batch.get_plausible_tree_count() > this->target_tree_count) {

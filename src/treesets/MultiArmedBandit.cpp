@@ -57,10 +57,8 @@ Bandit &MultiArmedBandit::select_next_bandit() {
     return selected_bandit;
 }
 
-void MultiArmedBandit::take_measurement(Bandit &current_bandit, TunedBatch &batch) {
+void MultiArmedBandit::take_measurement(Bandit &current_bandit, const TunedBatch &batch, const bool iteration_completed) {
     current_bandit.take_measurement(batch);
-
-    this->iterations_completed += 1;
 
     // if the current bandit is not the best one, check if the best one has to be updated
     if (current_bandit.get_parameters() != this->bandits[best_known_bandit].get_parameters()) {
@@ -69,31 +67,36 @@ void MultiArmedBandit::take_measurement(Bandit &current_bandit, TunedBatch &batc
         }
     }
 
-    // once all bandits have been selected once, assign variances to the bandits
-    if (iterations_completed == this->bandits.size()) {
-        // collect variances
-        double mean = 0.0;
-        for (const auto &bandit: bandits) {
-            mean += bandit.get_mean_throughput();
-        }
-        mean /= static_cast<double>(bandits.size());
+    // if this completes an iteration, check if we need to update the selection rule
+    if (iteration_completed) {
+        this->iterations_completed += 1;
 
-        double variance = 0.0;
-        for (const auto &bandit: bandits) {
-            variance += (mean - bandit.get_mean_throughput()) * (mean - bandit.get_mean_throughput());
-        }
-        variance /= static_cast<double>(bandits.size());
+        // once all bandits have been selected once, assign variances to the bandits
+        if (iterations_completed == this->bandits.size()) {
+            // collect variances
+            double mean = 0.0;
+            for (const auto &bandit: bandits) {
+                mean += bandit.get_mean_throughput();
+            }
+            mean /= static_cast<double>(bandits.size());
 
-        const auto standard_deviation = sqrt(variance);
+            double variance = 0.0;
+            for (const auto &bandit: bandits) {
+                variance += (mean - bandit.get_mean_throughput()) * (mean - bandit.get_mean_throughput());
+            }
+            variance /= static_cast<double>(bandits.size());
 
-        LOG_INFO << std::endl;
-        LOG_INFO << "Mean throughput is " << (mean * 1000.0) <<
-                " trees per second with the standard deviation over all bandits being " << (
-                    standard_deviation * 1000.0) <<
-                std::endl << std::endl;
+            const auto standard_deviation = sqrt(variance);
 
-        for (auto &bandit: this->bandits) {
-            bandit.initialize_variance(variance, INITIAL_VARIANCE_WEIGHT);
+            LOG_INFO << std::endl;
+            LOG_INFO << "Mean throughput is " << (mean * 1000.0) <<
+                    " trees per second with the standard deviation over all bandits being " << (
+                        standard_deviation * 1000.0) <<
+                    std::endl << std::endl;
+
+            for (auto &bandit: this->bandits) {
+                bandit.initialize_variance(variance, INITIAL_VARIANCE_WEIGHT);
+            }
         }
     }
 }

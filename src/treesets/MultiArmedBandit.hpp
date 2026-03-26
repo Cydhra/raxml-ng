@@ -71,8 +71,12 @@ public:
      *
      * @param current_bandit bandit which the measurement is for
      * @param batch the batch that created the measurement
+     * @param iteration_completed whether the measurement was taken from a completed iteration. If false, the batch
+     * will be modified with the measurement, but the MAB rule will not consider this as generating a reward for the
+     * purposes of the selection rule. Calling take_measurement with this flag unset can be used to generated
+     * measurements from prior knowledge or heuristics that are not part of the selection rule.
      */
-    void take_measurement(Bandit &current_bandit, TunedBatch &batch);
+    void take_measurement(Bandit &current_bandit, const TunedBatch &batch, bool iteration_completed);
 
 protected:
     std::vector<Bandit> bandits = std::vector<Bandit>();
