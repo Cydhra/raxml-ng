@@ -74,6 +74,7 @@ public:
             return this->bandits[0];
         }
 
+        selection_mutex.lock();
         // select next participating bandit
         // TODO guard against all bandits no longer participating
         do {
@@ -103,6 +104,7 @@ public:
                 selected_bandit.participating = false;
             }
 
+            selection_mutex.unlock();
             return best_bandit;
         }
 
@@ -122,6 +124,7 @@ public:
             LOG_INFO << std::endl << "Initial estimation of " << selected_bandit.get_name() << "." << std::endl;
         }
 
+        selection_mutex.unlock();
         return selected_bandit;
     }
 
@@ -136,6 +139,7 @@ public:
      * measurements from prior knowledge or heuristics that are not part of the selection rule.
      */
     void take_measurement(Bandit<Heuristic> &current_bandit, const TunedBatch &batch, const bool iteration_completed) {
+        measurement_mutex.lock();
         current_bandit.take_measurement(batch);
 
         // if the current bandit is not the best one, check if the best one has to be updated
@@ -177,6 +181,8 @@ public:
                 }
             }
         }
+
+        measurement_mutex.unlock();
     }
 
 protected:
@@ -197,6 +203,11 @@ protected:
      * How many measurements were taken by this MAB.
      */
     unsigned int iterations_completed = 0;
+
+private:
+    std::mutex measurement_mutex;
+
+    std::mutex selection_mutex;
 };
 
 

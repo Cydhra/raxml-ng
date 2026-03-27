@@ -77,23 +77,23 @@ protected:
      */
     unsigned int batch_cursor = 0;
 
-    MultiArmedBandit<std::shared_ptr<MultiArmedBandit<MetaParameters>>> hierarchical_mab = MultiArmedBandit<std::shared_ptr<MultiArmedBandit<MetaParameters>>>{};
+    MultiArmedBandit<std::shared_ptr<MultiArmedBandit<MetaParameters>>> hierarchical_mab;
 
     /**
      * The multi-armed bandit instance that contains aggressive heuristics
      */
-    std::shared_ptr<MultiArmedBandit<MetaParameters>> light_mab = std::make_shared<MultiArmedBandit<MetaParameters>>(MultiArmedBandit<MetaParameters>{});
+    std::shared_ptr<MultiArmedBandit<MetaParameters>> light_mab = std::make_shared<MultiArmedBandit<MetaParameters>>();
 
     /**
     * The multi-armed bandit instance that contains slower heuristics
     */
-    std::shared_ptr<MultiArmedBandit<MetaParameters>> heavy_mab = std::make_shared<MultiArmedBandit<MetaParameters>>(MultiArmedBandit<MetaParameters>{});
+    std::shared_ptr<MultiArmedBandit<MetaParameters>> heavy_mab = std::make_shared<MultiArmedBandit<MetaParameters>>();
 
     /**
      * The multi-armed bandit instance that contains light heuristics with fast commitment: we do model optimization to 0.1 EPS before anything
      * to commit to the local minimum.
      */
-    std::shared_ptr<MultiArmedBandit<MetaParameters>> commitment_mab = std::make_shared<MultiArmedBandit<MetaParameters>>(MultiArmedBandit<MetaParameters>{});
+    std::shared_ptr<MultiArmedBandit<MetaParameters>> commitment_mab = std::make_shared<MultiArmedBandit<MetaParameters>>();
 
     std::unique_ptr<ModelMap> backup_model = unique_ptr<ModelMap>(new ModelMap());
 
