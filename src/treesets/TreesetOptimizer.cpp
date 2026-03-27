@@ -85,27 +85,12 @@ void TreesetOptimizer::initialize_bandits() {
 }
 
 TunedBatch &TreesetOptimizer::select_next_batch(const Bandit<MetaParameters> &current_bandit) {
-    if (this->batch_cursor == this->batches.size()) {
-        // generate a new batch because we need it right now.
-        generate_batches(1);
-        return this->batches[this->batch_cursor];
+    advance_batch_cursor(1);
+
+    // if the cursor now surpasses the queue, fill it up
+    if (this->batch_cursor >= this->batches.size()) {
+        generate_batches(this->batches.size() - this->batch_cursor + 1);
     }
-
-    // if we still have batches in the queue, check if we should advance the cursor or reuse the current one:
-
-    // to speed up the initial round of computation where all bandits are executed once,
-    // we want to reuse batches. If the total rounds is already higher than the bandit count, we don't do that,
-    // so we actually make progress.
-    // TODO fix the reuse of batches for the hierarchical mab setup
-    // if (this->light_mab->num_iterations_completed() > this->light_mab->num_bandits() || !this->batches[this->batch_cursor].
-        // is_compatible(*current_bandit.get_parameters())) {
-        advance_batch_cursor(1);
-
-        // if the cursor now surpasses the queue, fill it up
-        if (this->batch_cursor == this->batches.size()) {
-            generate_batches(1);
-        }
-    // }
 
     LOG_DEBUG << "Batch cursor: " << this->batch_cursor << std::endl;
     return this->batches[this->batch_cursor];
