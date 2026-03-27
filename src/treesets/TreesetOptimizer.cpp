@@ -58,22 +58,29 @@ void TreesetOptimizer::initialize_bandits() {
         advance_batch_cursor(this->batches.size() - this->batch_cursor);
     } else {
         // init default bandits
-        this->light_mab->emplace_back("Greedy,DoModel,2spr", MetaParameters(1, false, 2, 0, false));
-        this->light_mab->emplace_back("Greedy,DoModel,4spr", MetaParameters(1, false, 4, 0, false));
-        this->light_mab->emplace_back("Greedy,NoModel,2spr", MetaParameters(1, true, 2, 0, false));
+        this->light_mab->emplace_back("Greedy,DoModel,2spr", MetaParameters(1, false, 2, 0, false, false));
+        this->light_mab->emplace_back("Greedy,DoModel,4spr", MetaParameters(1, false, 4, 0, false, false));
+        this->light_mab->emplace_back("Greedy,NoModel,2spr", MetaParameters(1, true, 2, 0, false, false));
 
-        this->light_mab->emplace_back("Fast,DoModel,2spr", MetaParameters(20, false, 2, 0, false));
-        this->light_mab->emplace_back("Fast,DoModel,4spr", MetaParameters(20, false, 4, 0, false));
-        this->light_mab->emplace_back("Fast,NoModel,2spr", MetaParameters(20, true, 2, 0, false));
+        this->light_mab->emplace_back("Fast,DoModel,2spr", MetaParameters(20, false, 2, 0, false, false));
+        this->light_mab->emplace_back("Fast,DoModel,4spr", MetaParameters(20, false, 4, 0, false, false));
+        this->light_mab->emplace_back("Fast,NoModel,2spr", MetaParameters(20, true, 2, 0, false, false));
 
         // heavy heuristics
-        this->heavy_mab->emplace_back("Slow,2spr", MetaParameters(20, false, 0, 2, false));
-        this->heavy_mab->emplace_back("Mixed,2+2spr", MetaParameters(20, false, 2, 2, false));
-        this->heavy_mab->emplace_back("Mixed,4+2spr", MetaParameters(20, false, 4, 2, false));
+        this->heavy_mab->emplace_back("Slow,2spr", MetaParameters(20, false, 0, 2, false, false));
+        this->heavy_mab->emplace_back("Mixed,2+2spr", MetaParameters(20, false, 2, 2, false, false));
+        this->heavy_mab->emplace_back("Mixed,4+2spr", MetaParameters(20, false, 4, 2, false, false));
+
+        // early commitment
+        this->commitment_mab->emplace_back("Commit,Greedy,DoModel,2spr", MetaParameters(1, false, 2, 0, false, true));
+        this->commitment_mab->emplace_back("Commit,Greedy,DoModel,4spr", MetaParameters(1, false, 4, 0, false, true));
+        this->commitment_mab->emplace_back("Commit,Fast,DoModel,2spr", MetaParameters(20, false, 2, 0, false, true));
+        this->commitment_mab->emplace_back("Commit,Fast,DoModel,4spr", MetaParameters(20, false, 4, 0, false, true));
 
         // second-level MAB
         this->hierarchical_mab.emplace_back("Light", this->light_mab);
         this->hierarchical_mab.emplace_back("Heavy", this->heavy_mab);
+        this->hierarchical_mab.emplace_back("Committing", this->commitment_mab);
     }
 }
 

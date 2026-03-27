@@ -94,7 +94,7 @@ public:
     * @return true if this bandit has no conceivable chance of becoming relevant in the algorithm again.
     */
     bool is_hopeless(const Bandit &other, const unsigned int total_samples) const {
-        // if either bandit is not sampled enough to allow a good estimate of the variance, return false
+        // if either bandit is not sampled enough to allow a good estimate of the mean, return false
         if (this->samples.size() < 3 || other.samples.size() < 3) {
             return false;
         }

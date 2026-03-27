@@ -246,12 +246,17 @@ void TunedBatch::optimize_topology(const Options &opts) {
     }
 }
 
-void TunedBatch::optimize_parameters(const Options &opts, const double epsilon, const bool model, const bool branches,
+void TunedBatch::optimize_parameters(const Options &opts, double epsilon, const bool model, const bool branches,
                                      const bool force) {
     this->mark_p_values_dirty();
 
     const auto opt_model = model && (!this->meta_parameters->skip_model || force);
     const auto opt_branches = branches;
+
+    if (!force && meta_parameters->early_commit) {
+        // force hyper-optimization if this batch is early-committing
+        epsilon = 0.1;
+    }
 
     if (opt_model && opt_branches) {
         LOG_INFO_TS << this->name << ": Optimizing all params (eps: " << epsilon << ")" << std::endl;

@@ -34,18 +34,29 @@ public:
      */
     const bool accept_starting_trees;
 
+    /**
+     * If true, the 0.1 model optimization is done instantly to commit the tree and model to the current local minimum.
+     * This helps with datasets with discordant signal to commit to a random signal instantly, instead of searching
+     * a global minimum.
+     */
+    const bool early_commit;
+
     MetaParameters(const unsigned int keep_top_k_topol, const bool skip_model, const unsigned int num_fast_spr,
                    const unsigned int num_slow_spr,
-                   const bool accept_starting_trees) : keep_top_k_topol(keep_top_k_topol), skip_model(skip_model),
+                   const bool accept_starting_trees,
+                   const bool early_commit) : keep_top_k_topol(keep_top_k_topol), skip_model(skip_model),
                                                        num_fast_spr(num_fast_spr), num_slow_spr(num_slow_spr),
-                                                       accept_starting_trees(accept_starting_trees) {
+                                                       accept_starting_trees(accept_starting_trees),
+                                                       early_commit(early_commit) {
     }
 
     friend bool operator==(const MetaParameters &lhs, const MetaParameters &rhs) {
         return lhs.keep_top_k_topol == rhs.keep_top_k_topol
                && lhs.skip_model == rhs.skip_model
                && lhs.num_fast_spr == rhs.num_fast_spr
-               && lhs.accept_starting_trees == rhs.accept_starting_trees;
+               && lhs.num_slow_spr == rhs.num_slow_spr
+               && lhs.accept_starting_trees == rhs.accept_starting_trees
+               && lhs.early_commit == rhs.early_commit;
     }
 
     friend bool operator!=(const MetaParameters &lhs, const MetaParameters &rhs) {

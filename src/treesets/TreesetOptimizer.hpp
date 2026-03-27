@@ -89,6 +89,12 @@ protected:
     */
     std::shared_ptr<MultiArmedBandit<MetaParameters>> heavy_mab = std::make_shared<MultiArmedBandit<MetaParameters>>(MultiArmedBandit<MetaParameters>{});
 
+    /**
+     * The multi-armed bandit instance that contains light heuristics with fast commitment: we do model optimization to 0.1 EPS before anything
+     * to commit to the local minimum.
+     */
+    std::shared_ptr<MultiArmedBandit<MetaParameters>> commitment_mab = std::make_shared<MultiArmedBandit<MetaParameters>>(MultiArmedBandit<MetaParameters>{});
+
     std::unique_ptr<ModelMap> backup_model = unique_ptr<ModelMap>(new ModelMap());
 
     /**
@@ -168,7 +174,7 @@ public:
         msa(msa),
         persite_loglh(persite_loglh) {
         // place the first bandit that represents the distribution of plausible starting trees
-        this->light_mab->emplace_back("Parsimony", MetaParameters(1, true, 0, 0, true));
+        this->light_mab->emplace_back("Parsimony", MetaParameters(1, true, 0, 0, true, false));
     }
 
     /**
