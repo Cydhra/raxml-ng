@@ -23,6 +23,10 @@ void BatchQueue::generate_batches(const unsigned int n) {
                                    recommended_worker_count(),
                                    msa,
                                    persite_loglh);
+
+        // mark the batch as unfinished
+        this->unfinished.emplace(batch_name);
+
         auto &current_batch = this->batches[this->batches.size() - 1];
 
         // TODO schedule the batches in parallel if enough threads are available
@@ -37,42 +41,41 @@ void BatchQueue::generate_batches(const unsigned int n) {
     }
 }
 
-void BatchQueue::advance_batch_cursor(const unsigned int n) {
-    const auto target_index = this->batch_cursor + n;
+TunedBatch &BatchQueue::select_next_batch(const MetaParameters &current_parameters) {
+    TunedBatch *selected_batch = nullptr;
 
-    // if we have not enough batches to move the cursor to that index, generate the missing ones
-    if (this->batches.size() < target_index) {
-        LOG_DEBUG << "Warning: cursor moved " << (target_index - this->batches.size()) <<
-                " batches past the end of the queue. Why are we generating batches that we will finalize instantly?" <<
-                std::endl;
-        generate_batches(target_index - this->batches.size());
+    // check if there exists a batch that is compatible
+    for (auto &batch : this->batches) {
+        if (unfinished.find(batch.get_name()) != unfinished.end()) {
+            if (in_flight.find(batch.get_name()) != in_flight.end()) {
+                continue;
+            }
+
+            if (batch.is_compatible(current_parameters)) {
+                selected_batch = &batch;
+            }
+        }
     }
 
-    for (unsigned int batch = this->batch_cursor; batch < target_index; ++batch) {
-        // perform AU test to get plausible tree count. If the AU test was already executed, it will transparently
-        // return the result of the previous run and not do any work
-        const auto batch_plausible_trees = this->batches[batch].perform_plausibility_check(this->opts);
-        this->total_plausible_trees += batch_plausible_trees;
-
-        // finalize batch
-        this->batches[batch].finalize();
+    if (!selected_batch) {
+        generate_batches(1);
+        selected_batch = &this->batches[this->batches.size() - 1];
     }
 
-    LOG_DEBUG_TS << "Finalized " << this->total_plausible_trees << " plausible trees." << std::endl;
-    this->batch_cursor += n;
-    assert(this->batch_cursor <= this->batches.size());
+    this->in_flight.emplace(selected_batch->get_name());
+    return *selected_batch;
 }
 
-TunedBatch &BatchQueue::select_next_batch(const MetaParameters &current_parameters) {
-    advance_batch_cursor(1);
+void BatchQueue::finish_batch(TunedBatch &batch) {
+    this->backup_batch_model(batch);
 
-    // if the cursor now surpasses the queue, fill it up
-    if (this->batch_cursor >= this->batches.size()) {
-        generate_batches(this->batches.size() - this->batch_cursor + 1);
+    if (batch.get_plausible_tree_count() > this->batch_size / 2) {
+        this->unfinished.erase(batch.get_name());
+        batch.finalize();
+        this->total_plausible_trees += batch.get_plausible_tree_count();
     }
 
-    LOG_DEBUG << "Batch cursor: " << this->batch_cursor << std::endl;
-    return this->batches[this->batch_cursor];
+    this->in_flight.erase(batch.get_name());
 }
 
 // ReSharper disable once CppMemberFunctionMayBeConst (confusing contract due to inner mutability)

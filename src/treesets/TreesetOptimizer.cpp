@@ -22,7 +22,7 @@ void TreesetOptimizer::initialize_bandits() {
     if (this->starting_tree_bandit().get_expected_tree_rate() >= 0.9) {
         LOG_INFO << "Starting trees are so successful, no ML optimization is necessary." << std::endl;
         // TODO instead of moving the cursor, force-finalize batches
-        this->batch_queue.advance_batch_cursor(this->batch_queue.num_batches());
+        // this->batch_queue.advance_batch_cursor(this->batch_queue.num_batches());
     } else {
         // init default bandits
         this->light_mab->emplace_back("Greedy,DoModel,2spr", MetaParameters(1, false, 2, 0, false, false));
@@ -76,11 +76,11 @@ void TreesetOptimizer::run() {
         current_batch.perform_plausibility_check(opts);
         mab.get_parameters()->get()->take_measurement(current_bandit, current_batch, true);
         this->hierarchical_mab.take_measurement(mab, current_batch, true);
+        this->batch_queue.finish_batch(current_batch);
 
         // check if we would exceed the final tree count if we finalized the current batch immediately
-        if (this->batch_queue.num_plausible_trees() + current_batch.get_plausible_tree_count() > this->target_tree_count) {
-            // finalize last batch
-            this->batch_queue.advance_batch_cursor(1);
+        if (this->batch_queue.num_plausible_trees() > this->target_tree_count) {
+            // TODO we should also count the unfinished batches
             break;
         }
     }

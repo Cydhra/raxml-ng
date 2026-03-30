@@ -176,6 +176,10 @@ public:
      */
     std::vector<double> &get_p_values() const;
 
+    std::string const& get_name() const {
+        return this->name;
+    }
+
 protected:
     /**
      * Name of the batch for outputting debug information.

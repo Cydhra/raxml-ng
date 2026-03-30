@@ -37,6 +37,11 @@ public:
     TunedBatch &select_next_batch(const MetaParameters &current_parameters);
 
     /**
+     * Return a batch to the queue after inference is completed.
+     */
+    void finish_batch(TunedBatch &batch);
+
+    /**
      * Backup the model of a batch
      * @param batch any batch
      */
@@ -111,24 +116,23 @@ protected:
     std::vector<TunedBatch> batches;
 
     /**
+     * Because some batches can be reused after inference if they did not achieve
+     */
+    std::unordered_set<std::string> unfinished = {};
+
+    /**
      * Because the inference of batches is parallel, and batches could be reused multiple times, the queue tracks
      * which batches are currently in-flight (meaning, there is currently a worker inferring trees for them).
      *
      * This maps the (unique) batch name to the index in the batch vector.
      * When a worker is done, the batch has to be removed from the in-flight map.
      */
-    std::unordered_map<string, unsigned int> in_flight = {};
+    std::unordered_set<std::string> in_flight = {};
 
     /**
      * Model parameter backup to initialize batch trees with.
      */
     std::unique_ptr<ModelMap> backup_model = unique_ptr<ModelMap>(new ModelMap());
-
-    /**
-     * Index of the next batch that is supposed to be optimized.
-     * There might be batches before that one, that are not finalized and may be selected again.
-     */
-    unsigned int batch_cursor = 0;
 
     /**
      * Number of plausible trees that all batches could provide right now.
@@ -158,13 +162,6 @@ protected:
 
 // TODO: these methods should not remain public
 public:
-    /**
-     * Advance the batch cursor by n steps, generating intermediary batches if necessary.
-     *
-     * @param n how many batches to skip
-     */
-    void advance_batch_cursor(unsigned int n);
-
     /**
      * Push-back `n` batches to the end of the batch vector, and infer starting trees for them.
      */
