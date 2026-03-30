@@ -2418,8 +2418,7 @@ void init_treeset_optimizer(RaxmlInstance &instance) {
   if (opts.command != Command::treeset)
     return;
 
-  instance.treeset_optimizer.reset(new TreesetOptimizer(instance, opts, instance.tip_msa_idmap, *instance.load_balancer,
-    300, opts.random_seed + 1, instance.parted_msa, instance.persite_loglh));
+  instance.treeset_optimizer.reset(new TreesetOptimizer(instance, opts, instance.parted_msa, instance.tip_msa_idmap, instance.persite_loglh, *instance.load_balancer, 300, opts.random_seed + 1));
 }
 
 unsigned int read_newick_trees_custom(SplitsTree& ref_tree, const std::string& fname,
