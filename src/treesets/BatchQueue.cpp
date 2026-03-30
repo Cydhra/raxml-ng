@@ -41,6 +41,13 @@ void BatchQueue::generate_batches(const unsigned int n) {
     }
 }
 
+void BatchQueue::finalize_batch(TunedBatch &batch) {
+    LOG_INFO_TS << "Finalized " << batch.get_name() << " with " << batch.get_plausible_tree_count() << " plausible trees." << std::endl;
+    this->unfinished.erase(batch.get_name());
+    batch.finalize();
+    this->total_plausible_trees += batch.get_plausible_tree_count();
+}
+
 TunedBatch &BatchQueue::select_next_batch(const MetaParameters &current_parameters) {
     TunedBatch *selected_batch = nullptr;
 
@@ -53,6 +60,13 @@ TunedBatch &BatchQueue::select_next_batch(const MetaParameters &current_paramete
 
             if (batch.is_compatible(current_parameters)) {
                 selected_batch = &batch;
+                batch.reuse_attempts = 0;
+            } else {
+                batch.reuse_attempts += 1;
+
+                if (batch.reuse_attempts >= this->max_reuse_attempts) {
+                    this->finalize_batch(batch);
+                }
             }
         }
     }
@@ -70,9 +84,7 @@ void BatchQueue::finish_batch(TunedBatch &batch) {
     this->backup_batch_model(batch);
 
     if (batch.get_plausible_tree_count() > this->batch_size / 2) {
-        this->unfinished.erase(batch.get_name());
-        batch.finalize();
-        this->total_plausible_trees += batch.get_plausible_tree_count();
+        this->finalize_batch(batch);
     }
 
     this->in_flight.erase(batch.get_name());

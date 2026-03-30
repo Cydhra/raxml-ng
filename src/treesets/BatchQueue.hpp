@@ -29,6 +29,11 @@ public:
     }
 
     /**
+     * How often the queue should try to reuse a batch before finalizing it.
+     */
+    unsigned int max_reuse_attempts = 10;
+
+    /**
      * Select a TunedBatch instance for inference with the given parameters.
      * If a previously inferred batch has potential for more plausible trees, and the parameters
      * are compatible with the parameters used for that batch before, that batch is returned.
@@ -149,6 +154,13 @@ protected:
      * to generate a batch of trees.
      */
     unsigned long long current_seed;
+
+    /**
+     * Finalize a batch and add its plausible tree count to the total count
+     *
+     * @param batch tuned batch which is in the unfinished queue
+     */
+    void finalize_batch(TunedBatch &batch);
 
     /**
      * Return the starting seed for generating `num_trees` trees.

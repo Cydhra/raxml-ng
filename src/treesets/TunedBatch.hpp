@@ -62,6 +62,11 @@ public:
     }
 
     /**
+     * How often the batch queue has attempted to reuse this batch.
+     */
+    unsigned int reuse_attempts = 0;
+
+    /**
      * Generate parsimony starting trees for this batch, and initialize the tree inference.
      */
     void generate_starting_trees(RaxmlInstance &instance, const Options &opts, LoadBalancer &load_balancer,
