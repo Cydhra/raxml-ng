@@ -33,11 +33,9 @@ void BatchQueue::generate_batches(const unsigned int n) {
         current_batch.update_meta_parameters(opts, tree_gen);
         current_batch.generate_starting_trees(this->instance, opts, load_balancer, tip_msa_idmap);
 
-        // if this isn't the very first tree, inherit model parameters from previous trees. Since we run the AU test
-        // on the first tree, we have parameters optimized once
-        if (this->batches.size() > 1) {
-            current_batch.assign_batch_models(*this->backup_model);
-        }
+        // assign the prepared model. If we have no model backed up yet, this is initialized with the default model,
+        // so nothing will break
+        current_batch.assign_batch_models(*this->backup_model);
     }
 }
 
