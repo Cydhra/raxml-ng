@@ -10,9 +10,11 @@ int recommended_worker_count() {
     return 1;
 }
 
-void BatchQueue::generate_batches(const unsigned int n) {
+TunedBatch *BatchQueue::generate_batches(const unsigned int n) {
     const std::string name_prefix = "Batch";
     const auto tree_gen = std::make_shared<MetaParameters>(1, false, 0, 0, true, false);
+
+    const auto start_index = this->batches.size();
 
     for (size_t i = 0; i < n; i++) {
         std::string batch_name = name_prefix + std::to_string(this->batches.size());
@@ -37,6 +39,8 @@ void BatchQueue::generate_batches(const unsigned int n) {
         // so nothing will break
         current_batch.assign_batch_models(*this->backup_model);
     }
+
+    return this->batches.data() + start_index;
 }
 
 void BatchQueue::finalize_batch(TunedBatch &batch) {

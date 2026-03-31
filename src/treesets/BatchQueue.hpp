@@ -34,6 +34,14 @@ public:
     unsigned int max_reuse_attempts = 10;
 
     /**
+     * Push-back `n` batches to the end of the batch vector, and infer starting trees for them.
+     *
+     * @return a pointer to the array of newly generated batches. The range [return_val, return_val + n] is a valid
+     * range of TunedBatch instances.
+     */
+    TunedBatch *generate_batches(unsigned int n);
+
+    /**
      * Select a TunedBatch instance for inference with the given parameters.
      * If a previously inferred batch has potential for more plausible trees, and the parameters
      * are compatible with the parameters used for that batch before, that batch is returned.
@@ -64,13 +72,6 @@ public:
      */
     unsigned int num_batches() const {
         return this->batches.size();
-    }
-
-    /**
-     * @return access to the batch vector
-     */
-    std::vector<TunedBatch>& get_batches() {
-        return this->batches;
     }
 
     /**
@@ -171,13 +172,6 @@ protected:
         this->current_seed += num_trees;
         return current;
     }
-
-// TODO: these methods should not remain public
-public:
-    /**
-     * Push-back `n` batches to the end of the batch vector, and infer starting trees for them.
-     */
-    void generate_batches(unsigned int n);
 };
 
 

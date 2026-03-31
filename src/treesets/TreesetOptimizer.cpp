@@ -2,27 +2,26 @@
 #include "TunedBatch.hpp"
 
 void TreesetOptimizer::prepare_initial_batches() {
-    this->batch_queue.generate_batches(1);
-    auto &first_batch = batch_queue.get_batches()[0];
+    auto &first_batch = this->batch_queue.generate_batches(1)[0];
     first_batch.perform_plausibility_check(opts);
     this->light_mab->take_measurement(starting_tree_bandit(), first_batch, false);
     this->batch_queue.backup_batch_model(first_batch);
 
-    this->batch_queue.generate_batches(INITIAL_VARIANCE_WEIGHT - 1);
+    const auto starter_batches = this->batch_queue.generate_batches(INITIAL_VARIANCE_WEIGHT - 1);
 
     // take a few measurements, but no more than necessary to have reasonable values for mean and variance
-    for (unsigned int index = 1; index < INITIAL_VARIANCE_WEIGHT; index++) {
-        auto &batch = batch_queue.get_batches()[index];
+    for (unsigned int index = 0; index < INITIAL_VARIANCE_WEIGHT - 1; index++) {
+        auto &batch = starter_batches[index];
         batch.perform_plausibility_check(opts);
         this->light_mab->take_measurement(starting_tree_bandit(), batch, false);
     }
 }
 
 void TreesetOptimizer::initialize_bandits() {
+    // TODO replace this by a general elimination rule
     if (this->starting_tree_bandit().get_expected_tree_rate() >= 0.9) {
         LOG_INFO << "Starting trees are so successful, no ML optimization is necessary." << std::endl;
-        // TODO instead of moving the cursor, force-finalize batches
-        // this->batch_queue.advance_batch_cursor(this->batch_queue.num_batches());
+        batch_queue.max_reuse_attempts = 0;
     } else {
         // init default bandits
         this->light_mab->emplace_back("Greedy,DoModel,2spr", MetaParameters(1, false, 2, 0, false, false));
