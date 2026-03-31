@@ -63,6 +63,7 @@ TunedBatch &BatchQueue::select_next_batch(const MetaParameters &current_paramete
             if (batch.is_compatible(current_parameters)) {
                 selected_batch = &batch;
                 batch.reuse_attempts = 0;
+                break;
             } else {
                 batch.reuse_attempts += 1;
 
