@@ -373,7 +373,7 @@ unsigned int TunedBatch::perform_au_test(const Options &opts) {
         }
     }
 
-    LOG_WORKER_TS(LogLevel::progress) << "AU test found " << plausible_tree_count << " plausible trees." << std::endl;
+    LOG_TS(LogLevel::progress) << "AU test found " << plausible_tree_count << " plausible trees for " << this->name << "." << std::endl;
     return plausible_tree_count;
 }
 
