@@ -395,6 +395,11 @@ void TunedBatch::update_meta_parameters(const Options &opts, const shared_ptr<Me
 }
 
 bool TunedBatch::is_compatible(const MetaParameters &new_parameters) const {
+    // a batch that already optimized with these exact parameters cannot be reused for the same parameters again
+    if (*this->meta_parameters == new_parameters) {
+        return false;
+    }
+
     // if the current parameters do the bare minimum, we can always continue with new parameters
     if (this->meta_parameters->accept_starting_trees) {
         return true;
@@ -429,6 +434,9 @@ bool TunedBatch::is_compatible(const MetaParameters &new_parameters) const {
     }
 
     // if the way the model is obtained doesn't match, the new parameters cannot replace the current ones
+    if (this->initial_model_optimized && this->meta_parameters->early_commit != new_parameters.early_commit) {
+        return false;
+    }
     if (this->initial_model_optimized && this->meta_parameters->skip_model != new_parameters.skip_model) {
         return false;
     }
