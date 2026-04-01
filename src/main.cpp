@@ -2414,7 +2414,7 @@ void autoselect_models(RaxmlInstance& instance, CheckpointManager &cm)
 }
 
 void init_treeset_optimizer(RaxmlInstance &instance) {
-  const auto& opts = instance.opts;
+  auto& opts = instance.opts;
   if (opts.command != Command::treeset)
     return;
 

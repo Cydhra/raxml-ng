@@ -12,8 +12,8 @@ struct RaxmlInstance;
 class BatchQueue {
 public:
     BatchQueue(RaxmlInstance &instance,
-               const Options &opts,
-               const IDVector &tip_msa_idmap,
+               Options &opts,
+               IDVector &tip_msa_idmap,
                LoadBalancer &load_balancer,
                const std::shared_ptr<PartitionedMSA> &msa,
                const std::vector<std::vector<doubleVector> > &persite_loglh,
@@ -77,7 +77,7 @@ public:
     /**
      * @return read-only access to the batch vector
      */
-    std::vector<TunedBatch> const& view_batches() const {
+    std::vector<TunedBatch> const &view_batches() const {
         return this->batches;
     }
 
@@ -90,17 +90,17 @@ protected:
     /**
      * Reference to the user options which are required for all optimization steps
      */
-    const Options &opts;
+    Options &opts;
 
     /**
      * Reference to the RAxML-ng instance's tip id-map which is used for starting tree generation.
      */
-    const IDVector &tip_msa_idmap;
+    IDVector &tip_msa_idmap;
 
     /**
      * Pointer to the partitioned msa instance of the current RAxML-ng run
      */
-    const std::shared_ptr<PartitionedMSA> msa;
+    std::shared_ptr<PartitionedMSA> msa;
 
     /**
      * Reference to the user-configured fine-grained load balancer used by the main RAxML instance.
@@ -110,7 +110,7 @@ protected:
     /**
      * Pointer to the persite_loglh vector of the reference tree run
      */
-    const std::vector<std::vector<doubleVector> > persite_loglh;
+    std::vector<std::vector<doubleVector> > persite_loglh;
 
     /**
      * List of all batches that are being inferred or were inferred by the optimizer. It is initialized with a
@@ -148,7 +148,7 @@ protected:
     /**
      * The number of trees to generate per batch.
      */
-    const unsigned int batch_size;
+    unsigned int batch_size;
 
     /**
      * The current seed for starting tree generation. Offset that by the number of generated trees whenever it is used

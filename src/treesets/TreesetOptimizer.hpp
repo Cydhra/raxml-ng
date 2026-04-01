@@ -83,9 +83,9 @@ public:
      * @param starting_seed the tree generating seed for the first tree. Subsequent seeds are incremented by one.
      */
     TreesetOptimizer(RaxmlInstance &instance,
-                     const Options &opts,
+                     Options &opts,
                      const std::shared_ptr<PartitionedMSA> &msa,
-                     const IDVector &tip_msa_idmap,
+                     IDVector &tip_msa_idmap,
                      const std::vector<std::vector<doubleVector> > &persite_loglh,
                      LoadBalancer &load_balancer,
                      const unsigned int target_tree_count,

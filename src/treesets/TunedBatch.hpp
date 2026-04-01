@@ -28,13 +28,13 @@ void thread_start_trees(RaxmlInstance &instance, TreeList &tree_list, StartingTr
  */
 class TunedBatch final {
 public:
-    TunedBatch(const string name,
+    TunedBatch(const string &name,
                const unsigned int starting_seed,
                const unsigned int batch_size,
                const unsigned int num_threads,
                const unsigned int num_workers,
                const std::shared_ptr<PartitionedMSA> &msa,
-               const std::vector<std::vector<doubleVector> > &reference_persite_loglh)
+               std::vector<std::vector<doubleVector> > &reference_persite_loglh)
         : name(name),
           starting_seed(starting_seed),
           num_threads(num_threads),
@@ -59,6 +59,67 @@ public:
         CoarseAssignment tree_ids(batch_size);
         std::iota(tree_ids.begin(), tree_ids.end(), 0);
         this->coarse_assignments = load_balancer.get_all_assignments(tree_ids, this->num_workers);
+    }
+
+    // delete copy constructor because of corax partition
+    TunedBatch(const TunedBatch &other) = delete;
+
+    TunedBatch(TunedBatch &&other) noexcept
+        : reuse_attempts(other.reuse_attempts),
+          name(std::move(other.name)),
+          meta_parameters(std::move(other.meta_parameters)),
+          starting_seed(other.starting_seed),
+          num_threads(other.num_threads),
+          num_workers(other.num_workers),
+          batch_start_trees(std::move(other.batch_start_trees)),
+          msa(other.msa),
+          spr_params(std::move(other.spr_params)),
+          num_fast_spr_performed(other.num_fast_spr_performed),
+          num_slow_spr_performed(other.num_slow_spr_performed),
+          reference_persite_loglh(other.reference_persite_loglh),
+          coarse_assignments(std::move(other.coarse_assignments)),
+          part_assignments(std::move(other.part_assignments)),
+          tree_topologies(std::move(other.tree_topologies)),
+          batch_trees(std::move(other.batch_trees)),
+          batch_persite_logh(std::move(other.batch_persite_logh)),
+          au_test(std::move(other.au_test)),
+          meta_parameters_set(other.meta_parameters_set),
+          initial_model_optimized(other.initial_model_optimized),
+          au_test_dirty(other.au_test_dirty),
+          plausible_tree_count(other.plausible_tree_count),
+          wall_time(other.wall_time) {
+    }
+
+    // explicitly implement move-assign to avoid implicit deletion
+    // TODO find out what prevents a default implementation from working. (The default implementation is implicitly deleted,
+    //  presumably because any of the members has an incorrect move-contract).
+    TunedBatch & operator=(TunedBatch &&other) noexcept {
+        if (this == &other)
+            return *this;
+        reuse_attempts = other.reuse_attempts;
+        name = std::move(other.name);
+        meta_parameters = std::move(other.meta_parameters);
+        starting_seed = other.starting_seed;
+        num_threads = other.num_threads;
+        num_workers = other.num_workers;
+        batch_start_trees = std::move(other.batch_start_trees);
+        msa = other.msa;
+        spr_params = std::move(other.spr_params);
+        num_fast_spr_performed = other.num_fast_spr_performed;
+        num_slow_spr_performed = other.num_slow_spr_performed;
+        reference_persite_loglh = other.reference_persite_loglh;
+        coarse_assignments = std::move(other.coarse_assignments);
+        part_assignments = std::move(other.part_assignments);
+        tree_topologies = std::move(other.tree_topologies);
+        batch_trees = std::move(other.batch_trees);
+        batch_persite_logh = std::move(other.batch_persite_logh);
+        au_test = std::move(other.au_test);
+        meta_parameters_set = other.meta_parameters_set;
+        initial_model_optimized = other.initial_model_optimized;
+        au_test_dirty = other.au_test_dirty;
+        plausible_tree_count = other.plausible_tree_count;
+        wall_time = other.wall_time;
+        return *this;
     }
 
     /**
@@ -201,28 +262,28 @@ protected:
      * The starting seed (starting from 0) for this batch. Batches infer starting trees with ascending seeds, so this
      * number is the number of starting trees in previous batches.
      */
-    const unsigned int starting_seed;
+    unsigned int starting_seed;
 
 
     /**
      * How many threads are used in this batch. Divisible by the number of workers.
      */
-    const unsigned int num_threads;
+    unsigned int num_threads;
 
     /**
      * Number of workers assigned to this batch.
      */
-    const unsigned int num_workers;
+    unsigned int num_workers;
 
     /**
      * Starting trees for this inference batch
      */
-    const shared_ptr<TreeList> batch_start_trees;
+    shared_ptr<TreeList> batch_start_trees;
 
     /**
      * A reference to the MSA used in inference. We need it for the AU test.
      */
-    const shared_ptr<PartitionedMSA> &msa;
+    shared_ptr<PartitionedMSA> msa;
 
     /**
      * SPR round parameters inherited from the default checkpoint manager. They will be updated by the batch according
@@ -246,7 +307,7 @@ protected:
      * Per-site log-likelihoods of the reference trees already inferred before the treeset heuristic kicked in.
      * These cannot change, and constitute the first part of the AU test input.
      */
-    const std::vector<std::vector<doubleVector> > &reference_persite_loglh;
+    std::vector<std::vector<doubleVector> > &reference_persite_loglh;
 
     /**
      * Assignment of trees to workers for tree inference. The AU test diverges from this assignment because the AU
