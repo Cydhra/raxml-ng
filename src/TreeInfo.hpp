@@ -76,6 +76,8 @@ public:
 
   TreeInfo& operator=(const TreeInfo&) = delete; // disable copy-assignment (the corax-allocation prevents copying)
 
+  TreeInfo & operator=(TreeInfo &&other) noexcept = default;
+
   const corax_treeinfo_t &pll_treeinfo() const { return *_pll_treeinfo; }
 
   const corax_unode_t &pll_utree_root() const
