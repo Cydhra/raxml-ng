@@ -19,7 +19,10 @@ constexpr double ACCEPT_TUNING_THRESHOLD = 0.9;
  */
 void parallel_au_bootstrap(AuTest &tester, const CoarseAssignmentList &assignment_list) {
     const unsigned int worker_id = ParallelContext::local_group_id();
-    auto &tree_ids = assignment_list.at(worker_id);
+    const unsigned int thread_id = ParallelContext::local_thread_id();
+    const unsigned int threads_per_worker = ParallelContext::threads_per_group();
+    const unsigned int virtual_worker_id = worker_id * threads_per_worker + thread_id;
+    auto &tree_ids = assignment_list.at(virtual_worker_id);
 
     const auto slice_start = *tree_ids.begin();
 
@@ -197,7 +200,7 @@ void TunedBatch::optimize_topology(const Options &opts) {
 #pragma GCC diagnostic ignored "-Wdangling-pointer"
     this->spr_params.total_moves = &total_moves;
     this->spr_params.increasing_moves = &increasing_moves;
- #pragma GCC diagnostic pop
+#pragma GCC diagnostic pop
     // ReSharper restore CppDFALocalValueEscapesFunction
 
     while (this->meta_parameters->num_fast_spr > this->num_fast_spr_performed || this->meta_parameters->num_slow_spr >
@@ -318,44 +321,53 @@ void TunedBatch::optimize(const Options &opts) {
     LOG_INFO_TS << this->name << ": total batch time after optimization: " << this->wall_time << "ms." << std::endl;
 }
 
-unsigned int TunedBatch::perform_au_test(const Options &opts) {
+void TunedBatch::perform_au_test() {
+    const unsigned int thread_id = ParallelContext::local_thread_id();
+    const unsigned int worker_id = ParallelContext::local_group_id();
+    const bool batch_leader = worker_id == 0 && thread_id == 0;
+
     if (!this->au_test_dirty) {
-        return this->plausible_tree_count;
+        return;
     }
 
-    this->au_test->reset_test_statistics();
+    if (batch_leader) {
+        this->au_test->reset_test_statistics();
+    }
 
-    // compute per-site log-likelihood in parallel
-    const auto sitelh_worker = make_kernel(
-        std::ref(this->coarse_assignments),
-        std::bind(sitelh_kernel,
-                  std::ref(*this->msa),
-                  std::ref(this->part_assignments),
-                  std::ref(this->batch_persite_logh),
-                  std::ref(this->batch_trees),
-                  _1, _2)
-    );
-    ParallelContext::init_pthreads_custom(opts, sitelh_worker, num_threads, num_workers);
-    sitelh_worker();
-    ParallelContext::finalize_threads();
+    const auto trees = this->coarse_assignments.at(worker_id);
+    for (const auto tree_id : trees) {
+        sitelh_kernel(*msa, part_assignments, batch_persite_logh, batch_trees, thread_id, tree_id);
+    }
+    ParallelContext::barrier();
 
     // next, change the parallelization scheme to avoid splitting trees between workers. If we have more workers than
     // trees, this sucks, but currently AU doesn't support per-partition parallelization because that would require
     // synchronizing accesses to the bootstrap replicate likelihood sums.
     // we therefore use as many workers as possible with one thread each now.
-    const unsigned int total_trees_au = reference_persite_loglh.size() + get_batch_size();
-    const unsigned int max_assigned_workers = min(total_trees_au, this->num_threads);
-    auto au_worker = std::bind(parallel_au_bootstrap, std::ref(*this->au_test), std::ref(this->au_assignment));
-    ParallelContext::init_pthreads_custom(opts, au_worker, max_assigned_workers, max_assigned_workers);
+    parallel_au_bootstrap(*au_test, au_assignment);
+
+    if (batch_leader) {
+        this->au_test->finalize_test_statistics();
+        this->au_test->calculate_p_values();
+
+        // mark AU test as valid
+        this->au_test_dirty = false;
+    }
+    ParallelContext::barrier();
+}
+
+unsigned int TunedBatch::perform_plausibility_check(const Options &opts) {
+    if (!this->au_test_dirty) {
+        return this->plausible_tree_count;
+    }
+
+    // TODO should we backup the less optimized model or just accept that we overspecify the model
+    this->optimize_parameters(opts, 0.1, true, true, true);
+    const auto au_worker = std::bind(&TunedBatch::perform_au_test, this);
+    ParallelContext::init_pthreads_custom(opts, au_worker, num_threads, num_workers);
     au_worker();
-
-    this->au_test->finalize_test_statistics();
-    this->au_test->calculate_p_values();
-
+    // const unsigned int plausible_trees = this->perform_au_test();
     ParallelContext::finalize_threads();
-
-    // mark AU test as valid
-    this->au_test_dirty = false;
 
     // count plausible trees
     this->plausible_tree_count = 0;
@@ -366,19 +378,9 @@ unsigned int TunedBatch::perform_au_test(const Options &opts) {
         }
     }
 
-    LOG_TS(LogLevel::progress) << "AU test found " << plausible_tree_count << " plausible trees for " << this->name << "." << std::endl;
+    LOG_TS(LogLevel::progress) << "AU test found " << plausible_tree_count << " plausible trees for " << this->name <<
+            "." << std::endl;
     return plausible_tree_count;
-}
-
-unsigned int TunedBatch::perform_plausibility_check(const Options &opts) {
-    if (!this->au_test_dirty) {
-        return this->plausible_tree_count;
-    }
-
-    // TODO should we backup the less optimized model or just accept that we overspecify the model
-    this->optimize_parameters(opts, 0.1, true, true, true);
-    const unsigned int plausible_trees = this->perform_au_test(opts);
-    return plausible_trees;
 }
 
 void TunedBatch::update_meta_parameters(const Options &opts, const shared_ptr<MetaParameters> new_parameters) {

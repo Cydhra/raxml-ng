@@ -418,7 +418,7 @@ protected:
     /**
      * Perform the AU test on the trees in the batch, as well as the supplied reference trees.
      */
-    unsigned int perform_au_test(const Options &opts);
+    void perform_au_test();
 
     /**
      * Called when the per-site log-likelihoods change, overriding the results of the AU-test
