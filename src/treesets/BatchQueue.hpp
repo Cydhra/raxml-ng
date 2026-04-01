@@ -57,8 +57,9 @@ public:
     void finish_batch(TunedBatch &batch);
 
     /**
-     * Backup the model of a batch
-     * @param batch any batch
+     * Backup the model of a batch.
+     * This attempts to acquire a mutex guard for the queue, so the caller must not hold the mutex.
+     * @param batch any batch from which one of its models is copied into the backup
      */
     void backup_batch_model(const TunedBatch &batch);
 
