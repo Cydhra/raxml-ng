@@ -59,6 +59,14 @@ public:
         CoarseAssignment tree_ids(batch_size);
         std::iota(tree_ids.begin(), tree_ids.end(), 0);
         this->coarse_assignments = load_balancer.get_all_assignments(tree_ids, this->num_workers);
+
+        // initialize au load balancing
+        const unsigned int total_trees_au = reference_persite_loglh.size() + batch_size;
+        const unsigned int max_assigned_workers = min(total_trees_au, this->num_threads);
+        CoarseAssignment au_tree_ids(total_trees_au);
+        std::iota(au_tree_ids.begin(), au_tree_ids.end(), 0);
+
+        this->au_assignment = load_balancer.get_all_assignments(au_tree_ids, max_assigned_workers);
     }
 
     // delete copy constructor because of corax partition
@@ -77,6 +85,7 @@ public:
           num_fast_spr_performed(other.num_fast_spr_performed),
           num_slow_spr_performed(other.num_slow_spr_performed),
           reference_persite_loglh(other.reference_persite_loglh),
+          au_assignment(std::move(other.au_assignment)),
           coarse_assignments(std::move(other.coarse_assignments)),
           part_assignments(std::move(other.part_assignments)),
           tree_topologies(std::move(other.tree_topologies)),
@@ -93,7 +102,7 @@ public:
     // explicitly implement move-assign to avoid implicit deletion
     // TODO find out what prevents a default implementation from working. (The default implementation is implicitly deleted,
     //  presumably because any of the members has an incorrect move-contract).
-    TunedBatch & operator=(TunedBatch &&other) noexcept {
+    TunedBatch &operator=(TunedBatch &&other) noexcept {
         if (this == &other)
             return *this;
         reuse_attempts = other.reuse_attempts;
@@ -108,6 +117,7 @@ public:
         num_fast_spr_performed = other.num_fast_spr_performed;
         num_slow_spr_performed = other.num_slow_spr_performed;
         reference_persite_loglh = other.reference_persite_loglh;
+        au_assignment = std::move(other.au_assignment);
         coarse_assignments = std::move(other.coarse_assignments);
         part_assignments = std::move(other.part_assignments);
         tree_topologies = std::move(other.tree_topologies);
@@ -242,7 +252,7 @@ public:
      */
     std::vector<double> &get_p_values() const;
 
-    std::string const& get_name() const {
+    std::string const &get_name() const {
         return this->name;
     }
 
@@ -263,7 +273,6 @@ protected:
      * number is the number of starting trees in previous batches.
      */
     unsigned int starting_seed;
-
 
     /**
      * How many threads are used in this batch. Divisible by the number of workers.
@@ -308,6 +317,15 @@ protected:
      * These cannot change, and constitute the first part of the AU test input.
      */
     std::vector<std::vector<doubleVector> > &reference_persite_loglh;
+
+    /**
+     * Assignment of trees to threads for the AU test. The AU test cannot split between partitions, and so no tree
+     * can have more than one thread assigned.
+     * This assignment is generated for a virtual threadpool where all threads are workers.
+     * This means, for the actual threadpool, the virtual assignment id has to be calculated as
+     * worker_id * threads_per_worker + thread_id.
+     */
+    CoarseAssignmentList au_assignment;
 
     /**
      * Assignment of trees to workers for tree inference. The AU test diverges from this assignment because the AU

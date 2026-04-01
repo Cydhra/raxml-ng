@@ -343,15 +343,9 @@ unsigned int TunedBatch::perform_au_test(const Options &opts) {
     // trees, this sucks, but currently AU doesn't support per-partition parallelization because that would require
     // synchronizing accesses to the bootstrap replicate likelihood sums.
     // we therefore use as many workers as possible with one thread each now.
-    const unsigned int total_trees_au = reference_persite_loglh.size() + this->get_batch_size();
+    const unsigned int total_trees_au = reference_persite_loglh.size() + get_batch_size();
     const unsigned int max_assigned_workers = min(total_trees_au, this->num_threads);
-    ContiguousCoarseLoadBalancer load_balancer;
-    CoarseAssignment tree_ids(total_trees_au);
-    std::iota(tree_ids.begin(), tree_ids.end(), 0);
-
-    const auto assignment = load_balancer.get_all_assignments(tree_ids, max_assigned_workers);
-
-    auto au_worker = std::bind(parallel_au_bootstrap, std::ref(*this->au_test), std::ref(assignment));
+    auto au_worker = std::bind(parallel_au_bootstrap, std::ref(*this->au_test), std::ref(this->au_assignment));
     ParallelContext::init_pthreads_custom(opts, au_worker, max_assigned_workers, max_assigned_workers);
     au_worker();
 
