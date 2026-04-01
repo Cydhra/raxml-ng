@@ -1,6 +1,8 @@
 #ifndef RAXML_BATCHQUEUE_HPP_
 #define RAXML_BATCHQUEUE_HPP_
+
 #include "TunedBatch.hpp"
+#include <atomic>
 
 // forward declaration of RaxmlInstance
 struct RaxmlInstance;
@@ -151,10 +153,18 @@ protected:
     unsigned int batch_size;
 
     /**
+     * The index of the batch generated next. This is independent of the size of the batch vector because multiple
+     * batches might be generated at the same time
+     */
+    std::atomic_uint32_t next_batch_index{0};
+
+    /**
      * The current seed for starting tree generation. Offset that by the number of generated trees whenever it is used
      * to generate a batch of trees.
      */
     unsigned long long current_seed;
+
+    std::mutex batch_mutex;
 
     /**
      * Finalize a batch and add its plausible tree count to the total count
