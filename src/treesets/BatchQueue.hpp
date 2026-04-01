@@ -163,7 +163,7 @@ protected:
      * The current seed for starting tree generation. Offset that by the number of generated trees whenever it is used
      * to generate a batch of trees.
      */
-    unsigned long long current_seed;
+    std::atomic_uint64_t current_seed;
 
     std::mutex batch_mutex;
 
@@ -179,8 +179,7 @@ protected:
      * The queue keeps track of how many trees have been generated and advances the seed accordingly.
      */
     unsigned long generate_seed_for_trees(const unsigned int num_trees) {
-        const unsigned long long current = this->current_seed;
-        this->current_seed += num_trees;
+        const auto current = this->current_seed.fetch_add(num_trees);
         return current;
     }
 };
