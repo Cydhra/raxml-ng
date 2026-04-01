@@ -358,8 +358,7 @@ unsigned int TunedBatch::perform_au_test(const Options &opts) {
     this->au_test->finalize_test_statistics();
     this->au_test->calculate_p_values();
 
-    // TODO: there is a bug here that forces us to detach, find it.
-    ParallelContext::finalize_threads(true);
+    ParallelContext::finalize_threads();
 
     // mark AU test as valid
     this->au_test_dirty = false;
