@@ -190,68 +190,92 @@ void TunedBatch::generate_starting_trees(RaxmlInstance &instance, const Options 
 }
 
 void TunedBatch::optimize_topology(const Options &opts) {
+    const unsigned int thread_id = ParallelContext::local_proc_id();
+    const unsigned int worker_id = ParallelContext::local_group_id();
+    const auto &tree_ids = this->coarse_assignments.at(worker_id);
+    const bool batch_leader = worker_id == 0 && thread_id == 0;
+
     // make sure debug outputs are initialized
     unsigned long int total_moves, increasing_moves;
 
-    // initialize the out-parameters of spr_params with valid addresses
-    // escaping pointers don't matter here because SPR params are only ever used in this function, and are always overwritten
-    // ReSharper disable CppDFALocalValueEscapesFunction
+    if (batch_leader) {
+        // initialize the out-parameters of spr_params with valid addresses
+        // escaping pointers don't matter here because SPR params are only ever used in this function, and are always overwritten
+        // ReSharper disable CppDFALocalValueEscapesFunction
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Wdangling-pointer"
-    this->spr_params.total_moves = &total_moves;
-    this->spr_params.increasing_moves = &increasing_moves;
+        this->spr_params.total_moves = &total_moves;
+        this->spr_params.increasing_moves = &increasing_moves;
 #pragma GCC diagnostic pop
-    // ReSharper restore CppDFALocalValueEscapesFunction
+        // ReSharper restore CppDFALocalValueEscapesFunction
+    }
 
-    while (this->meta_parameters->num_fast_spr > this->num_fast_spr_performed || this->meta_parameters->num_slow_spr >
-           this->num_slow_spr_performed) {
-        const auto fast = this->meta_parameters->num_fast_spr > this->num_fast_spr_performed;
-        auto rounds_performed = fast ? num_fast_spr_performed : num_slow_spr_performed;
+    // copy current status into local variables. This is simpler than putting those states into atomic counters and add
+    // barriers to their access
+    auto current_spr_fast = this->num_fast_spr_performed;
+    auto current_spr_slow = this->num_slow_spr_performed;
+
+    while (this->meta_parameters->num_fast_spr > current_spr_fast || this->meta_parameters->num_slow_spr >
+           current_spr_slow) {
+        const auto fast = this->meta_parameters->num_fast_spr > current_spr_fast;
+        const auto rounds_performed = fast ? current_spr_fast : current_spr_slow;
         auto total_rounds = fast ? meta_parameters->num_fast_spr : meta_parameters->num_slow_spr;
         auto num_rounds = total_rounds - rounds_performed;
 
-        auto round_name = fast ? "FAST" : "SLOW";
+        if (batch_leader) {
+            auto round_name = fast ? "FAST" : "SLOW";
 
-        LOG_INFO_TS << this->name << ": Optimizing topology (" << num_rounds << " of " << total_rounds << " total " <<
-                round_name << " spr rounds)" << std::endl;
+            LOG_INFO_TS << this->name << ": Optimizing topology (" << num_rounds << " of " << total_rounds << " total " <<
+                    round_name << " spr rounds)" << std::endl;
 
-        // make sure the spr-params are set correctly for fast/slow rounds
-        this->auto_configure(opts);
+            // make sure the spr-params are set correctly for fast/slow rounds
+            this->auto_configure(opts);
 
-        // make sure the AU test is invalidated
-        this->mark_p_values_dirty();
+            // make sure the AU test is invalidated
+            this->mark_p_values_dirty();
+        }
 
+        ParallelContext::global_barrier();
         const auto begin = std::chrono::steady_clock::now();
-        const auto spr_worker = make_kernel(
-            std::ref(this->coarse_assignments),
-            std::bind(spr_kernel,
-                      std::ref(this->batch_trees),
-                      std::ref(this->spr_params),
-                      rounds_performed,
-                      total_rounds,
-                      _1, _2));
-        ParallelContext::init_pthreads_custom(opts, spr_worker, num_threads, num_workers);
-        spr_worker();
-        ParallelContext::finalize_threads();
 
-        const auto end = std::chrono::steady_clock::now();
-        const unsigned int elapsed = static_cast<unsigned int>(std::chrono::duration_cast<
-            std::chrono::milliseconds>(end - begin).count());
-        this->wall_time += elapsed;
+        // run optimization kernel
+        for (const auto tree_id : tree_ids) {
+            spr_kernel(this->batch_trees, this->spr_params, rounds_performed, total_rounds, thread_id, tree_id);
+        }
 
-        // TODO this only works if checkpoints cannot recover tree states. When checkpointing is added, this mechanism needs
-        //  to be changed
         if (fast) {
-            num_fast_spr_performed = this->meta_parameters->num_fast_spr;
+            current_spr_fast = this->meta_parameters->num_fast_spr;
         } else {
-            num_slow_spr_performed = this->meta_parameters->num_slow_spr;
+            current_spr_slow = this->meta_parameters->num_slow_spr;
+        }
+
+        // update the TunedBatch status
+        if (batch_leader) {
+            const auto end = std::chrono::steady_clock::now();
+
+            const unsigned int elapsed = static_cast<unsigned int>(std::chrono::duration_cast<
+            std::chrono::milliseconds>(end - begin).count());
+            this->wall_time += elapsed;
+
+            if (fast) {
+                this->num_fast_spr_performed = current_spr_fast;
+            } else {
+                this->num_slow_spr_performed = current_spr_slow;
+            }
         }
     }
 }
 
 void TunedBatch::optimize_parameters(const Options &opts, double epsilon, const bool model, const bool branches,
                                      const bool force) {
-    this->mark_p_values_dirty();
+    const unsigned int thread_id = ParallelContext::local_proc_id();
+    const unsigned int worker_id = ParallelContext::local_group_id();
+    const auto &tree_ids = this->coarse_assignments.at(worker_id);
+    const bool batch_leader = worker_id == 0 && thread_id == 0;
+
+    if (batch_leader) {
+        this->mark_p_values_dirty();
+    }
 
     const auto opt_model = model && (!this->meta_parameters->skip_model || force);
     const auto opt_branches = branches;
@@ -262,49 +286,44 @@ void TunedBatch::optimize_parameters(const Options &opts, double epsilon, const 
     }
 
     if (opt_model && opt_branches) {
-        LOG_INFO_TS << this->name << ": Optimizing all params (eps: " << epsilon << ")" << std::endl;
-        // optimize model and branch lengths, such that we get accurate site likelihoods.
-        const auto opt_worker = make_kernel(
-            std::ref(this->coarse_assignments),
-            std::bind(param_opt_kernel,
-                      std::ref(this->batch_trees),
-                      epsilon,
-                      _1, _2)
-        );
-        ParallelContext::init_pthreads_custom(opts, opt_worker, num_threads, num_workers);
-        opt_worker();
-        ParallelContext::finalize_threads();
-    } else if (opt_model) {
-        LOG_INFO_TS << this->name << ": Optimizing model (eps: " << epsilon << ")" << std::endl;
+        if (batch_leader) {
+            LOG_INFO_TS << this->name << ": Optimizing all params (eps: " << epsilon << ")" << std::endl;
+        }
 
-        // optimize model and branch lengths, such that we get accurate site likelihoods.
-        const auto model_worker = make_kernel(
-            std::ref(this->coarse_assignments),
-            std::bind(model_opt_kernel,
-                      std::ref(this->batch_trees),
-                      epsilon,
-                      _1, _2)
-        );
-        ParallelContext::init_pthreads_custom(opts, model_worker, num_threads, num_workers);
-        model_worker();
-        ParallelContext::finalize_threads();
+        // run all parameters optimization
+        for (const auto tree_id : tree_ids) {
+            param_opt_kernel(this->batch_trees, epsilon, thread_id, tree_id);
+        }
+    } else if (opt_model) {
+        if (batch_leader) {
+            LOG_INFO_TS << this->name << ": Optimizing model (eps: " << epsilon << ")" << std::endl;
+        }
+
+        // run model optimization
+        for (const auto tree_id : tree_ids) {
+            model_opt_kernel(this->batch_trees, epsilon, thread_id, tree_id);
+        }
     } else if (branches) {
-        LOG_INFO_TS << this->name << ": Optimizing branches (eps: " << epsilon << ")" << std::endl;
-        // optimize branches
-        const auto branch_worker = make_kernel(
-            std::ref(this->coarse_assignments),
-            std::bind(blo_kernel,
-                      std::ref(this->batch_trees),
-                      epsilon,
-                      _1, _2)
-        );
-        ParallelContext::init_pthreads_custom(opts, branch_worker, num_threads, num_workers);
-        branch_worker();
-        ParallelContext::finalize_threads();
+        if (batch_leader) {
+            LOG_INFO_TS << this->name << ": Optimizing branches (eps: " << epsilon << ")" << std::endl;
+        }
+
+        // run model optimization
+        for (const auto tree_id : tree_ids) {
+            blo_kernel(this->batch_trees, epsilon, thread_id, tree_id);
+        }
+    }
+
+    if (batch_leader) {
+        LOG_INFO_TS << this->name << ": Model Opt complete (eps: " << epsilon << ")" << std::endl;
     }
 }
 
 void TunedBatch::optimize(const Options &opts) {
+    const unsigned int thread_id = ParallelContext::local_thread_id();
+    const unsigned int worker_id = ParallelContext::local_group_id();
+    const bool batch_leader = worker_id == 0 && thread_id == 0;
+
     if (!meta_parameters_set) {
         throw RaxmlException("TunedBatch has not been configured with meta heuristics");
     }
@@ -312,13 +331,25 @@ void TunedBatch::optimize(const Options &opts) {
     // do initial model and branch length optimization
     if (!this->initial_model_optimized) {
         this->optimize_parameters(opts, 3.0);
-        this->initial_model_optimized = true;
+
+        if (batch_leader) {
+            this->initial_model_optimized = true;
+        }
     }
 
     // compute all required SPR rounds
     this->optimize_topology(opts);
 
-    LOG_INFO_TS << this->name << ": total batch time after optimization: " << this->wall_time << "ms." << std::endl;
+    if (batch_leader) {
+        LOG_INFO_TS << this->name << ": total batch time after optimization: " << this->wall_time << "ms." << std::endl;
+    }
+}
+
+void TunedBatch::optimize_main(const Options &opts) {
+    const auto opt_worker = std::bind(&TunedBatch::optimize, this, std::ref(opts));
+    ParallelContext::init_pthreads_custom(opts, opt_worker, num_threads, num_workers);
+    opt_worker();
+    ParallelContext::finalize_threads();
 }
 
 void TunedBatch::perform_au_test() {
@@ -362,7 +393,11 @@ unsigned int TunedBatch::perform_plausibility_check(const Options &opts) {
     }
 
     // TODO should we backup the less optimized model or just accept that we overspecify the model
-    this->optimize_parameters(opts, 0.1, true, true, true);
+    const auto opt_worker = std::bind(&TunedBatch::optimize_parameters, this, opts, 0.1, true, true, true);
+    ParallelContext::init_pthreads_custom(opts, opt_worker, num_threads, num_workers);
+    opt_worker();
+    ParallelContext::finalize_threads();
+
     const auto au_worker = std::bind(&TunedBatch::perform_au_test, this);
     ParallelContext::init_pthreads_custom(opts, au_worker, num_threads, num_workers);
     au_worker();

@@ -169,6 +169,12 @@ public:
     void optimize(const Options &opts);
 
     /**
+     * Temporary optimizer method that handles threading. Will be obsolete when treeset optimizer handles the threadpool
+     * @param opts
+     */
+    void optimize_main(const Options &opts);
+
+    /**
      * Perform the AU test on the trees in the batch, as well as the supplied reference trees,
      * but backup the model before, optimize the model fully, and then restore the original model.
      *
