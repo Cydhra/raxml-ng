@@ -134,14 +134,53 @@ public:
   static bool master() { return proc_id() == 0; }
   static bool master_rank() { return _rank_id == 0; }
   static bool master_thread() { return _thread_id == 0; }
+
+  /**
+   * (Global) id of the current thread within the rank.
+   */
   static size_t thread_id() { return _thread_id; }
+
+  /**
+   * Global id of the current rank (MPI worker).
+   */
   static size_t rank_id() { return _rank_id; }
+
+  /**
+   * Id of the current thread globally (across all compute nodes).
+   */
   static size_t proc_id() { return _rank_id * _num_threads + _thread_id; }
+
+  /**
+   * Id of the current worker (thread group, tree search) globally.
+   */
   static size_t group_id() { return _thread_group->group_id; }
 
+  /**
+   * Id of the current thread within its worker (thread group, tree search).
+   */
   static size_t local_thread_id() { return _local_thread_id; }
+
+  /**
+   * Id of the current rank (MPI worker) within its node (MPI compute node).
+   */
   static size_t local_rank_id() { return _local_rank_id; }
+
+  /**
+   * (Global) id of the current thread within its local rank (MPI worker) assuming that multiple ranks work on the same tree search
+   * but no two tree searches share a rank. That is, all threads on a compute node are numbered contiguously, and this
+   * identifies them accross ranks, but local to the compute node.
+   *
+   * Note that it makes no sense to ever call this method, because the kind of parallelization (multiple tree searches
+   * accross several MPI nodes, but multiple ranks per tree search) that would make this useful is unsupported.
+   * You do not want this id for anything, and in general it doesn't identify threads uniquely.
+   *
+   * Note 2: This method would be more intuitive if _local_thread_id was replaced with _thread_id.
+   */
   static size_t local_proc_id() { return _local_rank_id * _num_threads + _local_thread_id; }
+
+  /**
+   * Id of the current worker (thread group, tree search) within the local rank (MPI worker).
+   */
   static size_t local_group_id() { return _thread_group->local_group_id; }
 
   static bool group_master() { return local_proc_id() == 0; }
