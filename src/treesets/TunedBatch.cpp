@@ -36,7 +36,7 @@ void parallel_au_bootstrap(AuTest &tester, const CoarseAssignmentList &assignmen
 void fine_grained_parallel(const CoarseAssignmentList &assignment_list,
                            const std::function<void(unsigned int, unsigned int)> &kernel) {
     const unsigned int worker_id = ParallelContext::local_group_id();
-    const unsigned int thread_id = ParallelContext::local_proc_id();
+    const unsigned int thread_id = ParallelContext::local_thread_id();
     auto &tree_ids = assignment_list.at(worker_id);
 
     for (const unsigned int tree_id: tree_ids) {
@@ -190,7 +190,7 @@ void TunedBatch::generate_starting_trees(RaxmlInstance &instance, const Options 
 }
 
 void TunedBatch::optimize_topology(const Options &opts) {
-    const unsigned int thread_id = ParallelContext::local_proc_id();
+    const unsigned int thread_id = ParallelContext::local_thread_id();
     const unsigned int worker_id = ParallelContext::local_group_id();
     const auto &tree_ids = this->coarse_assignments.at(worker_id);
     const bool batch_leader = worker_id == 0 && thread_id == 0;
@@ -268,7 +268,7 @@ void TunedBatch::optimize_topology(const Options &opts) {
 
 void TunedBatch::optimize_parameters(const Options &opts, double epsilon, const bool model, const bool branches,
                                      const bool force) {
-    const unsigned int thread_id = ParallelContext::local_proc_id();
+    const unsigned int thread_id = ParallelContext::local_thread_id();
     const unsigned int worker_id = ParallelContext::local_group_id();
     const auto &tree_ids = this->coarse_assignments.at(worker_id);
     const bool batch_leader = worker_id == 0 && thread_id == 0;
