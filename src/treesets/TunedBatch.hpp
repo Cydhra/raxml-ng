@@ -172,14 +172,19 @@ public:
 
     /**
      * Using the batch configuration, infer K trees in parallel.
+     *
+     * @param instance Raxml instance, required for tree generation
+     * @param opts command line options, required for parameter optimization
      */
-    void optimize(const Options &opts);
+    void optimize(RaxmlInstance &instance, const Options &opts);
 
     /**
      * Temporary optimizer method that handles threading. Will be obsolete when treeset optimizer handles the threadpool
-     * @param opts
+     *
+     * @param instance Raxml instance, required for tree generation
+     * @param opts command line options, required for parameter optimization
      */
-    void optimize_main(const Options &opts);
+    void optimize_main(RaxmlInstance &instance, const Options &opts);
 
     /**
      * Perform the AU test on the trees in the batch, as well as the supplied reference trees,

@@ -318,7 +318,7 @@ void TunedBatch::optimize_parameters(const Options &opts, double epsilon, const 
     }
 }
 
-void TunedBatch::optimize(const Options &opts) {
+void TunedBatch::optimize(RaxmlInstance &instance, const Options &opts) {
     const unsigned int thread_id = ParallelContext::local_thread_id();
     const unsigned int worker_id = ParallelContext::local_group_id();
     const bool batch_leader = worker_id == 0 && thread_id == 0;
@@ -344,8 +344,8 @@ void TunedBatch::optimize(const Options &opts) {
     }
 }
 
-void TunedBatch::optimize_main(const Options &opts) {
-    const auto opt_worker = std::bind(&TunedBatch::optimize, this, std::ref(opts));
+void TunedBatch::optimize_main(RaxmlInstance &instance, const Options &opts) {
+    const auto opt_worker = std::bind(&TunedBatch::optimize, this, std::ref(instance), std::ref(opts));
     ParallelContext::init_pthreads_custom(opts, opt_worker, num_threads, num_workers);
     opt_worker();
     ParallelContext::finalize_threads();

@@ -12,6 +12,8 @@ constexpr unsigned int DEFAULT_BATCH_SIZE = 16;
 
 class TreesetOptimizer {
 protected:
+    RaxmlInstance &instance;
+
     /**
      * Reference to the user options which are required for all optimization steps
      */
@@ -89,7 +91,8 @@ public:
                      const std::vector<std::vector<doubleVector> > &persite_loglh,
                      LoadBalancer &load_balancer,
                      const unsigned int target_tree_count,
-                     const unsigned long long starting_seed) : opts(opts),
+                     const unsigned long long starting_seed) : instance(instance),
+                                                               opts(opts),
                                                                batch_queue(
                                                                    instance, opts, tip_msa_idmap, load_balancer, msa,
                                                                    persite_loglh, starting_seed, DEFAULT_BATCH_SIZE),

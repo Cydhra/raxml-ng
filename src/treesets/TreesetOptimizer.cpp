@@ -71,7 +71,7 @@ void TreesetOptimizer::run() {
         auto &current_batch = this->batch_queue.select_next_batch(*current_bandit.get_parameters());
 
         current_batch.update_meta_parameters(opts, current_bandit.get_parameters());
-        current_batch.optimize_main(opts);
+        current_batch.optimize_main(instance, opts);
         current_batch.perform_plausibility_check_main(opts);
         mab.get_parameters()->get()->take_measurement(current_bandit, current_batch, true);
         this->hierarchical_mab.take_measurement(mab, current_batch, true);
