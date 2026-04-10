@@ -1,19 +1,25 @@
 #ifndef RAXML_THREADPOOL_HPP_
 #define RAXML_THREADPOOL_HPP_
 
+#include <cassert>
+#include <utility>
+#include "../ParallelContext.hpp"
 #include "SmartBarrier.hpp"
+
+// forward declaration
+class TaskGroup;
 
 /**
  * Callable function for tasks scheduled via the threadpool. The function takes the task-group barrier,
  * the task-specific worker_id, and the task-specific thread_id as input. Note that these are likely different from
  * the ones returned by ParallelContext.
  */
-using BatchTask = std::function<void(SmartBarrier, unsigned int, unsigned int)>;
+using BatchTask = std::function<void(TaskGroup &, unsigned int, unsigned int)>;
 
 /**
  * Callable function that returns new BatchTask callbacks on demand.
  */
-using TaskGenerator = std::function<BatchTask&()>;
+using TaskGenerator = std::function<BatchTask()>;
 
 /**
  * A group of workers (which are a threadgroup).
@@ -24,6 +30,41 @@ class TaskGroup {
 public:
     TaskGroup(const unsigned int num_threads, const unsigned int num_workers) : num_threads(num_threads),
         num_workers(num_workers), task_barrier(num_threads) {
+    }
+
+    /**
+     * Determines the leader thread in a task group.
+     *
+     * @param thread_id the local (within worker) thread id of the current thread
+     * @param worker_id the local (within rank) worker (thread group) id of the current thread
+     * @return true, if the current thread is the leader of the task group
+     */
+    bool is_group_leader(const unsigned int thread_id, const unsigned int worker_id) const {
+        return thread_id == 0 && (worker_id % num_workers) == 0;
+    }
+
+    /**
+     * Assign a new task function to the group. All threads should wait for a task to become assigned, then call it.
+     *
+     * @param task A callable that points to the (bound) task function
+     */
+    template <typename F>
+    void assign_task(F &&task) {
+        this->current_task = std::make_shared<BatchTask>(std::forward<F>(task));
+    }
+
+    /**
+     * Get a reference to the task currently assigned to the task group.
+     */
+    BatchTask &get_task() const {
+        return *current_task;
+    }
+
+    /**
+     * Enter the task barrier and wait until all threads have entered.
+     */
+    void enter_barrier() const {
+        this->task_barrier.enter();
     }
 
 protected:
@@ -41,6 +82,11 @@ protected:
      * Memory barrier for all workers in the task group.
      */
     SmartBarrier task_barrier;
+
+    /**
+     * Reference to the current task, which will be made available to all threads in the group.
+     */
+    std::shared_ptr<BatchTask> current_task;
 };
 
 /**
@@ -55,9 +101,12 @@ protected:
  * threads between workloads.
  */
 class ThreadPool {
-    ThreadPool(TaskGenerator &task_generator, const unsigned int total_threads,
+public:
+    ThreadPool(const TaskGenerator &task_generator, const unsigned int total_threads,
                const unsigned int workers_per_task_group,
-               const unsigned int num_task_groups) : task_generator(task_generator) {
+               const unsigned int num_task_groups) : total_threads(total_threads),
+                                                     workers_per_task_group(workers_per_task_group),
+                                                     task_generator(task_generator) {
         task_groups.reserve(num_task_groups);
 
         // TODO relax this assumption by assigning threads weirdly, or enforce it by disallowing num_task_groups to not be a divisor
@@ -69,7 +118,26 @@ class ThreadPool {
         }
     }
 
+    /**
+     * Spawn all threads, and then distribute work to task groups until no more work is left.
+     * Only then will the method return.
+     */
+    void work(const Options &opts);
+
 protected:
+    /**
+     * Total number of threads assigned to the pool (locally within an MPI rank).
+     */
+    unsigned int total_threads;
+
+    /**
+     * How many workers (tree searches) to assign each task group.
+     */
+    unsigned int workers_per_task_group;
+
+    /**
+     * The task groups contain barriers to synchronize tasks and know which threads are the task group leaders.
+     */
     std::vector<TaskGroup> task_groups;
 
     /**
@@ -78,6 +146,11 @@ protected:
      * the task group.
      */
     TaskGenerator &task_generator;
+
+    /**
+     * Main function for all pool threads, where they organize themselves and select work until none is left.
+     */
+    void thread_main();
 };
 
 #endif //RAXML_THREADPOOL_HPP_
