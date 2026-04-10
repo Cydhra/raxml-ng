@@ -151,6 +151,11 @@ public:
     void generate_starting_trees(RaxmlInstance &instance, const Options &opts);
 
     /**
+     * TODO: temp
+     */
+    void generate_starting_trees_main(RaxmlInstance &instance, const Options &opts);
+
+    /**
      * Perform model and branch length optimization according to the current tuning parameters and the given epsilon.
      * If model optimization is currently disabled, load models from a backup.
      *

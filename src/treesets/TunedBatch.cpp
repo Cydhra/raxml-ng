@@ -137,47 +137,48 @@ unsigned int TunedBatch::get_batch_size() const {
 }
 
 void TunedBatch::generate_starting_trees(RaxmlInstance &instance, const Options &opts) {
-    this->mark_p_values_dirty();
+    const unsigned int thread_id = ParallelContext::local_thread_id();
+    const unsigned int worker_id = ParallelContext::local_group_id();
+    const bool thread_leader = thread_id == 0 && worker_id == 0;
+
+    if (thread_leader) {
+        this->mark_p_values_dirty();
+    }
 
     const auto begin = std::chrono::steady_clock::now();
     intVector seeds(this->get_batch_size());
     // generate ascending seeds from a starting point to allow coordinating batch seeds reproducibly.
     std::iota(seeds.begin(), seeds.end(), this->starting_seed);
 
-    auto tree_builder = std::bind(thread_start_trees,
-                                  std::ref(instance),
-                                  std::ref(*this->batch_start_trees),
-                                  StartingTree::parsimony,
-                                  std::cref(seeds),
-                                  0,
-                                  false);
+    // TODO thread_start_trees assumes parallel context doesnt have more trees than this batch, so this method
+    //  call needs to be replaced
+    thread_start_trees(instance, *this->batch_start_trees, StartingTree::parsimony, seeds, 0, false);
 
-    // infer starting trees
-    const auto tree_workers = min(this->num_threads, this->get_batch_size());
-    ParallelContext::init_pthreads_custom(opts, tree_builder, tree_workers, tree_workers);
-    tree_builder();
-    ParallelContext::finalize_threads();
+    if (thread_leader) {
+        // load balance using the current thread assignment
+        PartitionAssignment part_sizes;
 
-    // load balance using the current thread assignment
-    PartitionAssignment part_sizes;
+        /* init list of partition sizes */
+        for (unsigned int i = 0; i < this->msa->part_list().size(); ++i) {
+            auto pinfo = &this->msa->part_list()[i];
+            part_sizes.assign_sites(i, 0, pinfo->length(), pinfo->model().clv_entry_size());
+        }
 
-    /* init list of partition sizes */
-    for (unsigned int i = 0; i < this->msa->part_list().size(); ++i) {
-        auto pinfo = &this->msa->part_list()[i];
-        part_sizes.assign_sites(i, 0, pinfo->length(), pinfo->model().clv_entry_size());
-    }
+        const auto threads_per_worker = this->num_threads_per_worker();
+        this->part_assignments = this->thread_load_balancer.get_all_assignments(part_sizes, threads_per_worker);
 
-    const auto threads_per_worker = this->num_threads_per_worker();
-    this->part_assignments = this->thread_load_balancer.get_all_assignments(part_sizes, threads_per_worker);
-
-    // step 3: create context for tree inference
-    for (unsigned int tree_id = 0; tree_id < this->get_batch_size(); ++tree_id) {
-        this->batch_trees.emplace_back();
-        for (unsigned int local_thread_id = 0; local_thread_id < threads_per_worker; ++local_thread_id) {
-            this->batch_trees[tree_id].emplace_back(opts, this->batch_start_trees->at(tree_id), *this->msa,
-                                                    this->tip_msa_idmap, this->part_assignments[local_thread_id]);
+        // step 3: create context for tree inference
+        for (unsigned int tree_id = 0; tree_id < this->get_batch_size(); ++tree_id) {
+            this->batch_trees.emplace_back();
+            for (unsigned int local_thread_id = 0; local_thread_id < threads_per_worker; ++local_thread_id) {
+                this->batch_trees[tree_id].emplace_back(opts, this->batch_start_trees->at(tree_id), *this->msa,
+                                                        this->tip_msa_idmap, this->part_assignments[local_thread_id]);
+            }
         }
     }
+
+    // TODO replace with task group barrier
+    ParallelContext::barrier();
 
     const auto end = std::chrono::steady_clock::now();
     const unsigned int elapsed = static_cast<unsigned int>(std::chrono::duration_cast<
@@ -186,6 +187,13 @@ void TunedBatch::generate_starting_trees(RaxmlInstance &instance, const Options 
 
     LOG_INFO_TS << this->name << ": total batch time after generating starting trees: " << this->wall_time << "ms." <<
             std::endl;
+}
+
+void TunedBatch::generate_starting_trees_main(RaxmlInstance &instance, const Options &opts) {
+    const auto tree_builder = std::bind(&TunedBatch::generate_starting_trees, this, std::ref(instance), std::cref(opts));
+    ParallelContext::init_pthreads_custom(opts, tree_builder, 8, 1);
+    tree_builder();
+    ParallelContext::finalize_threads();
 }
 
 void TunedBatch::optimize_topology(const Options &opts) {
