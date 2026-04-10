@@ -387,21 +387,24 @@ void TunedBatch::perform_au_test() {
     ParallelContext::barrier();
 }
 
-unsigned int TunedBatch::perform_plausibility_check(const Options &opts) {
+void TunedBatch::perform_plausibility_check(const Options &opts) {
+    // TODO should we backup the less optimized model or just accept that we overspecify the model
+    this->optimize_parameters(opts, 0.1, true, true, true);
+
+    // TODO replace with task group barrier
+    ParallelContext::global_barrier();
+
+    this->perform_au_test();
+}
+
+unsigned int TunedBatch::perform_plausibility_check_main(const Options &opts) {
     if (!this->au_test_dirty) {
         return this->plausible_tree_count;
     }
 
-    // TODO should we backup the less optimized model or just accept that we overspecify the model
-    const auto opt_worker = std::bind(&TunedBatch::optimize_parameters, this, opts, 0.1, true, true, true);
+    const auto opt_worker = std::bind(&TunedBatch::perform_plausibility_check, this, std::ref(opts));
     ParallelContext::init_pthreads_custom(opts, opt_worker, num_threads, num_workers);
     opt_worker();
-    ParallelContext::finalize_threads();
-
-    const auto au_worker = std::bind(&TunedBatch::perform_au_test, this);
-    ParallelContext::init_pthreads_custom(opts, au_worker, num_threads, num_workers);
-    au_worker();
-    // const unsigned int plausible_trees = this->perform_au_test();
     ParallelContext::finalize_threads();
 
     // count plausible trees
