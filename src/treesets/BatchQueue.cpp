@@ -22,16 +22,19 @@ void guarded_backup_batch_model(const TunedBatch &batch, ModelMap &backup_model,
 
 TunedBatch *BatchQueue::generate_batches(const unsigned int n) {
     const std::string name_prefix = "Batch";
-    const auto tree_gen = std::make_shared<MetaParameters>(1, false, 0, 0, true, false);
 
     auto batch_name_index = next_batch_index.fetch_add(n);
-    std::vector<TunedBatch> build_queue;
-    build_queue.reserve(n);
 
-    // create batches in build queue and move them later so we don't lock the mutex while the batches are prepared.
+    // lock the mutex for the batch queue
+    const std::lock_guard<std::mutex> lock(batch_mutex);
+
+    // get current final index
+    const auto new_slice_start = this->batches.size();
+
+    // place new batches at the end of the queue, and mark them as unfinished
     for (size_t i = 0; i < n; i++) {
         std::string batch_name = name_prefix + std::to_string(batch_name_index++);
-        build_queue.emplace_back(batch_name,
+        this->batches.emplace_back(batch_name,
                                  generate_seed_for_trees(this->batch_size),
                                  this->batch_size,
                                  recommended_thread_count(),
@@ -40,31 +43,17 @@ TunedBatch *BatchQueue::generate_batches(const unsigned int n) {
                                  load_balancer,
                                  tip_msa_idmap,
                                  persite_loglh);
-        auto &current_batch = build_queue[i];
+        auto &batch = this->batches.back();
 
-        // TODO schedule the batches in parallel if enough threads are available
-        current_batch.update_meta_parameters(opts, tree_gen);
-        current_batch.optimize_main(this->instance, opts);
-    }
-
-    // now modify the batch queue to make the batches accessible
-    const std::lock_guard<std::mutex> lock(batch_mutex);
-    for (auto &&batch: build_queue) {
         // mark the batch as unfinished
         this->unfinished.emplace(batch.get_name());
 
         // assign the prepared model. If we have no model backed up yet, this is initialized with the default model,
         // so nothing will break. This requires that the batch mutex is locked
-        batch.assign_batch_models(*this->backup_model);
+
+        // TODO reimplement this so it can accept the model even if no treeinfo objects exist yet
+        // batch.assign_batch_models(*this->backup_model);
     }
-
-    // get current final index
-    const auto new_slice_start = this->batches.size();
-
-    // add the batches to the queue
-    this->batches.insert(this->batches.end(),
-                         std::make_move_iterator(build_queue.begin()),
-                         std::make_move_iterator(build_queue.end()));
 
     // return (which drops the mutex guard)
     return this->batches.data() + new_slice_start;

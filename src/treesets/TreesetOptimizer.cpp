@@ -3,6 +3,9 @@
 
 void TreesetOptimizer::prepare_initial_batches() {
     auto &first_batch = this->batch_queue.generate_batches(1)[0];
+    first_batch.update_meta_parameters(opts, starting_tree_bandit().get_parameters());
+    first_batch.optimize_main(instance, opts);
+
     this->light_mab->take_measurement(starting_tree_bandit(), first_batch, false);
     this->batch_queue.backup_batch_model(first_batch);
 
@@ -11,6 +14,8 @@ void TreesetOptimizer::prepare_initial_batches() {
     // take a few measurements, but no more than necessary to have reasonable values for mean and variance
     for (unsigned int index = 0; index < INITIAL_VARIANCE_WEIGHT - 1; index++) {
         auto &batch = starter_batches[index];
+        batch.update_meta_parameters(opts, starting_tree_bandit().get_parameters());
+        batch.optimize_main(instance, opts);
         this->light_mab->take_measurement(starting_tree_bandit(), batch, false);
     }
 }
