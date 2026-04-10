@@ -7,7 +7,7 @@
  * A unique smart pointer for pthread_barrier_t that handles initialization and deletion automatically,
  * and therefore upholds a RAII contract and move construction.
  */
-class SmartBarrier : unique_ptr<pthread_barrier_t, std::function<void(pthread_barrier_t *)> > {
+class SmartBarrier : std::unique_ptr<pthread_barrier_t, std::function<void(pthread_barrier_t *)> > {
 public:
     explicit SmartBarrier(const unsigned int num_threads) : unique_ptr(new pthread_barrier_t, [](pthread_barrier_t *b) {
         if (b) {
