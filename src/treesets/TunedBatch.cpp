@@ -235,7 +235,7 @@ void TunedBatch::optimize_topology(const Options &opts) {
             this->mark_p_values_dirty();
         }
 
-        ParallelContext::global_barrier();
+        ParallelContext::global_barrier(); // required to propagate auto-configuration
         const auto begin = std::chrono::steady_clock::now();
 
         // run optimization kernel
@@ -329,27 +329,27 @@ void TunedBatch::optimize(RaxmlInstance &instance, const Options &opts) {
 
     if (!this->start_trees_generated()) {
         this->generate_starting_trees(instance, opts);
-
-        if (meta_parameters->accept_starting_trees) {
-            return;
-        }
     }
 
-    // do initial model and branch length optimization
-    if (!this->initial_model_optimized) {
-        this->optimize_parameters(3.0);
+    if (!meta_parameters->accept_starting_trees) {
+        // do initial model and branch length optimization
+        if (!this->initial_model_optimized) {
+            this->optimize_parameters(3.0);
 
-        if (batch_leader) {
-            this->initial_model_optimized = true;
+            if (batch_leader) {
+                this->initial_model_optimized = true;
+            }
         }
-    }
 
-    // compute all required SPR rounds
-    this->optimize_topology(opts);
+        // compute all required SPR rounds
+        this->optimize_topology(opts);
+    }
 
     if (batch_leader) {
-        LOG_INFO_TS << this->name << ": total batch time after optimization: " << this->wall_time << "ms." << std::endl;
+        LOG_INFO_TS << this->name << ": total batch time after heuristics: " << this->wall_time << "ms." << std::endl;
     }
+
+    perform_plausibility_check();
 }
 
 void TunedBatch::optimize_main(RaxmlInstance &instance, const Options &opts) {
@@ -376,7 +376,9 @@ void TunedBatch::perform_au_test() {
     for (const auto tree_id : trees) {
         sitelh_kernel(*msa, part_assignments, batch_persite_logh, batch_trees, thread_id, tree_id);
     }
-    ParallelContext::barrier();
+
+    // replace with group barrier
+    ParallelContext::global_barrier();
 
     // next, change the parallelization scheme to avoid splitting trees between workers. If we have more workers than
     // trees, this sucks, but currently AU doesn't support per-partition parallelization because that would require
@@ -391,10 +393,13 @@ void TunedBatch::perform_au_test() {
         // mark AU test as valid
         this->au_test_dirty = false;
     }
-    ParallelContext::barrier();
 }
 
-void TunedBatch::perform_plausibility_check(const Options &opts) {
+void TunedBatch::perform_plausibility_check() {
+    const unsigned int thread_id = ParallelContext::local_thread_id();
+    const unsigned int worker_id = ParallelContext::local_group_id();
+    const bool batch_leader = worker_id == 0 && thread_id == 0;
+
     // TODO should we backup the less optimized model or just accept that we overspecify the model
     this->optimize_parameters(0.1, true, true, true);
 
@@ -402,30 +407,19 @@ void TunedBatch::perform_plausibility_check(const Options &opts) {
     ParallelContext::global_barrier();
 
     this->perform_au_test();
-}
 
-unsigned int TunedBatch::perform_plausibility_check_main(const Options &opts) {
-    if (!this->au_test_dirty) {
-        return this->plausible_tree_count;
-    }
-
-    const auto opt_worker = std::bind(&TunedBatch::perform_plausibility_check, this, std::ref(opts));
-    ParallelContext::init_pthreads_custom(opts, opt_worker, num_threads, num_workers);
-    opt_worker();
-    ParallelContext::finalize_threads();
-
-    // count plausible trees
-    this->plausible_tree_count = 0;
-    auto first = this->au_test->get_p_values().begin() + reference_persite_loglh.size();
-    for (const auto last = this->au_test->get_p_values().end(); first != last; ++first) {
-        if (*first > SIGNIFICANCE_LEVEL) {
-            this->plausible_tree_count += 1;
+    // no barrier required, since batch leader is the one who finishes the AU test
+    if (batch_leader) {
+        this->plausible_tree_count = 0;
+        auto first = this->au_test->get_p_values().begin() + reference_persite_loglh.size();
+        for (const auto last = this->au_test->get_p_values().end(); first != last; ++first) {
+            if (*first > SIGNIFICANCE_LEVEL) {
+                this->plausible_tree_count += 1;
+            }
         }
-    }
 
-    LOG_TS(LogLevel::progress) << "AU test found " << plausible_tree_count << " plausible trees for " << this->name <<
-            "." << std::endl;
-    return plausible_tree_count;
+        LOG_INFO_TS << "AU test found " << plausible_tree_count << " plausible trees for " << this->name << "." << std::endl;
+    }
 }
 
 void TunedBatch::update_meta_parameters(const Options &opts, const shared_ptr<MetaParameters> new_parameters) {

@@ -167,12 +167,7 @@ public:
      *
      * @return The number of plausible trees.
      */
-    void perform_plausibility_check(const Options &opts);
-
-    /**
-     * Temporary function that handles multithreading for plausibility checks for migration
-     */
-    unsigned int perform_plausibility_check_main(const Options &opts);
+    void perform_plausibility_check();
 
     /**
      * Update the meta heuristical parameters of the batch, reconfiguring the search parameters from them.
