@@ -37,12 +37,14 @@ TunedBatch *BatchQueue::generate_batches(const unsigned int n) {
                                  recommended_thread_count(),
                                  recommended_worker_count(),
                                  msa,
+                                 load_balancer,
+                                 tip_msa_idmap,
                                  persite_loglh);
         auto &current_batch = build_queue[i];
 
         // TODO schedule the batches in parallel if enough threads are available
         current_batch.update_meta_parameters(opts, tree_gen);
-        current_batch.generate_starting_trees(this->instance, opts, load_balancer, tip_msa_idmap);
+        current_batch.generate_starting_trees(this->instance, opts);
     }
 
     // now modify the batch queue to make the batches accessible

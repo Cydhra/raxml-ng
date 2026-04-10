@@ -136,8 +136,7 @@ unsigned int TunedBatch::get_batch_size() const {
     return this->batch_start_trees->size();
 }
 
-void TunedBatch::generate_starting_trees(RaxmlInstance &instance, const Options &opts, LoadBalancer &load_balancer,
-                                         const IDVector &tip_msa_idmap) {
+void TunedBatch::generate_starting_trees(RaxmlInstance &instance, const Options &opts) {
     this->mark_p_values_dirty();
 
     const auto begin = std::chrono::steady_clock::now();
@@ -169,14 +168,14 @@ void TunedBatch::generate_starting_trees(RaxmlInstance &instance, const Options 
     }
 
     const auto threads_per_worker = this->num_threads_per_worker();
-    this->part_assignments = load_balancer.get_all_assignments(part_sizes, threads_per_worker);
+    this->part_assignments = this->thread_load_balancer.get_all_assignments(part_sizes, threads_per_worker);
 
     // step 3: create context for tree inference
     for (unsigned int tree_id = 0; tree_id < this->get_batch_size(); ++tree_id) {
         this->batch_trees.emplace_back();
         for (unsigned int local_thread_id = 0; local_thread_id < threads_per_worker; ++local_thread_id) {
             this->batch_trees[tree_id].emplace_back(opts, this->batch_start_trees->at(tree_id), *this->msa,
-                                                    tip_msa_idmap, this->part_assignments[local_thread_id]);
+                                                    this->tip_msa_idmap, this->part_assignments[local_thread_id]);
         }
     }
 

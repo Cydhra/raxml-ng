@@ -34,6 +34,8 @@ public:
                const unsigned int num_threads,
                const unsigned int num_workers,
                const std::shared_ptr<PartitionedMSA> &msa,
+               LoadBalancer &thread_load_balancer,
+               IDVector &tip_msa_idmap,
                std::vector<std::vector<doubleVector> > &reference_persite_loglh)
         : name(name),
           starting_seed(starting_seed),
@@ -42,6 +44,8 @@ public:
           batch_start_trees(new TreeList(batch_size)),
           msa(msa),
           reference_persite_loglh(reference_persite_loglh),
+          thread_load_balancer(thread_load_balancer),
+          tip_msa_idmap(tip_msa_idmap),
           batch_persite_logh(std::vector<std::vector<doubleVector> >(batch_size)) {
         for (auto &tree_slh: batch_persite_logh) {
             for (const auto &pinfo: msa->part_list())
@@ -72,6 +76,7 @@ public:
     // delete copy constructor because of corax partition
     TunedBatch(const TunedBatch &other) = delete;
 
+    // TODO check which property violates the copy/move contract so we dont have to implement this manually
     TunedBatch(TunedBatch &&other) noexcept
         : reuse_attempts(other.reuse_attempts),
           name(std::move(other.name)),
@@ -85,9 +90,11 @@ public:
           num_fast_spr_performed(other.num_fast_spr_performed),
           num_slow_spr_performed(other.num_slow_spr_performed),
           reference_persite_loglh(other.reference_persite_loglh),
+          thread_load_balancer(other.thread_load_balancer),
           au_assignment(std::move(other.au_assignment)),
           coarse_assignments(std::move(other.coarse_assignments)),
           part_assignments(std::move(other.part_assignments)),
+          tip_msa_idmap(other.tip_msa_idmap),
           tree_topologies(std::move(other.tree_topologies)),
           batch_trees(std::move(other.batch_trees)),
           batch_persite_logh(std::move(other.batch_persite_logh)),
@@ -100,8 +107,7 @@ public:
     }
 
     // explicitly implement move-assign to avoid implicit deletion
-    // TODO find out what prevents a default implementation from working. (The default implementation is implicitly deleted,
-    //  presumably because any of the members has an incorrect move-contract).
+    // TODO check which property violates the copy/move contract so we dont have to implement this manually
     TunedBatch &operator=(TunedBatch &&other) noexcept {
         if (this == &other)
             return *this;
@@ -117,9 +123,11 @@ public:
         num_fast_spr_performed = other.num_fast_spr_performed;
         num_slow_spr_performed = other.num_slow_spr_performed;
         reference_persite_loglh = other.reference_persite_loglh;
+        thread_load_balancer = std::move(other.thread_load_balancer),
         au_assignment = std::move(other.au_assignment);
         coarse_assignments = std::move(other.coarse_assignments);
         part_assignments = std::move(other.part_assignments);
+        tip_msa_idmap = std::move(other.tip_msa_idmap),
         tree_topologies = std::move(other.tree_topologies);
         batch_trees = std::move(other.batch_trees);
         batch_persite_logh = std::move(other.batch_persite_logh);
@@ -140,8 +148,7 @@ public:
     /**
      * Generate parsimony starting trees for this batch, and initialize the tree inference.
      */
-    void generate_starting_trees(RaxmlInstance &instance, const Options &opts, LoadBalancer &load_balancer,
-                                 const IDVector &tip_msa_idmap);
+    void generate_starting_trees(RaxmlInstance &instance, const Options &opts);
 
     /**
      * Perform model and branch length optimization according to the current tuning parameters and the given epsilon.
@@ -330,6 +337,12 @@ protected:
     std::vector<std::vector<doubleVector> > &reference_persite_loglh;
 
     /**
+     * Load balancer inherited from the main algorithm that handles fine-grained load balancing of threads within
+     * workers.
+     */
+    LoadBalancer &thread_load_balancer;
+
+    /**
      * Assignment of trees to threads for the AU test. The AU test cannot split between partitions, and so no tree
      * can have more than one thread assigned.
      * This assignment is generated for a virtual threadpool where all threads are workers.
@@ -345,10 +358,14 @@ protected:
     CoarseAssignmentList coarse_assignments;
 
     /**
-     * Assignment of partitions within the thread assignment of the batch. This differs from the part assignment of the
-     * main algorithm, if the batch got assigned different numbers of threads and workers.
+     * Fine-grained assignment of partitions to threads within workers (thread groups).
      */
     PartitionAssignmentList part_assignments;
+
+    /**
+     * Vector mapping sequence IDs to the MSA.
+     */
+    IDVector &tip_msa_idmap;
 
     /**
      * The final tree topologies. This vector is populated by a call to `finalize()` and is otherwise empty.
