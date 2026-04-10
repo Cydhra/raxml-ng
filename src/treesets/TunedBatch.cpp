@@ -189,13 +189,6 @@ void TunedBatch::generate_starting_trees(RaxmlInstance &instance, const Options 
             std::endl;
 }
 
-void TunedBatch::generate_starting_trees_main(RaxmlInstance &instance, const Options &opts) {
-    const auto tree_builder = std::bind(&TunedBatch::generate_starting_trees, this, std::ref(instance), std::cref(opts));
-    ParallelContext::init_pthreads_custom(opts, tree_builder, 8, 1);
-    tree_builder();
-    ParallelContext::finalize_threads();
-}
-
 void TunedBatch::optimize_topology(const Options &opts) {
     const unsigned int thread_id = ParallelContext::local_thread_id();
     const unsigned int worker_id = ParallelContext::local_group_id();
@@ -273,8 +266,7 @@ void TunedBatch::optimize_topology(const Options &opts) {
     }
 }
 
-void TunedBatch::optimize_parameters(const Options &opts, double epsilon, const bool model, const bool branches,
-                                     const bool force) {
+void TunedBatch::optimize_parameters(double epsilon, const bool model, const bool branches, const bool force) {
     const unsigned int thread_id = ParallelContext::local_thread_id();
     const unsigned int worker_id = ParallelContext::local_group_id();
     const auto &tree_ids = this->coarse_assignments.at(worker_id);
@@ -335,9 +327,17 @@ void TunedBatch::optimize(RaxmlInstance &instance, const Options &opts) {
         throw RaxmlException("TunedBatch has not been configured with meta heuristics");
     }
 
+    if (!this->start_trees_generated()) {
+        this->generate_starting_trees(instance, opts);
+
+        if (meta_parameters->accept_starting_trees) {
+            return;
+        }
+    }
+
     // do initial model and branch length optimization
     if (!this->initial_model_optimized) {
-        this->optimize_parameters(opts, 3.0);
+        this->optimize_parameters(3.0);
 
         if (batch_leader) {
             this->initial_model_optimized = true;
@@ -396,7 +396,7 @@ void TunedBatch::perform_au_test() {
 
 void TunedBatch::perform_plausibility_check(const Options &opts) {
     // TODO should we backup the less optimized model or just accept that we overspecify the model
-    this->optimize_parameters(opts, 0.1, true, true, true);
+    this->optimize_parameters(0.1, true, true, true);
 
     // TODO replace with task group barrier
     ParallelContext::global_barrier();

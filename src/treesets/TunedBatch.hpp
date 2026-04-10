@@ -146,36 +146,6 @@ public:
     unsigned int reuse_attempts = 0;
 
     /**
-     * Generate parsimony starting trees for this batch, and initialize the tree inference.
-     */
-    void generate_starting_trees(RaxmlInstance &instance, const Options &opts);
-
-    /**
-     * TODO: temp
-     */
-    void generate_starting_trees_main(RaxmlInstance &instance, const Options &opts);
-
-    /**
-     * Perform model and branch length optimization according to the current tuning parameters and the given epsilon.
-     * If model optimization is currently disabled, load models from a backup.
-     *
-     * @param opts parsed command line options and forced RAxML settings
-     * @param epsilon the likelihood threshold when to stop optimizing
-     * @param model if true, optimize model parameters
-     * @param branches if true, optimize branch lengths
-     * @param force if true, model optimization is forced, even if batch tuning parameters turn it off
-     */
-    void optimize_parameters(const Options &opts, double epsilon, bool model = true, bool branches = true,
-                             bool force = false);
-
-    /**
-     * Perform SPR rounds up to the target count, with meta-parameters according to the batch settings.
-     *
-     * @param opts parsed command line options and forced RAxML settings
-     */
-    void optimize_topology(const Options &opts);
-
-    /**
      * Using the batch configuration, infer K trees in parallel.
      *
      * @param instance Raxml instance, required for tree generation
@@ -452,6 +422,30 @@ protected:
     unsigned int num_threads_per_worker() const {
         return num_threads / num_workers;
     }
+
+    /**
+     * Generate parsimony starting trees for this batch, and initialize the tree inference.
+     */
+    void generate_starting_trees(RaxmlInstance &instance, const Options &opts);
+
+    /**
+     * Perform model and branch length optimization according to the current tuning parameters and the given epsilon.
+     * If model optimization is currently disabled, load models from a backup.
+     *
+     * @param epsilon the likelihood threshold when to stop optimizing
+     * @param model if true, optimize model parameters
+     * @param branches if true, optimize branch lengths
+     * @param force if true, model optimization is forced, even if batch tuning parameters turn it off
+     */
+    void optimize_parameters(double epsilon, bool model = true, bool branches = true,
+                             bool force = false);
+
+    /**
+     * Perform SPR rounds up to the target count, with meta-parameters according to the batch settings.
+     *
+     * @param opts parsed command line options and forced RAxML settings
+     */
+    void optimize_topology(const Options &opts);
 
     /**
      * Perform the AU test on the trees in the batch, as well as the supplied reference trees.
