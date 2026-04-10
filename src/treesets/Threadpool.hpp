@@ -102,7 +102,7 @@ protected:
  */
 class ThreadPool {
 public:
-    ThreadPool(const TaskGenerator &task_generator, const unsigned int total_threads,
+    ThreadPool(TaskGenerator &task_generator, const unsigned int total_threads,
                const unsigned int workers_per_task_group,
                const unsigned int num_task_groups) : total_threads(total_threads),
                                                      workers_per_task_group(workers_per_task_group),
