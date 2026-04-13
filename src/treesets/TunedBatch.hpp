@@ -193,6 +193,11 @@ public:
      */
     void assign_batch_models(const ModelMap &other);
 
+    /**
+     * Store the model of the first tree in the batch into a given model map.
+     *
+     * @param target Reference to a ModelMap where to store the model parameters
+     */
     void backup_models(ModelMap &target) const;
 
     /**
@@ -364,6 +369,12 @@ protected:
     * AU test instance
     */
     shared_ptr<AuTest> au_test;
+
+    /**
+     * Initial model parameters that get loaded into the tree info objects upon creation.
+     * This is initialized after creating the TunedBatch with a call to assign_batch_models.
+     */
+    ModelMap initial_model;
 
     /**
      * Flag indicating whether the batch has been configured with meta-parameters.

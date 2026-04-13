@@ -50,9 +50,7 @@ TunedBatch *BatchQueue::generate_batches(const unsigned int n) {
 
         // assign the prepared model. If we have no model backed up yet, this is initialized with the default model,
         // so nothing will break. This requires that the batch mutex is locked
-
-        // TODO reimplement this so it can accept the model even if no treeinfo objects exist yet
-        // batch.assign_batch_models(*this->backup_model);
+        batch.assign_batch_models(*this->backup_model);
     }
 
     // return (which drops the mutex guard)

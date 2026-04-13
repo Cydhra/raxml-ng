@@ -167,12 +167,14 @@ void TunedBatch::generate_starting_trees(RaxmlInstance &instance, const Options 
         const auto threads_per_worker = this->num_threads_per_worker();
         this->part_assignments = this->thread_load_balancer.get_all_assignments(part_sizes, threads_per_worker);
 
-        // step 3: create context for tree inference
+        // create context for tree inference and assign the initial model
         for (unsigned int tree_id = 0; tree_id < this->get_batch_size(); ++tree_id) {
             this->batch_trees.emplace_back();
             for (unsigned int local_thread_id = 0; local_thread_id < threads_per_worker; ++local_thread_id) {
                 this->batch_trees[tree_id].emplace_back(opts, this->batch_start_trees->at(tree_id), *this->msa,
                                                         this->tip_msa_idmap, this->part_assignments[local_thread_id]);
+
+                assign_models(batch_trees[tree_id][local_thread_id], this->initial_model);
             }
         }
     }
@@ -486,11 +488,7 @@ void TunedBatch::backup_models(ModelMap &target) const {
 }
 
 void TunedBatch::assign_batch_models(const ModelMap &other) {
-    for (unsigned int i = 0; i < this->get_batch_size(); ++i) {
-        for (unsigned int local_thread_id = 0; local_thread_id < this->num_threads_per_worker(); ++local_thread_id) {
-            assign_models(batch_trees[i][local_thread_id], other);
-        }
-    }
+    initial_model = other;
 }
 
 void TunedBatch::finalize() {
