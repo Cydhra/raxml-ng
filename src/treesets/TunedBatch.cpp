@@ -182,13 +182,15 @@ void TunedBatch::generate_starting_trees(RaxmlInstance &instance, const Options 
     // TODO replace with task group barrier
     ParallelContext::barrier();
 
-    const auto end = std::chrono::steady_clock::now();
-    const unsigned int elapsed = static_cast<unsigned int>(std::chrono::duration_cast<
-        std::chrono::milliseconds>(end - begin).count());
-    this->wall_time += elapsed;
+    if (thread_leader) {
+        const auto end = std::chrono::steady_clock::now();
+        const unsigned int elapsed = static_cast<unsigned int>(std::chrono::duration_cast<
+            std::chrono::milliseconds>(end - begin).count());
+        this->wall_time += elapsed;
 
-    LOG_INFO_TS << this->name << ": total batch time after generating starting trees: " << this->wall_time << "ms." <<
-            std::endl;
+        LOG_INFO_TS << this->name << ": total batch time after generating starting trees: " << this->wall_time << "ms." <<
+                std::endl;
+    }
 }
 
 void TunedBatch::optimize_topology(const Options &opts) {
@@ -237,6 +239,7 @@ void TunedBatch::optimize_topology(const Options &opts) {
             this->mark_p_values_dirty();
         }
 
+        // Todo replace with group barrier
         ParallelContext::global_barrier(); // required to propagate auto-configuration
         const auto begin = std::chrono::steady_clock::now();
 
