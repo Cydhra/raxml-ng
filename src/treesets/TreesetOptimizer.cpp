@@ -4,7 +4,7 @@
 void TreesetOptimizer::prepare_initial_batches() {
     auto &first_batch = this->batch_queue.generate_batches(1)[0];
     first_batch.update_meta_parameters(opts, starting_tree_bandit().get_parameters());
-    first_batch.optimize_main(instance, opts);
+    this->run_batch(&first_batch);
 
     this->light_mab->take_measurement(starting_tree_bandit(), first_batch, false);
     this->batch_queue.backup_batch_model(first_batch);
@@ -15,7 +15,7 @@ void TreesetOptimizer::prepare_initial_batches() {
     for (unsigned int index = 0; index < INITIAL_VARIANCE_WEIGHT - 1; index++) {
         auto &batch = starter_batches[index];
         batch.update_meta_parameters(opts, starting_tree_bandit().get_parameters());
-        batch.optimize_main(instance, opts);
+        this->run_batch(&batch);
         this->light_mab->take_measurement(starting_tree_bandit(), batch, false);
     }
 }
@@ -53,6 +53,12 @@ void TreesetOptimizer::initialize_bandits() {
     }
 }
 
+void TreesetOptimizer::run_batch(TunedBatch *batch) {
+    const auto opt_worker = std::bind(&TunedBatch::optimize, batch, std::ref(instance), std::ref(opts));
+    ParallelContext::init_pthreads_custom(opts, opt_worker, 8, 1);
+    opt_worker();
+    ParallelContext::finalize_threads();
+}
 
 void TreesetOptimizer::run() {
     LOG_INFO << std::endl;
@@ -74,7 +80,7 @@ void TreesetOptimizer::run() {
         auto &current_batch = this->batch_queue.select_next_batch(*current_bandit.get_parameters());
 
         current_batch.update_meta_parameters(opts, current_bandit.get_parameters());
-        current_batch.optimize_main(instance, opts);
+        this->run_batch(&current_batch);
         mab.get_parameters()->get()->take_measurement(current_bandit, current_batch, true);
         this->hierarchical_mab.take_measurement(mab, current_batch, true);
         this->batch_queue.finish_batch(current_batch);

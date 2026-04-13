@@ -72,6 +72,11 @@ protected:
      */
     void initialize_bandits();
 
+    /**
+     * TODO temporary method during refactoring to start threads
+     */
+    void run_batch(TunedBatch *batch);
+
 public:
     /**
      *

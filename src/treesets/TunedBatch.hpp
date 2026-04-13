@@ -154,14 +154,6 @@ public:
     void optimize(RaxmlInstance &instance, const Options &opts);
 
     /**
-     * Temporary optimizer method that handles threading. Will be obsolete when treeset optimizer handles the threadpool
-     *
-     * @param instance Raxml instance, required for tree generation
-     * @param opts command line options, required for parameter optimization
-     */
-    void optimize_main(RaxmlInstance &instance, const Options &opts);
-
-    /**
      * Perform the AU test on the trees in the batch, as well as the supplied reference trees,
      * but backup the model before, optimize the model fully, and then restore the original model.
      *

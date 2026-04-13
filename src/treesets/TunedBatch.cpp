@@ -357,13 +357,6 @@ void TunedBatch::optimize(RaxmlInstance &instance, const Options &opts) {
     perform_plausibility_check();
 }
 
-void TunedBatch::optimize_main(RaxmlInstance &instance, const Options &opts) {
-    const auto opt_worker = std::bind(&TunedBatch::optimize, this, std::ref(instance), std::ref(opts));
-    ParallelContext::init_pthreads_custom(opts, opt_worker, num_threads, num_workers);
-    opt_worker();
-    ParallelContext::finalize_threads();
-}
-
 void TunedBatch::perform_au_test() {
     const unsigned int thread_id = ParallelContext::local_thread_id();
     const unsigned int worker_id = ParallelContext::local_group_id();
