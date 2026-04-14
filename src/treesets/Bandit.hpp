@@ -201,7 +201,7 @@ public:
     /**
      * @return This bandit's meta parameters
      */
-    std::shared_ptr<Heuristic> get_parameters() {
+    std::shared_ptr<Heuristic> get_parameters() const {
         return this->parameters;
     }
 
@@ -210,6 +210,10 @@ public:
      */
     std::string get_name() const {
         return this->name;
+    }
+
+    unsigned int num_samples() const {
+        return this->samples.size();
     }
 
 protected:
