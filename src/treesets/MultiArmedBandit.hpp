@@ -154,19 +154,25 @@ public:
             this->iterations_completed += 1;
 
             // once all bandits have been selected once, assign variances to the bandits
-            if (iterations_completed == this->bandits.size()) {
+            if (iterations_completed >= this->bandits.size()) {
                 // collect variances
                 double mean = 0.0;
+                double num_bandits = 0.0;
                 for (const auto &bandit: bandits) {
-                    mean += bandit.get_mean_throughput();
+                    if (!isnan(bandit.get_mean_throughput())) {
+                        mean += bandit.get_mean_throughput();
+                        num_bandits += 1.0;
+                    }
                 }
-                mean /= static_cast<double>(bandits.size());
+                mean /= num_bandits;
 
                 double variance = 0.0;
                 for (const auto &bandit: bandits) {
-                    variance += (mean - bandit.get_mean_throughput()) * (mean - bandit.get_mean_throughput());
+                    if (!isnan(bandit.get_mean_throughput())) {
+                        variance += (mean - bandit.get_mean_throughput()) * (mean - bandit.get_mean_throughput());
+                    }
                 }
-                variance /= static_cast<double>(bandits.size());
+                variance /= num_bandits;
 
                 const auto standard_deviation = sqrt(variance);
 
@@ -183,6 +189,16 @@ public:
         }
 
         measurement_mutex.unlock();
+    }
+
+    bool has_bandit(std::string name) const {
+        for (auto &bandit : this->bandits) {
+            if (bandit.name == name) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
 protected:

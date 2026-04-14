@@ -21,36 +21,35 @@ void TreesetOptimizer::prepare_initial_batches() {
 }
 
 void TreesetOptimizer::initialize_bandits() {
-    // TODO replace this by a general elimination rule
-    if (this->starting_tree_bandit().get_expected_tree_rate() >= 0.9) {
-        LOG_INFO << "Starting trees are so successful, no ML optimization is necessary." << std::endl;
-        batch_queue.max_reuse_attempts = 0;
-    } else {
-        // init default bandits
-        this->light_mab->emplace_back("Greedy,DoModel,2spr", MetaParameters(1, false, 2, 0, false, false));
-        this->light_mab->emplace_back("Greedy,DoModel,4spr", MetaParameters(1, false, 4, 0, false, false));
-        this->light_mab->emplace_back("Greedy,NoModel,2spr", MetaParameters(1, true, 2, 0, false, false));
+    this->parsimony->emplace_back("Parsimony", MetaParameters(1, false, 0, 0, true, false));
 
-        this->light_mab->emplace_back("Fast,DoModel,2spr", MetaParameters(20, false, 2, 0, false, false));
-        this->light_mab->emplace_back("Fast,DoModel,4spr", MetaParameters(20, false, 4, 0, false, false));
-        this->light_mab->emplace_back("Fast,NoModel,2spr", MetaParameters(20, true, 2, 0, false, false));
+    // init default bandits
+    this->light_mab->emplace_back("Greedy,DoModel,2spr", MetaParameters(1, false, 2, 0, false, false));
+    this->light_mab->emplace_back("Greedy,DoModel,4spr", MetaParameters(1, false, 4, 0, false, false));
+    this->light_mab->emplace_back("Greedy,NoModel,2spr", MetaParameters(1, true, 2, 0, false, false));
 
-        // heavy heuristics
-        this->heavy_mab->emplace_back("Slow,2spr", MetaParameters(20, false, 0, 2, false, false));
-        this->heavy_mab->emplace_back("Mixed,2+2spr", MetaParameters(20, false, 2, 2, false, false));
-        this->heavy_mab->emplace_back("Mixed,4+2spr", MetaParameters(20, false, 4, 2, false, false));
+    this->light_mab->emplace_back("Fast,DoModel,2spr", MetaParameters(20, false, 2, 0, false, false));
+    this->light_mab->emplace_back("Fast,DoModel,4spr", MetaParameters(20, false, 4, 0, false, false));
+    this->light_mab->emplace_back("Fast,NoModel,2spr", MetaParameters(20, true, 2, 0, false, false));
 
-        // early commitment
-        this->commitment_mab->emplace_back("Commit,Greedy,DoModel,2spr", MetaParameters(1, false, 2, 0, false, true));
-        this->commitment_mab->emplace_back("Commit,Greedy,DoModel,4spr", MetaParameters(1, false, 4, 0, false, true));
-        this->commitment_mab->emplace_back("Commit,Fast,DoModel,2spr", MetaParameters(20, false, 2, 0, false, true));
-        this->commitment_mab->emplace_back("Commit,Fast,DoModel,4spr", MetaParameters(20, false, 4, 0, false, true));
+    // heavy heuristics
+    this->heavy_mab->emplace_back("Slow,2spr", MetaParameters(20, false, 0, 2, false, false));
+    this->heavy_mab->emplace_back("Mixed,2+2spr", MetaParameters(20, false, 2, 2, false, false));
+    this->heavy_mab->emplace_back("Mixed,4+2spr", MetaParameters(20, false, 4, 2, false, false));
 
-        // second-level MAB
-        this->hierarchical_mab.emplace_back("Light", this->light_mab);
-        this->hierarchical_mab.emplace_back("Heavy", this->heavy_mab);
-        this->hierarchical_mab.emplace_back("Committing", this->commitment_mab);
-    }
+    // early commitment
+    this->commitment_mab->emplace_back("Commit,Greedy,DoModel,2spr", MetaParameters(1, false, 2, 0, false, true));
+    this->commitment_mab->emplace_back("Commit,Greedy,DoModel,4spr", MetaParameters(1, false, 4, 0, false, true));
+    this->commitment_mab->emplace_back("Commit,Fast,DoModel,2spr", MetaParameters(20, false, 2, 0, false, true));
+    this->commitment_mab->emplace_back("Commit,Fast,DoModel,4spr", MetaParameters(20, false, 4, 0, false, true));
+
+    // set up successors
+    this->successors[this->parsimony.get()] = { make_tuple("Light", this->light_mab), make_tuple("Commitment", this->commitment_mab) };
+    this->successors[this->light_mab.get()] = { make_tuple("Heavy", this->heavy_mab) };
+    this->successors[this->commitment_mab.get()] = { make_tuple("Heavy", this->heavy_mab) };
+
+    // second-level MAB
+    this->hierarchical_mab.emplace_back("Starting Trees", parsimony);
 }
 
 void TreesetOptimizer::run_batch(TunedBatch *batch) {
@@ -65,13 +64,7 @@ void TreesetOptimizer::run() {
     LOG_INFO_TS << "Treeset: Inferring at least " << this->target_tree_count <<
             " plausible trees while optimizing throughput." << std::endl;
 
-    this->prepare_initial_batches();
-    LOG_INFO << std::endl;
-    LOG_INFO << "Expected throughput of starting trees: " << (
-                this->starting_tree_bandit().get_mean_throughput() * 1000.0) <<
-            " trees per second at a mean success rate of "
-            << (this->starting_tree_bandit().get_expected_tree_rate() * 100.0) << "%." << std::endl;
-
+    // initialize all bandit arms, and add the parsimony arm to the top-level MAB.
     this->initialize_bandits();
 
     while (this->batch_queue.num_plausible_trees() < this->target_tree_count) {
@@ -81,8 +74,14 @@ void TreesetOptimizer::run() {
 
         current_batch.update_meta_parameters(opts, current_bandit.get_parameters());
         this->run_batch(&current_batch);
+
+        // take measurements
         mab.get_parameters()->get()->take_measurement(current_bandit, current_batch, true);
         this->hierarchical_mab.take_measurement(mab, current_batch, true);
+
+        this->check_mab_modification(mab);
+
+        // inform the batch queue that the batch has been inferred
         this->batch_queue.finish_batch(current_batch);
 
         // check if we would exceed the final tree count if we finalized the current batch immediately
@@ -94,6 +93,21 @@ void TreesetOptimizer::run() {
 
     LOG_INFO_TS << "Inferred " << this->batch_queue.num_plausible_trees() << " plausible trees in " << this->batch_queue.num_batches() <<
             " batches." << std::endl;
+}
+
+void TreesetOptimizer::check_mab_modification(const Bandit<shared_ptr<MultiArmedBandit<MetaParameters> > > &current_arm) {
+    // TODO implement a proper heuristic here. For now, we check if the current arm exceeds 75% success per batch,
+    //  and if not, we add arms according to a pre-defined mapping.
+
+    if (current_arm.num_samples() > 4 && current_arm.get_expected_tree_rate() < 0.75) {
+        const auto pointer = current_arm.get_parameters().get()->get();
+        for (auto &successor : this->successors.at(pointer)) {
+            if (!hierarchical_mab.has_bandit(std::get<0>(successor))) {
+                LOG_INFO << "Adding bandit " << std::get<0>(successor) << " to algorithm." << std::endl;
+                hierarchical_mab.emplace_back(std::get<0>(successor), std::get<1>(successor));
+            }
+        }
+    }
 }
 
 std::vector<Tree> TreesetOptimizer::get_all_trees() const {

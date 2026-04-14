@@ -31,6 +31,9 @@ protected:
 
     MultiArmedBandit<std::shared_ptr<MultiArmedBandit<MetaParameters> > > hierarchical_mab;
 
+    std::shared_ptr<MultiArmedBandit<MetaParameters> > parsimony = std::make_shared<MultiArmedBandit<
+        MetaParameters> >();
+
     /**
      * The multi-armed bandit instance that contains aggressive heuristics
      */
@@ -49,6 +52,13 @@ protected:
      */
     std::shared_ptr<MultiArmedBandit<MetaParameters> > commitment_mab = std::make_shared<MultiArmedBandit<
         MetaParameters> >();
+
+    /**
+     * A mapping of bandit arms that are successors to previous arms in case they are not yet optimal.
+     * For example, the successors to the parsimony arm are the light and commitment arms, so if the parsimony arm
+     * does not find enough plausible trees, the successor arms are added to the algorithm.
+     */
+    unordered_map<MultiArmedBandit<MetaParameters> *, std::vector<std::tuple<std::string, std::shared_ptr<MultiArmedBandit<MetaParameters> >>>> successors;
 
     /**
      * Get the bandit that represents the distribution of plausible trees obtained from accepting starting trees.
@@ -110,6 +120,16 @@ public:
      * Run the treeset optimizer to infer K plausible trees.
      */
     void run();
+
+    /**
+     * Check whether we should insert new arms into the MAB depending on the performance of the current bandit arm.
+     * This implements a heuristic that enables exploration for new arms if they have potential to be useful within
+     * the algorithm.
+     * This enables us to skip exploring arms that have no potential gain over currently explored arms.
+     *
+     * @param current_arm the arm of the MAB that was last modified
+     */
+    void check_mab_modification(const Bandit<shared_ptr<MultiArmedBandit<MetaParameters>>> &current_arm);
 
     /**
      * Obtain all trees (plausible and rejected) inferred during the treeset optimization into a common vector and
