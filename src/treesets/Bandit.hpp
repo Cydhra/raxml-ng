@@ -141,7 +141,7 @@ public:
 
         // calculate participation of the estimator, gradually replacing it with actual measurements
         const auto weight = this->estimated_variance_weight - min(this->estimated_variance_weight,
-                                                            static_cast<unsigned int>(this->samples.size()));
+                                                                  static_cast<unsigned int>(this->samples.size()));
 
         variance_sum *= weight;
 
@@ -172,7 +172,9 @@ public:
         // as defined by 10.1016/0196-8858(85)90002-8, formula 4.13 with the choice of `a_(n,i)` = `(log n) / i`,
         // where `n` is the total number of samples, and `i` is the number of samples drawn for this bandit.
         // do note that the formula contains the standard deviation, not the variance, so we move the variance into the root.
-        return mean_throughput + sqrt(variance * 2.0 * log(static_cast<double>(total_samples)) / static_cast<double>(this->samples.size()));
+        return mean_throughput + sqrt(
+                   variance * 2.0 * log(static_cast<double>(total_samples)) / static_cast<double>(this->samples.
+                       size()));
     }
 
     /**
@@ -195,7 +197,9 @@ public:
         const auto variance = this->get_variance();
 
         // see get_upper_confidence
-        return mean_throughput + sqrt(4.0 * variance * 2.0 * log(static_cast<double>(total_samples)) / static_cast<double>(this->samples.size()));
+        return mean_throughput + sqrt(
+                   4.0 * variance * 2.0 * log(static_cast<double>(total_samples)) / static_cast<double>(this->samples.
+                       size()));
     }
 
     /**
@@ -252,8 +256,27 @@ protected:
      * @param batch A tuned batch which has been run on the parameter set of this Bandit instance.
      */
     void take_measurement(const TunedBatch &batch) {
+        // if we have no other samples yet, we initialize the variance estimate by overestimating it intentionally
+        if (samples.size() == 0) {
+            const auto mean = static_cast<double>(batch.get_plausible_tree_count()) / static_cast<double>(batch.
+                                  elapsed_wall_time());
+            constexpr auto worst_case = 0.0;
+            const auto best_case = static_cast<double>(batch.get_batch_size()) / static_cast<double>(batch.
+                                       elapsed_wall_time());
+
+            auto over_estimated_variance = 0.0;
+            // sample mean is equal to sample, so the measured sample has contribution 0
+            over_estimated_variance += (mean - worst_case) * (mean - worst_case);
+            over_estimated_variance += (mean - best_case) * (mean - best_case);
+
+            // initialize variance with an estimate that overestimates it by the maximum amount obtained from one sample
+            // and two extreme value.
+            this->initialize_variance(over_estimated_variance / 3, 3);
+        }
+
         LOG_INFO_TS << "[" << this->name << "]: Takes measurement: " << (
-                    static_cast<double>(batch.get_plausible_tree_count()) / static_cast<double>(batch.elapsed_wall_time()) *
+                    static_cast<double>(batch.get_plausible_tree_count()) / static_cast<double>(batch.
+                        elapsed_wall_time()) *
                     1000.0)
                 << " trees per second." << std::endl;
         this->samples.emplace_back(batch.elapsed_wall_time(), batch.get_plausible_tree_count(), batch.get_batch_size());

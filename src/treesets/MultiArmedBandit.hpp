@@ -149,43 +149,9 @@ public:
             }
         }
 
-        // if this completes an iteration, check if we need to update the selection rule
+        // if this completes an iteration, update the counter for calculating confidence thresholds
         if (iteration_completed) {
             this->iterations_completed += 1;
-
-            // once all bandits have been selected once, assign variances to the bandits
-            if (iterations_completed >= this->bandits.size()) {
-                // collect variances
-                double mean = 0.0;
-                double num_bandits = 0.0;
-                for (const auto &bandit: bandits) {
-                    if (!isnan(bandit.get_mean_throughput())) {
-                        mean += bandit.get_mean_throughput();
-                        num_bandits += 1.0;
-                    }
-                }
-                mean /= num_bandits;
-
-                double variance = 0.0;
-                for (const auto &bandit: bandits) {
-                    if (!isnan(bandit.get_mean_throughput())) {
-                        variance += (mean - bandit.get_mean_throughput()) * (mean - bandit.get_mean_throughput());
-                    }
-                }
-                variance /= num_bandits;
-
-                const auto standard_deviation = sqrt(variance);
-
-                LOG_INFO << std::endl;
-                LOG_INFO << "Mean throughput is " << (mean * 1000.0) <<
-                        " trees per second with the standard deviation over all bandits being " << (
-                            standard_deviation * 1000.0) <<
-                        std::endl << std::endl;
-
-                for (auto &bandit: this->bandits) {
-                    bandit.initialize_variance(variance, INITIAL_VARIANCE_WEIGHT);
-                }
-            }
         }
 
         measurement_mutex.unlock();

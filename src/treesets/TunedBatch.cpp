@@ -180,7 +180,7 @@ void TunedBatch::generate_starting_trees(RaxmlInstance &instance, const Options 
     }
 
     // TODO replace with task group barrier
-    ParallelContext::barrier();
+    ParallelContext::global_barrier();
 
     if (thread_leader) {
         const auto end = std::chrono::steady_clock::now();
