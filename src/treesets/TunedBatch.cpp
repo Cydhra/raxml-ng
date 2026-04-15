@@ -154,6 +154,10 @@ void TunedBatch::generate_starting_trees(RaxmlInstance &instance, const Options 
     //  call needs to be replaced
     thread_start_trees(instance, *this->batch_start_trees, StartingTree::parsimony, seeds, 0, false);
 
+    // barrier so we dont start building tree-info objects without finished trees
+    // TODO replace with task group barrier
+    ParallelContext::global_barrier();
+
     if (thread_leader) {
         // load balance using the current thread assignment
         PartitionAssignment part_sizes;
@@ -177,13 +181,9 @@ void TunedBatch::generate_starting_trees(RaxmlInstance &instance, const Options 
                 assign_models(batch_trees[tree_id][local_thread_id], this->initial_model);
             }
         }
-    }
 
-    // TODO replace with task group barrier
-    ParallelContext::global_barrier();
-
-    if (thread_leader) {
         const auto end = std::chrono::steady_clock::now();
+
         const unsigned int elapsed = static_cast<unsigned int>(std::chrono::duration_cast<
             std::chrono::milliseconds>(end - begin).count());
         this->wall_time += elapsed;
@@ -191,6 +191,11 @@ void TunedBatch::generate_starting_trees(RaxmlInstance &instance, const Options 
         LOG_INFO_TS << this->name << ": total batch time after generating starting trees: " << this->wall_time << "ms." <<
                 std::endl;
     }
+
+    // barrier so we dont start inferring without the treeinfo objects
+    // TODO replace with task group barrier
+    // TODO we should divide the task of creating the treeinfo objects between threads, then this barrier might be superfluous
+    ParallelContext::global_barrier();
 }
 
 void TunedBatch::optimize_topology(const Options &opts) {
