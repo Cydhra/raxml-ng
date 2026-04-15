@@ -7,7 +7,7 @@ int recommended_thread_count() {
 
 int recommended_worker_count() {
     // TODO this is only true for the tuning phase
-    return 1;
+    return 8;
 }
 
 /**

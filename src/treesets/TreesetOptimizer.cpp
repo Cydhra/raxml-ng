@@ -54,7 +54,7 @@ void TreesetOptimizer::initialize_bandits() {
 
 void TreesetOptimizer::run_batch(TunedBatch *batch) {
     const auto opt_worker = std::bind(&TunedBatch::optimize, batch, std::ref(instance), std::ref(opts));
-    ParallelContext::init_pthreads_custom(opts, opt_worker, 8, 1);
+    ParallelContext::init_pthreads_custom(opts, opt_worker, 8, 8);
     opt_worker();
     ParallelContext::finalize_threads();
 }
