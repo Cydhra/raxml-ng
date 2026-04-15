@@ -353,6 +353,11 @@ void TunedBatch::optimize(RaxmlInstance &instance, const Options &opts) {
 
         // compute all required SPR rounds
         this->optimize_topology(opts);
+
+        // i don't know why we need this barrier. It can seg-fault if we dont use it, because some threads are already
+        // in model-opt of the AU test while others are still doing SPR rounds. But why is that a problem?
+        // todo also replace this with a task barrier.
+        ParallelContext::global_barrier();
     }
 
     if (batch_leader) {
