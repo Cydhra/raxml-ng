@@ -412,6 +412,10 @@ protected:
         spr_params.thorough = this->num_fast_spr_performed >= this->meta_parameters->num_fast_spr;
         spr_params.lh_epsilon_brlen_full = opts.lh_epsilon;
         spr_params.lh_epsilon_brlen_triplet = opts.lh_epsilon_brlen_triplet;
+
+        // we don't need those
+        spr_params.increasing_moves = nullptr;
+        spr_params.total_moves = nullptr;
     }
 
     /**

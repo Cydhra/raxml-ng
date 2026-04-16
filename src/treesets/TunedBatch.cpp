@@ -206,21 +206,6 @@ void TunedBatch::optimize_topology(const Options &opts) {
     const auto &tree_ids = this->coarse_assignments.at(worker_id);
     const bool batch_leader = worker_id == 0 && thread_id == 0;
 
-    // make sure debug outputs are initialized
-    unsigned long int total_moves, increasing_moves;
-
-    if (batch_leader) {
-        // initialize the out-parameters of spr_params with valid addresses
-        // escaping pointers don't matter here because SPR params are only ever used in this function, and are always overwritten
-        // ReSharper disable CppDFALocalValueEscapesFunction
-#pragma GCC diagnostic push
-#pragma GCC diagnostic ignored "-Wdangling-pointer"
-        this->spr_params.total_moves = &total_moves;
-        this->spr_params.increasing_moves = &increasing_moves;
-#pragma GCC diagnostic pop
-        // ReSharper restore CppDFALocalValueEscapesFunction
-    }
-
     // copy current status into local variables. This is simpler than putting those states into atomic counters and add
     // barriers to their access
     auto current_spr_fast = this->num_fast_spr_performed;
@@ -355,11 +340,6 @@ void TunedBatch::optimize(RaxmlInstance &instance, const Options &opts) {
 
         // compute all required SPR rounds
         this->optimize_topology(opts);
-
-        // i don't know why we need this barrier. It can seg-fault if we dont use it, because some threads are already
-        // in model-opt of the AU test while others are still doing SPR rounds. But why is that a problem?
-        // todo also replace this with a task barrier.
-        ParallelContext::global_barrier();
     }
 
     if (batch_leader) {
