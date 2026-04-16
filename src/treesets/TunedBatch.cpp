@@ -32,104 +32,6 @@ void parallel_au_bootstrap(AuTest &tester, const CoarseAssignmentList &assignmen
     ParallelContext::global_barrier();
 }
 
-/**
- * Helper function to perform fine-grained parallelization on a given function.
- */
-void fine_grained_parallel(const CoarseAssignmentList &assignment_list,
-                           const std::function<void(unsigned int, unsigned int)> &kernel) {
-    const unsigned int worker_id = ParallelContext::local_group_id();
-    const unsigned int thread_id = ParallelContext::local_thread_id();
-    auto &tree_ids = assignment_list.at(worker_id);
-
-    for (const unsigned int tree_id: tree_ids) {
-        kernel(thread_id, tree_id);
-    }
-}
-
-/**
- * Convert a std::function that takes a thread_id and a tree_id into a kernel for a p-thread.
- *
- * @param assignment_list coarse load balance assignment for the trees in the batch
- * @param kernel the function that is called for each tree in the assignment
- * @return a functor that acts as a main function for a p-thread
- */
-std::function<void()> make_kernel(const CoarseAssignmentList &assignment_list,
-                                  const std::function<void(unsigned int, unsigned int)> &kernel) {
-    return std::bind(fine_grained_parallel, assignment_list, kernel);
-}
-
-/**
- * Parallel kernel for the per-site log-likelihood calculation, given to make_kernel to create a pthread-main
- */
-void sitelh_kernel(const PartitionedMSA &msa,
-                   const PartitionAssignmentList &partition_assignment,
-                   std::vector<std::vector<doubleVector> > &persite_loglh,
-                   std::vector<std::vector<TreeInfo> > &batch_trees,
-                   const unsigned int thread_id,
-                   const unsigned int tree_id) {
-    // collect the sub-partitions for the local worker
-    auto &partitions = partition_assignment.at(thread_id);
-    auto &tree_likelihood_vec = persite_loglh[tree_id];
-    std::vector<double *> thread_partition_view(msa.part_count(), nullptr);
-
-    for (const auto &pa: partitions) {
-        thread_partition_view[pa.part_id] = tree_likelihood_vec[pa.part_id].data() + pa.start;
-    }
-
-    // calculate site likelihoods for the assigned sub-partitions
-    batch_trees[tree_id][thread_id].persite_loglh(thread_partition_view);
-}
-
-/**
- * Parallel kernel for SPR rounds, given to make_kernel to create a pthread-main
- */
-void spr_kernel(std::vector<std::vector<TreeInfo> > &batch_trees,
-                spr_round_params &spr_params,
-                const unsigned int num_spr_performed,
-                const unsigned int target_num_spr,
-                const unsigned int thread_id,
-                const unsigned int tree_id) {
-    for (unsigned int spr_round = num_spr_performed; spr_round < target_num_spr; ++spr_round) {
-        batch_trees[tree_id][thread_id].spr_round(spr_params);
-        batch_trees[tree_id][thread_id].optimize_branches(1.0, 1);
-    }
-
-    LOG_WORKER_TS(LogLevel::debug) << "performed " << (target_num_spr - num_spr_performed)
-            << (spr_params.ntopol_keep < 20 ? " GREEDY" : " FAST") << " spr rounds (radius: " << spr_params.radius_min
-            << ") for tree search #" << (tree_id + 1) << std::endl;
-}
-
-/**
- * Parallel kernel for model optimization, given to make_kernel to create a pthread-main
- */
-void model_opt_kernel(std::vector<std::vector<TreeInfo> > &batch_trees,
-                      const double epsilon,
-                      const unsigned int thread_id,
-                      const unsigned int tree_id) {
-    batch_trees[tree_id][thread_id].optimize_model(epsilon);
-}
-
-/**
- * Parallel kernel for branch length optimization, given to make_kernel to create a pthread-main
- */
-void blo_kernel(std::vector<std::vector<TreeInfo> > &batch_trees,
-                const double epsilon,
-                const unsigned int thread_id,
-                const unsigned int tree_id) {
-    batch_trees[tree_id][thread_id].optimize_params(CORAX_OPT_PARAM_BRANCHES_ITERATIVE, epsilon);
-}
-
-/**
- * Parallel kernel for branch length optimization, given to make_kernel to create a pthread-main
- */
-void param_opt_kernel(std::vector<std::vector<TreeInfo> > &batch_trees,
-                      const double epsilon,
-                      const unsigned int thread_id,
-                      const unsigned int tree_id) {
-    batch_trees[tree_id][thread_id].optimize_params(CORAX_OPT_PARAM_ALL, epsilon);
-}
-
-
 void TunedBatch::mark_p_values_dirty() {
     this->au_test_dirty = true;
 }
@@ -141,63 +43,47 @@ unsigned int TunedBatch::get_batch_size() const {
 void TunedBatch::generate_starting_trees(RaxmlInstance &instance, const Options &opts) {
     const unsigned int thread_id = ParallelContext::local_thread_id();
     const unsigned int worker_id = ParallelContext::local_group_id();
+    const unsigned int group_worker_id = worker_id * num_threads_per_worker() + thread_id;
     const bool thread_leader = thread_id == 0 && worker_id == 0;
 
     if (thread_leader) {
         this->mark_p_values_dirty();
     }
 
+    // time measurement
     const auto begin = std::chrono::steady_clock::now();
-    intVector seeds(this->get_batch_size());
+
     // generate ascending seeds from a starting point to allow coordinating batch seeds reproducibly.
+    intVector seeds(this->get_batch_size());
     std::iota(seeds.begin(), seeds.end(), this->starting_seed);
 
-    // TODO thread_start_trees assumes parallel context doesnt have more trees than this batch, so this method
-    //  call needs to be replaced
-    thread_start_trees(instance, *this->batch_start_trees, StartingTree::parsimony, seeds, 0, false);
+    // generate trees from seeds
+    for (const auto id: this->exclusive_assignment.at(group_worker_id)) {
+        (*this->batch_start_trees)[id] = generate_tree(instance, StartingTree::parsimony, seeds[id], false);
+    }
 
-    // barrier so we dont start building tree-info objects without finished trees
+    // barrier so we dont start building tree-info objects without finished trees (since the thread assignment changes)
     // TODO replace with task group barrier
     ParallelContext::global_barrier();
 
+    // create context for tree inference and assign the initial model
+    for (const auto id: this->coarse_assignments.at(worker_id)) {
+        this->batch_trees[id][thread_id].emplace(opts, this->batch_start_trees->at(id), *this->msa,
+                                                        this->tip_msa_idmap, this->part_assignments[thread_id]);
+        assign_models(batch_trees[id][thread_id].value(), this->initial_model);
+    }
+
     if (thread_leader) {
-        // load balance using the current thread assignment
-        PartitionAssignment part_sizes;
-
-        /* init list of partition sizes */
-        for (unsigned int i = 0; i < this->msa->part_list().size(); ++i) {
-            auto pinfo = &this->msa->part_list()[i];
-            part_sizes.assign_sites(i, 0, pinfo->length(), pinfo->model().clv_entry_size());
-        }
-
-        const auto threads_per_worker = this->num_threads_per_worker();
-        this->part_assignments = this->thread_load_balancer.get_all_assignments(part_sizes, threads_per_worker);
-
-        // create context for tree inference and assign the initial model
-        for (unsigned int tree_id = 0; tree_id < this->get_batch_size(); ++tree_id) {
-            this->batch_trees.emplace_back();
-            for (unsigned int local_thread_id = 0; local_thread_id < threads_per_worker; ++local_thread_id) {
-                this->batch_trees[tree_id].emplace_back(opts, this->batch_start_trees->at(tree_id), *this->msa,
-                                                        this->tip_msa_idmap, this->part_assignments[local_thread_id]);
-
-                assign_models(batch_trees[tree_id][local_thread_id], this->initial_model);
-            }
-        }
-
         const auto end = std::chrono::steady_clock::now();
 
         const unsigned int elapsed = static_cast<unsigned int>(std::chrono::duration_cast<
             std::chrono::milliseconds>(end - begin).count());
         this->wall_time += elapsed;
 
-        LOG_INFO_TS << this->name << ": total batch time after generating starting trees: " << this->wall_time << "ms." <<
+        LOG_INFO_TS << this->name << ": total batch time after generating starting trees: " << this->wall_time << "ms."
+                <<
                 std::endl;
     }
-
-    // barrier so we dont start inferring without the treeinfo objects
-    // TODO replace with task group barrier
-    // TODO we should divide the task of creating the treeinfo objects between threads, then this barrier might be superfluous
-    ParallelContext::global_barrier();
 }
 
 void TunedBatch::optimize_topology(const Options &opts) {
@@ -221,7 +107,8 @@ void TunedBatch::optimize_topology(const Options &opts) {
         if (batch_leader) {
             auto round_name = fast ? "FAST" : "SLOW";
 
-            LOG_INFO_TS << this->name << ": Optimizing topology (" << num_rounds << " of " << total_rounds << " total " <<
+            LOG_INFO_TS << this->name << ": Optimizing topology (" << num_rounds << " of " << total_rounds << " total "
+                    <<
                     round_name << " spr rounds)" << std::endl;
 
             // make sure the spr-params are set correctly for fast/slow rounds
@@ -236,8 +123,15 @@ void TunedBatch::optimize_topology(const Options &opts) {
         const auto begin = std::chrono::steady_clock::now();
 
         // run optimization kernel
-        for (const auto tree_id : tree_ids) {
-            spr_kernel(this->batch_trees, this->spr_params, rounds_performed, total_rounds, thread_id, tree_id);
+        for (const auto tree_id: tree_ids) {
+            for (unsigned int spr_round = rounds_performed; spr_round < total_rounds; ++spr_round) {
+                batch_trees[tree_id][thread_id].value().spr_round(spr_params);
+                batch_trees[tree_id][thread_id].value().optimize_branches(1.0, 1);
+            }
+
+            LOG_WORKER_TS(LogLevel::debug) << "performed " << (total_rounds - rounds_performed)
+                    << (spr_params.ntopol_keep < 20 ? " GREEDY" : " FAST") << " spr rounds (radius: " << spr_params.radius_min
+                    << ") for tree search #" << (tree_id + 1) << std::endl;
         }
 
         if (fast) {
@@ -251,7 +145,7 @@ void TunedBatch::optimize_topology(const Options &opts) {
             const auto end = std::chrono::steady_clock::now();
 
             const unsigned int elapsed = static_cast<unsigned int>(std::chrono::duration_cast<
-            std::chrono::milliseconds>(end - begin).count());
+                std::chrono::milliseconds>(end - begin).count());
             this->wall_time += elapsed;
 
             if (fast) {
@@ -287,8 +181,8 @@ void TunedBatch::optimize_parameters(double epsilon, const bool model, const boo
         }
 
         // run all parameters optimization
-        for (const auto tree_id : tree_ids) {
-            param_opt_kernel(this->batch_trees, epsilon, thread_id, tree_id);
+        for (const auto tree_id: tree_ids) {
+            batch_trees[tree_id][thread_id].value().optimize_params(CORAX_OPT_PARAM_ALL, epsilon);
         }
     } else if (opt_model) {
         if (batch_leader) {
@@ -296,8 +190,8 @@ void TunedBatch::optimize_parameters(double epsilon, const bool model, const boo
         }
 
         // run model optimization
-        for (const auto tree_id : tree_ids) {
-            model_opt_kernel(this->batch_trees, epsilon, thread_id, tree_id);
+        for (const auto tree_id: tree_ids) {
+            batch_trees[tree_id][thread_id].value().optimize_model(epsilon);
         }
     } else if (branches) {
         if (batch_leader) {
@@ -305,8 +199,8 @@ void TunedBatch::optimize_parameters(double epsilon, const bool model, const boo
         }
 
         // run model optimization
-        for (const auto tree_id : tree_ids) {
-            blo_kernel(this->batch_trees, epsilon, thread_id, tree_id);
+        for (const auto tree_id: tree_ids) {
+            batch_trees[tree_id][thread_id].value().optimize_params(CORAX_OPT_PARAM_BRANCHES_ITERATIVE, epsilon);
         }
     }
 
@@ -363,8 +257,17 @@ void TunedBatch::perform_au_test() {
     }
 
     const auto trees = this->coarse_assignments.at(worker_id);
-    for (const auto tree_id : trees) {
-        sitelh_kernel(*msa, part_assignments, batch_persite_logh, batch_trees, thread_id, tree_id);
+    for (const auto tree_id: trees) {
+        // collect the sub-partitions for the local worker
+        auto &tree_likelihood_vec = batch_persite_logh[tree_id];
+        std::vector<double *> thread_partition_view(msa.get()->part_count(), nullptr);
+
+        for (const auto &pa: part_assignments.at(thread_id)) {
+            thread_partition_view[pa.part_id] = tree_likelihood_vec[pa.part_id].data() + pa.start;
+        }
+
+        // calculate site likelihoods for the assigned sub-partitions
+        batch_trees[tree_id][thread_id].value().persite_loglh(thread_partition_view);
     }
 
     // replace with group barrier
@@ -405,7 +308,8 @@ void TunedBatch::perform_plausibility_check() {
             }
         }
 
-        LOG_INFO_TS << "AU test found " << plausible_tree_count << " plausible trees for " << this->name << "." << std::endl;
+        LOG_INFO_TS << "AU test found " << plausible_tree_count << " plausible trees for " << this->name << "." <<
+                std::endl;
     }
 }
 
@@ -468,7 +372,7 @@ bool TunedBatch::is_compatible(const MetaParameters &new_parameters) const {
 void TunedBatch::backup_models(ModelMap &target) const {
     for (size_t part_id = 0; part_id < this->msa->part_count(); ++part_id) {
         // all threads have the same model, so backup from the first thread is sufficient
-        assign(target[part_id], this->batch_trees[0][part_id], part_id);
+        assign(target[part_id], this->batch_trees[0][part_id].value(), part_id);
     }
 }
 
@@ -481,7 +385,7 @@ void TunedBatch::finalize() {
     this->au_test->free_test_statistics();
 
     for (auto &batch_tree: this->batch_trees) {
-        this->tree_topologies.push_back(batch_tree.at(0).tree());
+        this->tree_topologies.push_back(batch_tree.at(0).value().tree());
     }
 
     // delete corax allocations
@@ -502,8 +406,9 @@ unsigned int TunedBatch::get_plausible_tree_count() const {
 
 bool TunedBatch::start_trees_generated() const {
     // generating the starting trees will initialize the TreeInfo objects in this->batch_trees, which is otherwise empty.
-    // Conversely, the batch_start_trees vector always contains the tree objects, whether they have been generated or not.
-    return this->batch_trees.size() == this->batch_start_trees->size();
+    // note that this method is not thread save, because it assumes the vector is either initialized fully, or not at all,
+    // meaning a partial initialization during starting tree generation will lead to unpredictable behavior
+    return this->batch_trees.front().front().has_value();
 }
 
 Tree TunedBatch::get_tree(const unsigned int index) const {
@@ -520,7 +425,7 @@ std::vector<double> TunedBatch::get_tree_likelihoods() {
     for (unsigned int i = 0; i < this->batch_trees.size(); i++) {
         auto loglh = 0.0;
         for (auto &part: this->batch_trees[i]) {
-            loglh += part.loglh();
+            loglh += part.value().loglh();
         }
         result[i] = loglh;
     }
