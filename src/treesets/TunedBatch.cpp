@@ -393,9 +393,6 @@ void TunedBatch::perform_plausibility_check() {
     // TODO should we backup the less optimized model or just accept that we overspecify the model
     this->optimize_parameters(0.1, true, true, true);
 
-    // TODO replace with task group barrier
-    ParallelContext::global_barrier();
-
     this->perform_au_test();
 
     // no barrier required, since batch leader is the one who finishes the AU test
