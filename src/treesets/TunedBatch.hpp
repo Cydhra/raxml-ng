@@ -1,7 +1,9 @@
 #ifndef RAXML_TUNEDBATCH_HPP_
 #define RAXML_TUNEDBATCH_HPP_
 
+#include <memory>
 #include <optional>
+#include <utility>
 #include "MetaParameters.hpp"
 #include "../loadbalance/LoadBalancer.hpp"
 #include "../loadbalance/CoarseLoadBalancer.hpp"
@@ -28,7 +30,7 @@ Tree generate_tree(const RaxmlInstance &instance, StartingTree type, int random_
  */
 class TunedBatch final {
 public:
-    TunedBatch(const string &name,
+    TunedBatch(string name,
                const unsigned int starting_seed,
                const unsigned int batch_size,
                const unsigned int num_threads,
@@ -37,7 +39,7 @@ public:
                LoadBalancer &thread_load_balancer,
                IDVector &tip_msa_idmap,
                std::vector<std::vector<doubleVector> > &reference_persite_loglh)
-        : name(name),
+        : name(std::move(name)),
           starting_seed(starting_seed),
           num_threads(num_threads),
           num_workers(num_workers),
@@ -53,8 +55,8 @@ public:
         }
 
         // we can initialize au_test only after initializing the per-site lnl partition vectors
-        this->au_test.reset(new AuTest(msa, reference_persite_loglh, batch_persite_logh, AU_DEFAULT_SCALES,
-                                       AU_DEFAULT_REPS, starting_seed));
+        this->au_test = std::make_shared<AuTest>(msa, reference_persite_loglh, batch_persite_logh, AU_DEFAULT_SCALES,
+                                       AU_DEFAULT_REPS, starting_seed);
         this->au_test->allocate_test_statistics();
 
         // prepare space for the tree-info objects
@@ -106,14 +108,14 @@ public:
           num_threads(other.num_threads),
           num_workers(other.num_workers),
           batch_start_trees(std::move(other.batch_start_trees)),
-          msa(other.msa),
-          spr_params(std::move(other.spr_params)),
+          msa(std::move(other.msa)),
+          spr_params(other.spr_params),
           num_fast_spr_performed(other.num_fast_spr_performed),
           num_slow_spr_performed(other.num_slow_spr_performed),
           reference_persite_loglh(other.reference_persite_loglh),
           thread_load_balancer(other.thread_load_balancer),
           au_assignment(std::move(other.au_assignment)),
-          exclusive_assignment(other.exclusive_assignment),
+          exclusive_assignment(std::move(other.exclusive_assignment)),
           coarse_assignments(std::move(other.coarse_assignments)),
           part_assignments(std::move(other.part_assignments)),
           tip_msa_idmap(other.tip_msa_idmap),
@@ -140,8 +142,8 @@ public:
         num_threads = other.num_threads;
         num_workers = other.num_workers;
         batch_start_trees = std::move(other.batch_start_trees);
-        msa = other.msa;
-        spr_params = std::move(other.spr_params);
+        msa = std::move(other.msa);
+        spr_params = other.spr_params;
         num_fast_spr_performed = other.num_fast_spr_performed;
         num_slow_spr_performed = other.num_slow_spr_performed;
         reference_persite_loglh = other.reference_persite_loglh;
