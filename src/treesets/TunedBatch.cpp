@@ -241,6 +241,15 @@ void TunedBatch::optimize(RaxmlInstance &instance, const Options &opts) {
     }
 
     perform_plausibility_check();
+
+    if (batch_leader) {
+        auto guard = std::lock_guard(*this->topology_access.get());
+
+        // backup tree topologies so we can get the plausible trees on demand
+        for (auto &batch_tree: this->batch_trees) {
+            this->tree_topologies.push_back(batch_tree.at(0).value().tree());
+        }
+    }
 }
 
 void TunedBatch::perform_au_test() {
@@ -384,10 +393,6 @@ void TunedBatch::finalize() {
     LOG_DEBUG << "Finalized " << name << "." << std::endl;
     this->au_test->free_test_statistics();
 
-    for (auto &batch_tree: this->batch_trees) {
-        this->tree_topologies.push_back(batch_tree.at(0).value().tree());
-    }
-
     // delete corax allocations
     this->batch_trees.clear();
 }
@@ -412,8 +417,10 @@ bool TunedBatch::start_trees_generated() const {
 }
 
 Tree TunedBatch::get_tree(const unsigned int index) const {
+    auto guard = std::lock_guard(*this->topology_access.get());
+
     if (this->tree_topologies.empty()) {
-        throw RaxmlException("cannot obtain trees from non-finalized batch");
+        throw RaxmlException("cannot obtain trees from non-optimized batch");
     }
 
     return this->tree_topologies[index];

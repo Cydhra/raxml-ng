@@ -371,6 +371,13 @@ protected:
     IDVector &tip_msa_idmap;
 
     /**
+     * Mutex guard for the topologies vector, where the topologies of previous optimize() calls are backed up, in case
+     * we end the algorithm before the current call to optimize() is finished.
+     * Unique pointer to provide inner mutability. Const so the move constructors don't touch it.
+     */
+    const std::unique_ptr<std::mutex> topology_access = make_unique<std::mutex>();
+
+    /**
      * The final tree topologies. This vector is populated by a call to `finalize()` and is otherwise empty.
      */
     std::vector<Tree> tree_topologies{};
