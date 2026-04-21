@@ -33,11 +33,38 @@ void TreesetOptimizer::initialize_bandits() {
     this->hierarchical_mab.emplace_back("Starting Trees", parsimony);
 }
 
-void TreesetOptimizer::run_batch(TunedBatch *batch) {
-    const auto opt_worker = std::bind(&TunedBatch::optimize, batch, std::ref(instance), std::ref(opts));
-    ParallelContext::init_pthreads_custom(opts, opt_worker, 8, 8);
-    opt_worker();
-    ParallelContext::finalize_threads();
+void TreesetOptimizer::run_batch(Bandit<std::shared_ptr<MultiArmedBandit<MetaParameters> > > &mab, Bandit<MetaParameters> &bandit,
+                   TunedBatch &batch, TaskGroup &context, unsigned int worker_id, unsigned int thread_id) {
+    batch.optimize(instance, opts);
+
+    if (context.is_group_leader(thread_id, worker_id)) {
+        // take measurements
+        mab.get_parameters()->get()->take_measurement(bandit, batch, true);
+        this->hierarchical_mab.take_measurement(mab, batch, true);
+
+        this->check_mab_modification(mab);
+
+        // inform the batch queue that the batch has been inferred
+        this->batch_queue.finish_batch(batch);
+
+        if (this->batch_queue.num_plausible_trees() > this->target_tree_count) {
+            // TODO we should also count the unfinished batches
+            pool.shutdown();
+        }
+    }
+}
+
+BatchTask TreesetOptimizer::next_work_unit() {
+    auto &mab = this->hierarchical_mab.select_next_bandit();
+    auto &current_bandit = mab.get_parameters().get()->get()->select_next_bandit();
+    auto &current_batch = this->batch_queue.select_next_batch(*current_bandit.get_parameters());
+    current_batch.update_meta_parameters(opts, current_bandit.get_parameters());
+
+    BatchTask runner = [this, &mab, &current_bandit, &current_batch](TaskGroup &context, const unsigned int worker_id, const unsigned int thread_id) {
+        this->run_batch(mab, current_bandit, current_batch, context, worker_id, thread_id);
+    };
+
+    return runner;
 }
 
 void TreesetOptimizer::run() {
@@ -48,29 +75,7 @@ void TreesetOptimizer::run() {
     // initialize all bandit arms, and add the parsimony arm to the top-level MAB.
     this->initialize_bandits();
 
-    while (this->batch_queue.num_plausible_trees() < this->target_tree_count) {
-        auto &mab = this->hierarchical_mab.select_next_bandit();
-        auto &current_bandit = mab.get_parameters().get()->get()->select_next_bandit();
-        auto &current_batch = this->batch_queue.select_next_batch(*current_bandit.get_parameters());
-
-        current_batch.update_meta_parameters(opts, current_bandit.get_parameters());
-        this->run_batch(&current_batch);
-
-        // take measurements
-        mab.get_parameters()->get()->take_measurement(current_bandit, current_batch, true);
-        this->hierarchical_mab.take_measurement(mab, current_batch, true);
-
-        this->check_mab_modification(mab);
-
-        // inform the batch queue that the batch has been inferred
-        this->batch_queue.finish_batch(current_batch);
-
-        // check if we would exceed the final tree count if we finalized the current batch immediately
-        if (this->batch_queue.num_plausible_trees() > this->target_tree_count) {
-            // TODO we should also count the unfinished batches
-            break;
-        }
-    }
+    pool.work(opts);
 
     LOG_INFO_TS << "Inferred " << this->batch_queue.num_plausible_trees() << " plausible trees in " << this->batch_queue.num_batches() <<
             " batches." << std::endl;

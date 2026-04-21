@@ -7,11 +7,18 @@
 #include "MultiArmedBandit.hpp"
 #include "../loadbalance/LoadBalancer.hpp"
 #include "../Checkpoint.hpp"
+#include "Threadpool.hpp"
 
 constexpr unsigned int DEFAULT_BATCH_SIZE = 16;
 
 class TreesetOptimizer {
 protected:
+    ThreadPool pool;
+
+    /**
+     * Reference to RaxmlInstance that we require for some of the optimization routines. We don't access or modify it,
+     * we just pass it to baseline algorithms.
+     */
     RaxmlInstance &instance;
 
     /**
@@ -58,7 +65,8 @@ protected:
      * For example, the successors to the parsimony arm are the light and commitment arms, so if the parsimony arm
      * does not find enough plausible trees, the successor arms are added to the algorithm.
      */
-    unordered_map<MultiArmedBandit<MetaParameters> *, std::vector<std::tuple<std::string, std::shared_ptr<MultiArmedBandit<MetaParameters> >>>> successors;
+    unordered_map<MultiArmedBandit<MetaParameters> *, std::vector<std::tuple<std::string, std::shared_ptr<
+        MultiArmedBandit<MetaParameters> > > > > successors;
 
     /**
      * Get the bandit that represents the distribution of plausible trees obtained from accepting starting trees.
@@ -74,9 +82,22 @@ protected:
     void initialize_bandits();
 
     /**
-     * TODO temporary method during refactoring to start threads
+     * Main method for the threadpool workers.
+     * This method runs one batch and then handles the updates to the MABs.
+     * It is bound into a BatchTask by next_work_unit.
      */
-    void run_batch(TunedBatch *batch);
+    void run_batch(Bandit<std::shared_ptr<MultiArmedBandit<MetaParameters> > > &mab, Bandit<MetaParameters> &bandit,
+                   TunedBatch &batch, TaskGroup &context, unsigned int worker_id, unsigned int thread_id);
+
+    /**
+     * Select a unit of work of the current state of the optimizer algorithm.
+     * This advances the multi-armed bandits, selects one using the current amount of learned information, and
+     * selects a batch to run the bandit against.
+     * It curries the necessary parameters to the main method of the batch (run_batch) leaving an instance of a BatchTask.
+     *
+     * @return the main method of the next tuned batch to call by all threads of the work group that called this method.
+     */
+    BatchTask next_work_unit();
 
 public:
     /**
@@ -97,7 +118,11 @@ public:
                      const std::vector<std::vector<doubleVector> > &persite_loglh,
                      LoadBalancer &load_balancer,
                      const unsigned int target_tree_count,
-                     const unsigned long long starting_seed) : instance(instance),
+                     const unsigned long long starting_seed) : pool(ThreadPool(
+                                                                   [this] {
+                                                                       return this->next_work_unit();
+                                                                   }, 8, 8, 1)),
+                                                               instance(instance),
                                                                opts(opts),
                                                                batch_queue(
                                                                    instance, opts, tip_msa_idmap, load_balancer, msa,
@@ -120,7 +145,7 @@ public:
      *
      * @param current_arm the arm of the MAB that was last modified
      */
-    void check_mab_modification(const Bandit<shared_ptr<MultiArmedBandit<MetaParameters>>> &current_arm);
+    void check_mab_modification(const Bandit<shared_ptr<MultiArmedBandit<MetaParameters> > > &current_arm);
 
     /**
      * Obtain all trees (plausible and rejected) inferred during the treeset optimization into a common vector and
