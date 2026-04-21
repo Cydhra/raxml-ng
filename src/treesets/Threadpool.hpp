@@ -36,11 +36,11 @@ public:
     /**
      * Determines the leader thread in a task group.
      *
-     * @param thread_id the local (within worker) thread id of the current thread
      * @param worker_id the local (within rank) worker (thread group) id of the current thread
+     * @param thread_id the local (within worker) thread id of the current thread
      * @return true, if the current thread is the leader of the task group
      */
-    bool is_group_leader(const unsigned int thread_id, const unsigned int worker_id) const {
+    bool is_group_leader(const unsigned int worker_id, const unsigned int thread_id) const {
         return thread_id == 0 && (worker_id % num_workers) == 0;
     }
 

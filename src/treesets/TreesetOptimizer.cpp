@@ -37,7 +37,7 @@ void TreesetOptimizer::run_batch(Bandit<std::shared_ptr<MultiArmedBandit<MetaPar
                    TunedBatch &batch, TaskGroup &context, unsigned int worker_id, unsigned int thread_id) {
     batch.optimize(instance, opts);
 
-    if (context.is_group_leader(thread_id, worker_id)) {
+    if (context.is_group_leader(worker_id, thread_id)) {
         // take measurements
         mab.get_parameters()->get()->take_measurement(bandit, batch, true);
         this->hierarchical_mab.take_measurement(mab, batch, true);
