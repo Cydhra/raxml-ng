@@ -26,8 +26,7 @@ void parallel_au_bootstrap(AuTest &tester, const CoarseAssignmentList &assignmen
 
     tester.run_bootstrap(tree_ids.size(), slice_start);
 
-    // todo replace with group barrier
-    ParallelContext::global_barrier();
+    context.enter_barrier();
 }
 
 void TunedBatch::mark_p_values_dirty() {
@@ -59,8 +58,7 @@ void TunedBatch::generate_starting_trees(RaxmlInstance &instance, const Options 
     }
 
     // barrier so we dont start building tree-info objects without finished trees (since the thread assignment changes)
-    // TODO replace with task group barrier
-    ParallelContext::global_barrier();
+    context.enter_barrier();
 
     // create context for tree inference and assign the initial model
     for (const auto id: this->coarse_assignments.at(worker_id)) {
@@ -111,8 +109,7 @@ void TunedBatch::optimize_topology(const Options &opts, const TaskGroup &context
             this->mark_p_values_dirty();
         }
 
-        // Todo replace with group barrier
-        ParallelContext::global_barrier(); // required to propagate auto-configuration
+        context.enter_barrier(); // required to propagate auto-configuration
         const auto begin = std::chrono::steady_clock::now();
 
         // run optimization kernel
@@ -268,7 +265,7 @@ void TunedBatch::perform_au_test(const TaskGroup &context, const unsigned int wo
     }
 
     // replace with group barrier
-    ParallelContext::global_barrier();
+    context.enter_barrier();
 
     // next, change the parallelization scheme to avoid splitting trees between workers. If we have more workers than
     // trees, this sucks, but currently AU doesn't support per-partition parallelization because that would require
