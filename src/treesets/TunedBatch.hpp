@@ -125,7 +125,7 @@ public:
           au_test(std::move(other.au_test)),
           meta_parameters_set(other.meta_parameters_set),
           initial_model_optimized(other.initial_model_optimized),
-          au_test_dirty(other.au_test_dirty),
+          au_test_dirty(other.au_test_dirty.load()),
           plausible_tree_count(other.plausible_tree_count),
           wall_time(other.wall_time) {
     }
@@ -159,7 +159,7 @@ public:
         au_test = std::move(other.au_test);
         meta_parameters_set = other.meta_parameters_set;
         initial_model_optimized = other.initial_model_optimized;
-        au_test_dirty = other.au_test_dirty;
+        au_test_dirty = other.au_test_dirty.load();
         plausible_tree_count = other.plausible_tree_count;
         wall_time = other.wall_time;
         return *this;
@@ -422,7 +422,7 @@ protected:
      * Flag indicating whether the au_test instance is outdated.
      * The class must set the flag to true whenever the per-site log-likelihoods for the batch trees change.
      */
-    bool au_test_dirty{true};
+    atomic_bool au_test_dirty{true};
 
     /**
      * Number of plausible trees as determined by the last AU test.
