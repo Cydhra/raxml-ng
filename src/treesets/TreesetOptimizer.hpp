@@ -114,7 +114,7 @@ public:
                      const unsigned long long starting_seed) : pool(ThreadPool(
                                                                    [this] {
                                                                        return this->next_work_unit();
-                                                                   }, 8, 8, 1)),
+                                                                   }, 8, 4, 2)),
                                                                instance(instance),
                                                                opts(opts),
                                                                batch_queue(
