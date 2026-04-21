@@ -102,7 +102,7 @@ protected:
  */
 class ThreadPool {
 public:
-    ThreadPool(TaskGenerator &task_generator, const unsigned int total_threads,
+    ThreadPool(const TaskGenerator &task_generator, const unsigned int total_threads,
                const unsigned int workers_per_task_group,
                const unsigned int num_task_groups) : total_threads(total_threads),
                                                      workers_per_task_group(workers_per_task_group),
@@ -145,7 +145,7 @@ protected:
      * For each task group, the generator is called and then the generated function is called once for each thread in
      * the task group.
      */
-    TaskGenerator &task_generator;
+    TaskGenerator task_generator;
 
     /**
      * Main function for all pool threads, where they organize themselves and select work until none is left.
