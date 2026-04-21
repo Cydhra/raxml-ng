@@ -9,17 +9,13 @@
 using namespace std::placeholders;
 
 /**
- * Ratio of plausible sets a batch needs to achieve to consider the thread parameters sufficient for inference
- */
-constexpr double ACCEPT_TUNING_THRESHOLD = 0.9;
-
-/**
  * Parallel kernel of the AU test bootstrapping, given to pthreads as their main function.
  * @param tester AuTest instance
  * @param assignment_list assignment of trees to workers
+ * @param worker_id group-local worker id
  */
 void parallel_au_bootstrap(AuTest &tester, const CoarseAssignmentList &assignment_list, const TaskGroup &context,
-                           unsigned int worker_id, unsigned int thread_id) {
+                           const unsigned int worker_id, unsigned int) {
     auto &tree_ids = assignment_list.at(worker_id);
 
     const auto slice_start = *tree_ids.begin();
@@ -241,7 +237,6 @@ void TunedBatch::optimize(RaxmlInstance &instance, const Options &opts, const Ta
         auto guard = std::lock_guard(*this->topology_access.get());
 
         // backup tree topologies so we can get the plausible trees on demand
-        unsigned int i = 0;
         for (auto &batch_tree: this->batch_trees) {
             this->tree_topologies.push_back(batch_tree.at(0).value().tree());
         }

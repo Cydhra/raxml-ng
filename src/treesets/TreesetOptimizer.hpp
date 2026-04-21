@@ -69,13 +69,6 @@ protected:
         MultiArmedBandit<MetaParameters> > > > > successors;
 
     /**
-     * Get the bandit that represents the distribution of plausible trees obtained from accepting starting trees.
-     */
-    Bandit<MetaParameters> &starting_tree_bandit() {
-        return this->light_mab->get_bandit(0);
-    }
-
-    /**
      * Initialize the bandit algorithms we use during the inference. These depend on the parameters derivded from initial
      * starting tree inference in `prepare_initial_batches()`
      */
