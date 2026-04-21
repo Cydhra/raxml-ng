@@ -240,13 +240,11 @@ void TunedBatch::optimize(RaxmlInstance &instance, const Options &opts, const Ta
 }
 
 void TunedBatch::perform_au_test(const TaskGroup &context, const unsigned int worker_id, const unsigned int thread_id) {
-    const bool batch_leader = worker_id == 0 && thread_id == 0;
-
     if (!this->au_test_dirty) {
         return;
     }
 
-    if (batch_leader) {
+    if (context.is_group_leader(worker_id, thread_id)) {
         this->au_test->reset_test_statistics();
     }
 
@@ -273,7 +271,7 @@ void TunedBatch::perform_au_test(const TaskGroup &context, const unsigned int wo
     // we therefore use as many workers as possible with one thread each now.
     parallel_au_bootstrap(*au_test, au_assignment, context, worker_id, thread_id);
 
-    if (batch_leader) {
+    if (context.is_group_leader(worker_id, thread_id)) {
         this->au_test->finalize_test_statistics();
         this->au_test->calculate_p_values();
 
