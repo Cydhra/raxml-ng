@@ -3,6 +3,7 @@
 
 #include <cassert>
 #include <utility>
+#include <atomic>
 #include "../ParallelContext.hpp"
 #include "SmartBarrier.hpp"
 
@@ -124,6 +125,21 @@ public:
      */
     void work(const Options &opts);
 
+    /**
+     * Thread groups will no longer ask for work and exit their main method.
+     * Threads will not cancel their existing work.
+     */
+    void shutdown() {
+        this->running.exchange(0);
+    }
+
+    /**
+     * Joins all remaining threads. This can only be called from the main thread.
+     */
+    static void join() {
+        ParallelContext::finalize();
+    }
+
 protected:
     /**
      * Total number of threads assigned to the pool (locally within an MPI rank).
@@ -146,6 +162,11 @@ protected:
      * the task group.
      */
     TaskGenerator task_generator;
+
+    /**
+     * While true, workers search for more work.
+     */
+    std::atomic_uint running = 1;
 
     /**
      * Main function for all pool threads, where they organize themselves and select work until none is left.

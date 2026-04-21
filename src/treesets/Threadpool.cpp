@@ -16,16 +16,18 @@ void ThreadPool::thread_main() {
     const auto task_id = worker_id / this->workers_per_task_group;
     TaskGroup &context = this->task_groups[task_id];
 
-    // obtain new task for this thread
-    if (context.is_group_leader(local_thread_id, worker_id)) {
-        const auto task = this->task_generator();
-        context.assign_task(std::move(task));
-        context.enter_barrier();
-    } else {
-        context.enter_barrier();
-    }
+    while (this->running) {
+        // obtain new task for this thread
+        if (context.is_group_leader(local_thread_id, worker_id)) {
+            const auto task = this->task_generator();
+            context.assign_task(std::move(task));
+            context.enter_barrier();
+        } else {
+            context.enter_barrier();
+        }
 
-    // solve task
-    const auto &task = context.get_task();
-    task(context, worker_id, local_thread_id);
+        // solve task
+        const auto &task = context.get_task();
+        task(context, worker_id, local_thread_id);
+    }
 }
