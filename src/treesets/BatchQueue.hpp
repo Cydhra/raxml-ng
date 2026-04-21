@@ -40,8 +40,11 @@ public:
      *
      * @return a pointer to the array of newly generated batches. The range [return_val, return_val + n] is a valid
      * range of TunedBatch instances.
+     *
+     * @param num_workers number of workers assigned to the batch
+     * @param num_threads total number of threads (not per worker) assigned to the batch
      */
-    TunedBatch &generate_batch();
+    TunedBatch &generate_batch(unsigned int num_workers, unsigned int num_threads);
 
     /**
      * Select a TunedBatch instance for inference with the given parameters.
@@ -49,7 +52,7 @@ public:
      * are compatible with the parameters used for that batch before, that batch is returned.
      * Otherwise, a new batch is generated and returned.
      */
-    TunedBatch &select_next_batch(const MetaParameters &current_parameters);
+    TunedBatch &select_next_batch(const MetaParameters &current_parameters, unsigned int num_workers, unsigned int num_threads);
 
     /**
      * Return a batch to the queue after inference is completed.

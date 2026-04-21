@@ -1,15 +1,5 @@
 #include "BatchQueue.hpp"
 
-int recommended_thread_count() {
-    // TODO add parameters to options containing the max thread count, which we just assign to the single worker per rank
-    return 8;
-}
-
-int recommended_worker_count() {
-    // TODO this is only true for the tuning phase
-    return 8;
-}
-
 /**
  * Backup a model from the given batch, iff a lock guard is provided.
  *
@@ -20,7 +10,7 @@ void guarded_backup_batch_model(const TunedBatch &batch, ModelMap &backup_model,
     batch.backup_models(backup_model);
 }
 
-TunedBatch &BatchQueue::generate_batch() {
+TunedBatch &BatchQueue::generate_batch(const unsigned int num_workers, const unsigned int num_threads) {
     const std::string name_prefix = "Batch";
 
     auto batch_name_index = next_batch_index.fetch_add(1);
@@ -33,8 +23,8 @@ TunedBatch &BatchQueue::generate_batch() {
     this->batches.emplace_back(batch_name,
                              generate_seed_for_trees(this->batch_size),
                              this->batch_size,
-                             recommended_thread_count(),
-                             recommended_worker_count(),
+                             num_threads,
+                             num_workers,
                              msa,
                              load_balancer,
                              tip_msa_idmap,
@@ -60,7 +50,7 @@ void BatchQueue::finalize_batch(TunedBatch &batch) {
     this->total_plausible_trees += batch.get_plausible_tree_count();
 }
 
-TunedBatch &BatchQueue::select_next_batch(const MetaParameters &current_parameters) {
+TunedBatch &BatchQueue::select_next_batch(const MetaParameters &current_parameters, const unsigned int num_workers, const unsigned int num_threads) {
     TunedBatch *selected_batch = nullptr;
 
     batch_mutex.lock();
@@ -89,7 +79,7 @@ TunedBatch &BatchQueue::select_next_batch(const MetaParameters &current_paramete
         // unlock mutex to allow generation of batches without keeping the queue locked, and because generate_batches
         // will attempt to lock it again when the batch is added to the vector.
         batch_mutex.unlock();
-        selected_batch = &generate_batch();
+        selected_batch = &generate_batch(num_workers, num_threads);
 
         // relock to add batch to in-flight set
         batch_mutex.lock();

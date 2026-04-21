@@ -153,6 +153,20 @@ public:
         ParallelContext::finalize();
     }
 
+    /**
+     * @return the total number of raxml workers assigned to each task group.
+     */
+    unsigned int workers_per_task() const {
+        return this->workers_per_task_group;
+    }
+
+    /**
+     * @return the total number of threads assigned to each task group. Divisible by the number of workers
+     */
+    unsigned int threads_per_task() const {
+        return this->total_threads / this->task_groups.size();
+    }
+
 protected:
     /**
      * Total number of threads assigned to the pool (locally within an MPI rank).
