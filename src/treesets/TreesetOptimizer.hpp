@@ -128,8 +128,6 @@ public:
                                                                    instance, opts, tip_msa_idmap, load_balancer, msa,
                                                                    persite_loglh, starting_seed, DEFAULT_BATCH_SIZE),
                                                                target_tree_count(target_tree_count) {
-        // place the first bandit that represents the distribution of plausible starting trees
-        this->light_mab->emplace_back("Parsimony", MetaParameters(1, true, 0, 0, true, false));
     }
 
     /**
