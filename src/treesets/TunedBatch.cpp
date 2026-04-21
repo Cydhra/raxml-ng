@@ -18,9 +18,9 @@ constexpr double ACCEPT_TUNING_THRESHOLD = 0.9;
  * @param tester AuTest instance
  * @param assignment_list assignment of trees to workers
  */
-void parallel_au_bootstrap(AuTest &tester, const CoarseAssignmentList &assignment_list, const TaskGroup &context, unsigned int worker_id, unsigned int thread_id) {
-    const unsigned int virtual_worker_id = context.get_group_thread_id(worker_id, thread_id);
-    auto &tree_ids = assignment_list.at(virtual_worker_id);
+void parallel_au_bootstrap(AuTest &tester, const CoarseAssignmentList &assignment_list, const TaskGroup &context,
+                           unsigned int worker_id, unsigned int thread_id) {
+    auto &tree_ids = assignment_list.at(worker_id);
 
     const auto slice_start = *tree_ids.begin();
 
@@ -51,8 +51,9 @@ void TunedBatch::generate_starting_trees(RaxmlInstance &instance, const Options 
     std::iota(seeds.begin(), seeds.end(), this->starting_seed);
 
     // generate trees from seeds
-    for (const auto id: this->exclusive_assignment.at(context.get_group_thread_id(worker_id, thread_id))) {
+    for (const auto id: this->exclusive_assignment.at(worker_id)) {
         (*this->batch_start_trees)[id] = generate_tree(instance, StartingTree::parsimony, seeds[id], false);
+        this->num_trees_generated.fetch_add(1);
     }
 
     // barrier so we dont start building tree-info objects without finished trees (since the thread assignment changes)
@@ -78,7 +79,8 @@ void TunedBatch::generate_starting_trees(RaxmlInstance &instance, const Options 
     }
 }
 
-void TunedBatch::optimize_topology(const Options &opts, const TaskGroup &context, const unsigned int worker_id, const unsigned int thread_id) {
+void TunedBatch::optimize_topology(const Options &opts, const TaskGroup &context, const unsigned int worker_id,
+                                   const unsigned int thread_id) {
     const auto &tree_ids = this->coarse_assignments.at(worker_id);
 
     // copy current status into local variables. This is simpler than putting those states into atomic counters and add
@@ -231,6 +233,7 @@ void TunedBatch::optimize(RaxmlInstance &instance, const Options &opts, const Ta
         auto guard = std::lock_guard(*this->topology_access.get());
 
         // backup tree topologies so we can get the plausible trees on demand
+        unsigned int i = 0;
         for (auto &batch_tree: this->batch_trees) {
             this->tree_topologies.push_back(batch_tree.at(0).value().tree());
         }
@@ -278,7 +281,8 @@ void TunedBatch::perform_au_test(const TaskGroup &context, const unsigned int wo
     }
 }
 
-void TunedBatch::perform_plausibility_check(const TaskGroup &context, const unsigned int worker_id, const unsigned int thread_id) {
+void TunedBatch::perform_plausibility_check(const TaskGroup &context, const unsigned int worker_id,
+                                            const unsigned int thread_id) {
     // TODO should we backup the less optimized model or just accept that we overspecify the model
     this->optimize_parameters(context, worker_id, thread_id, 0.1, true, true, true);
 
@@ -384,13 +388,6 @@ unsigned int TunedBatch::get_plausible_tree_count() const {
     }
 
     throw new RaxmlException("current p-values are dirty");
-}
-
-bool TunedBatch::start_trees_generated() const {
-    // generating the starting trees will initialize the TreeInfo objects in this->batch_trees, which is otherwise empty.
-    // note that this method is not thread save, because it assumes the vector is either initialized fully, or not at all,
-    // meaning a partial initialization during starting tree generation will lead to unpredictable behavior
-    return this->batch_trees.front().front().has_value();
 }
 
 Tree TunedBatch::get_tree(const unsigned int index) const {

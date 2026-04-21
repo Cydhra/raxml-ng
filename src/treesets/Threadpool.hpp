@@ -54,7 +54,7 @@ public:
      * @return thread id of contiguous ids in the TaskGroup
      */
     unsigned int get_group_thread_id(const unsigned int worker_id, const unsigned int thread_id) const {
-        return worker_id * (num_threads / num_workers) + thread_id;
+        return (worker_id % num_workers) * (num_threads / num_workers) + thread_id;
     }
 
     /**

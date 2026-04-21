@@ -57,12 +57,12 @@ public:
 
         // we can initialize au_test only after initializing the per-site lnl partition vectors
         this->au_test = std::make_shared<AuTest>(msa, reference_persite_loglh, batch_persite_logh, AU_DEFAULT_SCALES,
-                                       AU_DEFAULT_REPS, starting_seed);
+                                                 AU_DEFAULT_REPS, starting_seed);
         this->au_test->allocate_test_statistics();
 
         // prepare space for the tree-info objects
-        this->batch_trees = std::vector<std::vector<std::optional<TreeInfo>> >(batch_size);
-        for (auto &vector : batch_trees) {
+        this->batch_trees = std::vector<std::vector<std::optional<TreeInfo> > >(batch_size);
+        for (auto &vector: batch_trees) {
             vector.resize(this->num_threads_per_worker());
         }
 
@@ -177,7 +177,8 @@ public:
      * @param instance Raxml instance, required for tree generation
      * @param opts command line options, required for parameter optimization
      */
-    void optimize(RaxmlInstance &instance, const Options &opts, const TaskGroup &context, unsigned int worker_id, unsigned int thread_id);
+    void optimize(RaxmlInstance &instance, const Options &opts, const TaskGroup &context, unsigned int worker_id,
+                  unsigned int thread_id);
 
     /**
      * Perform the AU test on the trees in the batch, as well as the supplied reference trees,
@@ -243,11 +244,6 @@ public:
      * @return Time spent working on inference in milliseconds.
      */
     unsigned int elapsed_wall_time() const;
-
-    /**
-     * @return Whether the starting trees have been generated for this batch.
-     */
-    bool start_trees_generated() const;
 
     /**
      * Compute the output tree of the `index`-th tree of this batch.
@@ -388,7 +384,7 @@ protected:
      * The outer vector is indexed by tree, the inner by in-worker thread id (i.e. if each worker has 4 threads,
      * the inner vectors contain 4 TreeInfo instances).
      */
-    std::vector<std::vector<std::optional<TreeInfo>>> batch_trees;
+    std::vector<std::vector<std::optional<TreeInfo> > > batch_trees;
 
     /**
      * Per-site log-likelihoods of the trees inferred in this batch. We recalculate these if the tree has changed,
@@ -411,6 +407,11 @@ protected:
      * Flag indicating whether the batch has been configured with meta-parameters.
      */
     bool meta_parameters_set{false};
+
+    /**
+     * How many starting trees have been generated.
+     */
+    atomic_uint num_trees_generated{0};
 
     /**
      * Flag indicating whether the model has been optimized once (or alternatively, if a pre-optimized model
@@ -465,9 +466,17 @@ protected:
     }
 
     /**
+     * @return Whether all starting trees have been generated for this batch.
+     */
+    bool start_trees_generated() const {
+        return this->num_trees_generated == get_batch_size();
+    }
+
+    /**
      * Generate parsimony starting trees for this batch, and initialize the tree inference.
      */
-    void generate_starting_trees(RaxmlInstance &instance, const Options &opts, const TaskGroup &context, unsigned int worker_id, unsigned int thread_id);
+    void generate_starting_trees(RaxmlInstance &instance, const Options &opts, const TaskGroup &context,
+                                 unsigned int worker_id, unsigned int thread_id);
 
     /**
      * Perform model and branch length optimization according to the current tuning parameters and the given epsilon.
@@ -478,14 +487,16 @@ protected:
      * @param branches if true, optimize branch lengths
      * @param force if true, model optimization is forced, even if batch tuning parameters turn it off
      */
-    void optimize_parameters(const TaskGroup &context, unsigned int worker_id, unsigned int thread_id, double epsilon, bool model = true, bool branches = true,bool force = false);
+    void optimize_parameters(const TaskGroup &context, unsigned int worker_id, unsigned int thread_id, double epsilon,
+                             bool model = true, bool branches = true, bool force = false);
 
     /**
      * Perform SPR rounds up to the target count, with meta-parameters according to the batch settings.
      *
      * @param opts parsed command line options and forced RAxML settings
      */
-    void optimize_topology(const Options &opts, const TaskGroup &context, unsigned int worker_id, unsigned int thread_id);
+    void optimize_topology(const Options &opts, const TaskGroup &context, unsigned int worker_id,
+                           unsigned int thread_id);
 
     /**
      * Perform the AU test on the trees in the batch, as well as the supplied reference trees.

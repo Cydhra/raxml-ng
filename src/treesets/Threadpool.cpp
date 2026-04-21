@@ -13,8 +13,11 @@ void ThreadPool::thread_main() {
     // determine local context of this thread
     const auto local_thread_id = ParallelContext::local_thread_id();
     const auto worker_id = ParallelContext::local_group_id();
+
     const auto task_id = worker_id / this->workers_per_task_group;
     TaskGroup &context = this->task_groups[task_id];
+
+    const auto group_worker_id = context.get_group_thread_id(worker_id, local_thread_id);
 
     while (this->running) {
         // obtain new task for this thread
@@ -28,7 +31,7 @@ void ThreadPool::thread_main() {
 
         // solve task
         const auto &task = context.get_task();
-        task(context, worker_id, local_thread_id);
+        task(context, group_worker_id, local_thread_id);
 
         // wait at a barrier to make sure the task isn't shutting down the threadpool while some workers are already
         // in the next loop iteration.
