@@ -39,8 +39,6 @@ unsigned int TunedBatch::get_batch_size() const {
 
 void TunedBatch::generate_starting_trees(RaxmlInstance &instance, const Options &opts, const TaskGroup &context,
                                          const unsigned int worker_id, const unsigned int thread_id) {
-    const unsigned int group_worker_id = worker_id * num_threads_per_worker() + thread_id;
-
     if (context.is_group_leader(worker_id, thread_id)) {
         this->mark_p_values_dirty();
     }
@@ -53,7 +51,7 @@ void TunedBatch::generate_starting_trees(RaxmlInstance &instance, const Options 
     std::iota(seeds.begin(), seeds.end(), this->starting_seed);
 
     // generate trees from seeds
-    for (const auto id: this->exclusive_assignment.at(group_worker_id)) {
+    for (const auto id: this->exclusive_assignment.at(context.get_group_thread_id(worker_id, thread_id))) {
         (*this->batch_start_trees)[id] = generate_tree(instance, StartingTree::parsimony, seeds[id], false);
     }
 
