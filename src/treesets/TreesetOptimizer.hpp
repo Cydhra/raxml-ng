@@ -68,15 +68,6 @@ protected:
     }
 
     /**
-     * Prepare the initial TunedBatch instances we use for inference.
-     * Because we have a number of trees we have to infer, we have a minimum number of batches required even if every
-     * tree becomes plausible.
-     * Those are inferred here, and they are used to infer initial guesses over meta-parameters, like the variance of
-     * the underlying distribution of plausible trees.
-     */
-    void prepare_initial_batches();
-
-    /**
      * Initialize the bandit algorithms we use during the inference. These depend on the parameters derivded from initial
      * starting tree inference in `prepare_initial_batches()`
      */
