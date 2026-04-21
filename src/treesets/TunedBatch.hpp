@@ -5,6 +5,7 @@
 #include <optional>
 #include <utility>
 #include "MetaParameters.hpp"
+#include "Threadpool.hpp"
 #include "../loadbalance/LoadBalancer.hpp"
 #include "../loadbalance/CoarseLoadBalancer.hpp"
 #include "../au/AuTest.hpp"
@@ -176,7 +177,7 @@ public:
      * @param instance Raxml instance, required for tree generation
      * @param opts command line options, required for parameter optimization
      */
-    void optimize(RaxmlInstance &instance, const Options &opts);
+    void optimize(RaxmlInstance &instance, const Options &opts, const TaskGroup &context, unsigned int worker_id, unsigned int thread_id);
 
     /**
      * Perform the AU test on the trees in the batch, as well as the supplied reference trees,
@@ -184,7 +185,7 @@ public:
      *
      * @return The number of plausible trees.
      */
-    void perform_plausibility_check();
+    void perform_plausibility_check(const TaskGroup &context, unsigned int worker_id, unsigned int thread_id);
 
     /**
      * Update the meta heuristical parameters of the batch, reconfiguring the search parameters from them.
@@ -466,7 +467,7 @@ protected:
     /**
      * Generate parsimony starting trees for this batch, and initialize the tree inference.
      */
-    void generate_starting_trees(RaxmlInstance &instance, const Options &opts);
+    void generate_starting_trees(RaxmlInstance &instance, const Options &opts, const TaskGroup &context, unsigned int worker_id, unsigned int thread_id);
 
     /**
      * Perform model and branch length optimization according to the current tuning parameters and the given epsilon.
@@ -477,20 +478,19 @@ protected:
      * @param branches if true, optimize branch lengths
      * @param force if true, model optimization is forced, even if batch tuning parameters turn it off
      */
-    void optimize_parameters(double epsilon, bool model = true, bool branches = true,
-                             bool force = false);
+    void optimize_parameters(const TaskGroup &context, unsigned int worker_id, unsigned int thread_id, double epsilon, bool model = true, bool branches = true,bool force = false);
 
     /**
      * Perform SPR rounds up to the target count, with meta-parameters according to the batch settings.
      *
      * @param opts parsed command line options and forced RAxML settings
      */
-    void optimize_topology(const Options &opts);
+    void optimize_topology(const Options &opts, const TaskGroup &context, unsigned int worker_id, unsigned int thread_id);
 
     /**
      * Perform the AU test on the trees in the batch, as well as the supplied reference trees.
      */
-    void perform_au_test();
+    void perform_au_test(const TaskGroup &context, unsigned int worker_id, unsigned int thread_id);
 
     /**
      * Called when the per-site log-likelihoods change, overriding the results of the AU-test

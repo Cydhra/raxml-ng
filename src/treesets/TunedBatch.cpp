@@ -4,6 +4,7 @@
 #include "../loadbalance/CoarseLoadBalancer.hpp"
 #include <chrono>
 #include "Bandit.hpp"
+#include "Threadpool.hpp"
 
 using namespace std::placeholders;
 
@@ -17,11 +18,8 @@ constexpr double ACCEPT_TUNING_THRESHOLD = 0.9;
  * @param tester AuTest instance
  * @param assignment_list assignment of trees to workers
  */
-void parallel_au_bootstrap(AuTest &tester, const CoarseAssignmentList &assignment_list) {
-    const unsigned int worker_id = ParallelContext::local_group_id();
-    const unsigned int thread_id = ParallelContext::local_thread_id();
-    const unsigned int threads_per_worker = ParallelContext::threads_per_group();
-    const unsigned int virtual_worker_id = worker_id * threads_per_worker + thread_id;
+void parallel_au_bootstrap(AuTest &tester, const CoarseAssignmentList &assignment_list, const TaskGroup &context, unsigned int worker_id, unsigned int thread_id) {
+    const unsigned int virtual_worker_id = context.get_group_thread_id(worker_id, thread_id);
     auto &tree_ids = assignment_list.at(virtual_worker_id);
 
     const auto slice_start = *tree_ids.begin();
@@ -40,13 +38,11 @@ unsigned int TunedBatch::get_batch_size() const {
     return this->batch_start_trees->size();
 }
 
-void TunedBatch::generate_starting_trees(RaxmlInstance &instance, const Options &opts) {
-    const unsigned int thread_id = ParallelContext::local_thread_id();
-    const unsigned int worker_id = ParallelContext::local_group_id();
+void TunedBatch::generate_starting_trees(RaxmlInstance &instance, const Options &opts, const TaskGroup &context,
+                                         const unsigned int worker_id, const unsigned int thread_id) {
     const unsigned int group_worker_id = worker_id * num_threads_per_worker() + thread_id;
-    const bool thread_leader = thread_id == 0 && worker_id == 0;
 
-    if (thread_leader) {
+    if (context.is_group_leader(worker_id, thread_id)) {
         this->mark_p_values_dirty();
     }
 
@@ -69,11 +65,11 @@ void TunedBatch::generate_starting_trees(RaxmlInstance &instance, const Options 
     // create context for tree inference and assign the initial model
     for (const auto id: this->coarse_assignments.at(worker_id)) {
         this->batch_trees[id][thread_id].emplace(opts, this->batch_start_trees->at(id), *this->msa,
-                                                        this->tip_msa_idmap, this->part_assignments[thread_id]);
+                                                 this->tip_msa_idmap, this->part_assignments[thread_id]);
         assign_models(batch_trees[id][thread_id].value(), this->initial_model);
     }
 
-    if (thread_leader) {
+    if (context.is_group_leader(worker_id, thread_id)) {
         const auto end = std::chrono::steady_clock::now();
 
         const unsigned int elapsed = static_cast<unsigned int>(std::chrono::duration_cast<
@@ -86,11 +82,8 @@ void TunedBatch::generate_starting_trees(RaxmlInstance &instance, const Options 
     }
 }
 
-void TunedBatch::optimize_topology(const Options &opts) {
-    const unsigned int thread_id = ParallelContext::local_thread_id();
-    const unsigned int worker_id = ParallelContext::local_group_id();
+void TunedBatch::optimize_topology(const Options &opts, const TaskGroup &context, const unsigned int worker_id, const unsigned int thread_id) {
     const auto &tree_ids = this->coarse_assignments.at(worker_id);
-    const bool batch_leader = worker_id == 0 && thread_id == 0;
 
     // copy current status into local variables. This is simpler than putting those states into atomic counters and add
     // barriers to their access
@@ -104,7 +97,7 @@ void TunedBatch::optimize_topology(const Options &opts) {
         auto total_rounds = fast ? meta_parameters->num_fast_spr : meta_parameters->num_slow_spr;
         auto num_rounds = total_rounds - rounds_performed;
 
-        if (batch_leader) {
+        if (context.is_group_leader(worker_id, thread_id)) {
             auto round_name = fast ? "FAST" : "SLOW";
 
             LOG_INFO_TS << this->name << ": Optimizing topology (" << num_rounds << " of " << total_rounds << " total "
@@ -130,7 +123,8 @@ void TunedBatch::optimize_topology(const Options &opts) {
             }
 
             LOG_WORKER_TS(LogLevel::debug) << "performed " << (total_rounds - rounds_performed)
-                    << (spr_params.ntopol_keep < 20 ? " GREEDY" : " FAST") << " spr rounds (radius: " << spr_params.radius_min
+                    << (spr_params.ntopol_keep < 20 ? " GREEDY" : " FAST") << " spr rounds (radius: " << spr_params.
+                    radius_min
                     << ") for tree search #" << (tree_id + 1) << std::endl;
         }
 
@@ -141,7 +135,7 @@ void TunedBatch::optimize_topology(const Options &opts) {
         }
 
         // update the TunedBatch status
-        if (batch_leader) {
+        if (context.is_group_leader(worker_id, thread_id)) {
             const auto end = std::chrono::steady_clock::now();
 
             const unsigned int elapsed = static_cast<unsigned int>(std::chrono::duration_cast<
@@ -157,13 +151,12 @@ void TunedBatch::optimize_topology(const Options &opts) {
     }
 }
 
-void TunedBatch::optimize_parameters(double epsilon, const bool model, const bool branches, const bool force) {
-    const unsigned int thread_id = ParallelContext::local_thread_id();
-    const unsigned int worker_id = ParallelContext::local_group_id();
+void TunedBatch::optimize_parameters(const TaskGroup &context, const unsigned int worker_id,
+                                     const unsigned int thread_id, double epsilon, const bool model,
+                                     const bool branches, const bool force) {
     const auto &tree_ids = this->coarse_assignments.at(worker_id);
-    const bool batch_leader = worker_id == 0 && thread_id == 0;
 
-    if (batch_leader) {
+    if (context.is_group_leader(worker_id, thread_id)) {
         this->mark_p_values_dirty();
     }
 
@@ -176,7 +169,7 @@ void TunedBatch::optimize_parameters(double epsilon, const bool model, const boo
     }
 
     if (opt_model && opt_branches) {
-        if (batch_leader) {
+        if (context.is_group_leader(worker_id, thread_id)) {
             LOG_INFO_TS << this->name << ": Optimizing all params (eps: " << epsilon << ")" << std::endl;
         }
 
@@ -185,7 +178,7 @@ void TunedBatch::optimize_parameters(double epsilon, const bool model, const boo
             batch_trees[tree_id][thread_id].value().optimize_params(CORAX_OPT_PARAM_ALL, epsilon);
         }
     } else if (opt_model) {
-        if (batch_leader) {
+        if (context.is_group_leader(worker_id, thread_id)) {
             LOG_INFO_TS << this->name << ": Optimizing model (eps: " << epsilon << ")" << std::endl;
         }
 
@@ -194,7 +187,7 @@ void TunedBatch::optimize_parameters(double epsilon, const bool model, const boo
             batch_trees[tree_id][thread_id].value().optimize_model(epsilon);
         }
     } else if (branches) {
-        if (batch_leader) {
+        if (context.is_group_leader(worker_id, thread_id)) {
             LOG_INFO_TS << this->name << ": Optimizing branches (eps: " << epsilon << ")" << std::endl;
         }
 
@@ -204,45 +197,42 @@ void TunedBatch::optimize_parameters(double epsilon, const bool model, const boo
         }
     }
 
-    if (batch_leader) {
+    if (context.is_group_leader(worker_id, thread_id)) {
         LOG_INFO_TS << this->name << ": Model Opt complete (eps: " << epsilon << ")" << std::endl;
     }
 }
 
-void TunedBatch::optimize(RaxmlInstance &instance, const Options &opts) {
-    const unsigned int thread_id = ParallelContext::local_thread_id();
-    const unsigned int worker_id = ParallelContext::local_group_id();
-    const bool batch_leader = worker_id == 0 && thread_id == 0;
-
+void TunedBatch::optimize(RaxmlInstance &instance, const Options &opts, const TaskGroup &context,
+                          const unsigned int worker_id, const unsigned int thread_id) {
     if (!meta_parameters_set) {
         throw RaxmlException("TunedBatch has not been configured with meta heuristics");
     }
 
     if (!this->start_trees_generated()) {
-        this->generate_starting_trees(instance, opts);
+        this->generate_starting_trees(instance, opts, context, worker_id, thread_id);
     }
 
     if (!meta_parameters->accept_starting_trees) {
         // do initial model and branch length optimization
         if (!this->initial_model_optimized) {
-            this->optimize_parameters(3.0);
+            this->optimize_parameters(context, worker_id, thread_id, 3.0);
 
-            if (batch_leader) {
+            if (context.is_group_leader(worker_id, thread_id)) {
                 this->initial_model_optimized = true;
             }
         }
 
         // compute all required SPR rounds
-        this->optimize_topology(opts);
+        this->optimize_topology(opts, context, worker_id, thread_id);
     }
 
-    if (batch_leader) {
+    if (context.is_group_leader(worker_id, thread_id)) {
         LOG_INFO_TS << this->name << ": total batch time after heuristics: " << this->wall_time << "ms." << std::endl;
     }
 
-    perform_plausibility_check();
+    perform_plausibility_check(context, worker_id, thread_id);
 
-    if (batch_leader) {
+    if (context.is_group_leader(worker_id, thread_id)) {
         auto guard = std::lock_guard(*this->topology_access.get());
 
         // backup tree topologies so we can get the plausible trees on demand
@@ -252,9 +242,7 @@ void TunedBatch::optimize(RaxmlInstance &instance, const Options &opts) {
     }
 }
 
-void TunedBatch::perform_au_test() {
-    const unsigned int thread_id = ParallelContext::local_thread_id();
-    const unsigned int worker_id = ParallelContext::local_group_id();
+void TunedBatch::perform_au_test(const TaskGroup &context, const unsigned int worker_id, const unsigned int thread_id) {
     const bool batch_leader = worker_id == 0 && thread_id == 0;
 
     if (!this->au_test_dirty) {
@@ -286,7 +274,7 @@ void TunedBatch::perform_au_test() {
     // trees, this sucks, but currently AU doesn't support per-partition parallelization because that would require
     // synchronizing accesses to the bootstrap replicate likelihood sums.
     // we therefore use as many workers as possible with one thread each now.
-    parallel_au_bootstrap(*au_test, au_assignment);
+    parallel_au_bootstrap(*au_test, au_assignment, context, worker_id, thread_id);
 
     if (batch_leader) {
         this->au_test->finalize_test_statistics();
@@ -297,18 +285,14 @@ void TunedBatch::perform_au_test() {
     }
 }
 
-void TunedBatch::perform_plausibility_check() {
-    const unsigned int thread_id = ParallelContext::local_thread_id();
-    const unsigned int worker_id = ParallelContext::local_group_id();
-    const bool batch_leader = worker_id == 0 && thread_id == 0;
-
+void TunedBatch::perform_plausibility_check(const TaskGroup &context, const unsigned int worker_id, const unsigned int thread_id) {
     // TODO should we backup the less optimized model or just accept that we overspecify the model
-    this->optimize_parameters(0.1, true, true, true);
+    this->optimize_parameters(context, worker_id, thread_id, 0.1, true, true, true);
 
-    this->perform_au_test();
+    this->perform_au_test(context, worker_id, thread_id);
 
     // no barrier required, since batch leader is the one who finishes the AU test
-    if (batch_leader) {
+    if (context.is_group_leader(worker_id, thread_id)) {
         this->plausible_tree_count = 0;
         auto first = this->au_test->get_p_values().begin() + reference_persite_loglh.size();
         for (const auto last = this->au_test->get_p_values().end(); first != last; ++first) {
