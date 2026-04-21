@@ -41,7 +41,7 @@ public:
      * @return a pointer to the array of newly generated batches. The range [return_val, return_val + n] is a valid
      * range of TunedBatch instances.
      */
-    TunedBatch *generate_batches(unsigned int n);
+    TunedBatch &generate_batch();
 
     /**
      * Select a TunedBatch instance for inference with the given parameters.
@@ -80,7 +80,7 @@ public:
     /**
      * @return read-only access to the batch vector
      */
-    std::vector<TunedBatch> const &view_batches() const {
+    std::deque<TunedBatch> const &view_batches() const {
         return this->batches;
     }
 
@@ -121,8 +121,11 @@ protected:
      *
      * Some of the batches might already be finalized.
      * There is, however, no guarantee that the finalized batches are contiguous.
+     *
+     * This needs to be a deque rather than a vector because threads will hold references while elements are inserted,
+     * so moving of existing elements must not happen.
      */
-    std::vector<TunedBatch> batches;
+    std::deque<TunedBatch> batches;
 
     /**
      * Because some batches can be reused after inference if they did not achieve

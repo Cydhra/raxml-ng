@@ -20,41 +20,36 @@ void guarded_backup_batch_model(const TunedBatch &batch, ModelMap &backup_model,
     batch.backup_models(backup_model);
 }
 
-TunedBatch *BatchQueue::generate_batches(const unsigned int n) {
+TunedBatch &BatchQueue::generate_batch() {
     const std::string name_prefix = "Batch";
 
-    auto batch_name_index = next_batch_index.fetch_add(n);
+    auto batch_name_index = next_batch_index.fetch_add(1);
 
     // lock the mutex for the batch queue
     const std::lock_guard<std::mutex> lock(batch_mutex);
 
-    // get current final index
-    const auto new_slice_start = this->batches.size();
-
     // place new batches at the end of the queue, and mark them as unfinished
-    for (size_t i = 0; i < n; i++) {
-        std::string batch_name = name_prefix + std::to_string(batch_name_index++);
-        this->batches.emplace_back(batch_name,
-                                 generate_seed_for_trees(this->batch_size),
-                                 this->batch_size,
-                                 recommended_thread_count(),
-                                 recommended_worker_count(),
-                                 msa,
-                                 load_balancer,
-                                 tip_msa_idmap,
-                                 persite_loglh);
-        auto &batch = this->batches.back();
+    std::string batch_name = name_prefix + std::to_string(batch_name_index);
+    this->batches.emplace_back(batch_name,
+                             generate_seed_for_trees(this->batch_size),
+                             this->batch_size,
+                             recommended_thread_count(),
+                             recommended_worker_count(),
+                             msa,
+                             load_balancer,
+                             tip_msa_idmap,
+                             persite_loglh);
+    auto &batch = this->batches.back();
 
-        // mark the batch as unfinished
-        this->unfinished.emplace(batch.get_name());
+    // mark the batch as unfinished
+    this->unfinished.emplace(batch.get_name());
 
-        // assign the prepared model. If we have no model backed up yet, this is initialized with the default model,
-        // so nothing will break. This requires that the batch mutex is locked
-        batch.assign_batch_models(*this->backup_model);
-    }
+    // assign the prepared model. If we have no model backed up yet, this is initialized with the default model,
+    // so nothing will break. This requires that the batch mutex is locked
+    batch.assign_batch_models(*this->backup_model);
 
     // return (which drops the mutex guard)
-    return this->batches.data() + new_slice_start;
+    return this->batches[batch_name_index];
 }
 
 void BatchQueue::finalize_batch(TunedBatch &batch) {
@@ -94,7 +89,7 @@ TunedBatch &BatchQueue::select_next_batch(const MetaParameters &current_paramete
         // unlock mutex to allow generation of batches without keeping the queue locked, and because generate_batches
         // will attempt to lock it again when the batch is added to the vector.
         batch_mutex.unlock();
-        selected_batch = &generate_batches(1)[0];
+        selected_batch = &generate_batch();
 
         // relock to add batch to in-flight set
         batch_mutex.lock();
