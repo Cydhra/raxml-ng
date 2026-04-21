@@ -29,5 +29,10 @@ void ThreadPool::thread_main() {
         // solve task
         const auto &task = context.get_task();
         task(context, worker_id, local_thread_id);
+
+        // wait at a barrier to make sure the task isn't shutting down the threadpool while some workers are already
+        // in the next loop iteration.
+        // TODO this still breaks if another thread cancels the pool while some workers are still in this barrier and others already left
+        context.enter_barrier();
     }
 }
