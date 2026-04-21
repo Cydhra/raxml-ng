@@ -168,7 +168,13 @@ public:
     }
 
 protected:
-    std::vector<Bandit<Heuristic> > bandits = std::vector<Bandit<Heuristic> >();
+    /**
+     * Registered bandits in this MAB.
+     * Bandits must not be removed from this list.
+     * This list is implemented with a deque to avoid reallocations while batches hold references to the bandits
+     * in the list.
+     */
+    std::deque<Bandit<Heuristic> > bandits = std::deque<Bandit<Heuristic> >();
 
     /**
      * Points to the bandit that was selected last.
