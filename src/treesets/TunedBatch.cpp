@@ -165,6 +165,8 @@ void TunedBatch::optimize_parameters(const TaskGroup &context, const unsigned in
         epsilon = 0.1;
     }
 
+    const auto begin = std::chrono::steady_clock::now();
+
     if (opt_model && opt_branches) {
         if (context.is_group_leader(worker_id, thread_id)) {
             LOG_INFO_TS << this->name << ": Optimizing all params (eps: " << epsilon << ")" << std::endl;
@@ -195,6 +197,12 @@ void TunedBatch::optimize_parameters(const TaskGroup &context, const unsigned in
     }
 
     if (context.is_group_leader(worker_id, thread_id)) {
+        if (!force) {
+            const auto end = std::chrono::steady_clock::now();
+            this->wall_time += static_cast<unsigned int>(std::chrono::duration_cast<
+                std::chrono::milliseconds>(end - begin).count());
+        }
+
         LOG_INFO_TS << this->name << ": Model Opt complete (eps: " << epsilon << ")" << std::endl;
     }
 }
