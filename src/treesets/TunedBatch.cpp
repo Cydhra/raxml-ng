@@ -284,6 +284,7 @@ void TunedBatch::perform_au_test(const TaskGroup &context, const unsigned int wo
 void TunedBatch::perform_plausibility_check(const TaskGroup &context, const unsigned int worker_id,
                                             const unsigned int thread_id) {
     // TODO should we backup the less optimized model or just accept that we overspecify the model
+    const auto begin = std::chrono::steady_clock::now();
     this->optimize_parameters(context, worker_id, thread_id, 0.1, true, true, true);
 
     this->perform_au_test(context, worker_id, thread_id);
@@ -300,6 +301,11 @@ void TunedBatch::perform_plausibility_check(const TaskGroup &context, const unsi
 
         LOG_INFO_TS << "AU test found " << plausible_tree_count << " plausible trees for " << this->name << "." <<
                 std::endl;
+
+        const auto end = std::chrono::steady_clock::now();
+        this->au_wall_time = static_cast<unsigned int>(std::chrono::duration_cast<std::chrono::milliseconds>(
+                end - begin)
+            .count());
     }
 }
 
@@ -379,7 +385,7 @@ void TunedBatch::finalize() {
 }
 
 unsigned int TunedBatch::elapsed_wall_time() const {
-    return this->wall_time;
+    return this->wall_time + this->au_wall_time;
 }
 
 unsigned int TunedBatch::get_plausible_tree_count() const {

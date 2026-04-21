@@ -440,6 +440,13 @@ protected:
     unsigned int wall_time{0};
 
     /**
+     * Time spent in AU test. This has to be considered for the total wall time, because the amortized cost of AU test
+     * increases if less trees become plausible. But it cannot be added directly on top of the wall time, because
+     * batch reusing should not double-count the AU test time.
+     */
+    unsigned int au_wall_time{0};
+
+    /**
      * Update spr_params instance according to the meta_parameters
      */
     void auto_configure(const Options &opts) {
