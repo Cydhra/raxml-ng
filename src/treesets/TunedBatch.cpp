@@ -398,11 +398,7 @@ unsigned int TunedBatch::elapsed_wall_time() const {
 }
 
 unsigned int TunedBatch::get_plausible_tree_count() const {
-    if (au_test->is_finished() && !au_test_dirty) {
-        return this->plausible_tree_count;
-    }
-
-    throw new RaxmlException("current p-values are dirty");
+    return this->plausible_tree_count;
 }
 
 Tree TunedBatch::get_tree(const unsigned int index) const {
