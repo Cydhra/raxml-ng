@@ -86,11 +86,13 @@ public:
         auto &best_bandit = this->bandits[this->best_known_bandit];
 
         if (selected_bandit.num_samples() == 0) {
-            LOG_INFO << std::endl << "Initial estimation of " << selected_bandit.get_name() << "." << std::endl;
+            LOG_INFO << std::endl;
+            LOG_WORKER_TS(LogLevel::info) << "Initial estimation of " << selected_bandit.get_name() << "." << std::endl;
         } else {
             if (this->bandit_cursor != this->best_known_bandit && selected_bandit.is_worse_than(
                     best_bandit, iterations_completed)) {
-                LOG_INFO << std::endl << "Switching to best bandit " << best_bandit.get_name() <<
+                LOG_INFO << std::endl;
+                LOG_WORKER_TS(LogLevel::info) << "Switching to best bandit " << best_bandit.get_name() <<
                         " because its mean expected success ("
                         << (best_bandit.get_mean_throughput() * 1000.0) <<
                         " t/s) exceeds the largest reasonable success of "
@@ -102,7 +104,7 @@ public:
                 // because this requires both trees to have been selected thrice, this likely only ever excludes parsimony
                 // TODO the exclusion mechanism should be encapsulated a bit better
                 if (selected_bandit.is_hopeless(best_bandit, iterations_completed)) {
-                    LOG_INFO << "Excluding bandit " << selected_bandit.get_name() <<
+                    LOG_WORKER_TS(LogLevel::info) << "Excluding bandit " << selected_bandit.get_name() <<
                             " from algorithm because it is much worse than the others." << std::endl;
                     selected_bandit.participating = false;
                 }
@@ -113,7 +115,8 @@ public:
 
             if (!std::isnan(selected_bandit.get_upper_confidence(iterations_completed))) {
                 if (this->bandit_cursor != this->best_known_bandit) {
-                    LOG_INFO << std::endl << "Selecting bandit " << selected_bandit.get_name() <<
+                    LOG_INFO << std::endl;
+                    LOG_WORKER_TS(LogLevel::info) << "Selecting bandit " << selected_bandit.get_name() <<
                             " because its largest reasonable success ("
                             << (selected_bandit.get_upper_confidence(iterations_completed) * 1000.0) <<
                             " t/s) exceeds the mean expected success of current best bandit "
@@ -121,7 +124,8 @@ public:
                             " t/s)." <<
                             std::endl;
                 } else {
-                    LOG_INFO << std::endl << "Selecting bandit " << selected_bandit.get_name() << " (mean: " << (
+                    LOG_INFO << std::endl;
+                    LOG_WORKER_TS(LogLevel::info) << "Selecting bandit " << selected_bandit.get_name() << " (mean: " << (
                         best_bandit.get_mean_throughput() * 1000.0) << " t/s)." << std::endl;
                 }
             }

@@ -43,7 +43,7 @@ TunedBatch &BatchQueue::generate_batch(const unsigned int num_workers, const uns
 }
 
 void BatchQueue::finalize_batch(TunedBatch &batch) {
-    LOG_INFO_TS << "Finalized " << batch.get_name() << " with " << batch.get_plausible_tree_count() <<
+    LOG_WORKER_TS(LogLevel::info) << "Finalized " << batch.get_name() << " with " << batch.get_plausible_tree_count() <<
             " plausible trees." << std::endl;
     this->unfinished.erase(batch.get_name());
     batch.finalize();
