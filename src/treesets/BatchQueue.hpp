@@ -70,7 +70,7 @@ public:
      * @return the number of plausible trees found so far
      */
     unsigned int num_plausible_trees() const {
-        return this->total_plausible_trees;
+        return this->finalized_plausible_trees + this->unfinished_plausible_trees;
     }
 
     /**
@@ -150,9 +150,14 @@ protected:
     std::unique_ptr<ModelMap> backup_model = unique_ptr<ModelMap>(new ModelMap());
 
     /**
-     * Number of plausible trees that all batches could provide right now.
+     * Number of plausible trees that finalized batches provide right now.
      */
-    unsigned int total_plausible_trees = 0;
+    unsigned int finalized_plausible_trees = 0;
+
+    /**
+     * Number of plausible trees in batches that are unfinished and thus could change again.
+     */
+    unsigned int unfinished_plausible_trees = 0;
 
     /**
      * The number of trees to generate per batch.

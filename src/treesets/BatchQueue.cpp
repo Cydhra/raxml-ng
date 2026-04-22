@@ -47,7 +47,16 @@ void BatchQueue::finalize_batch(TunedBatch &batch) {
             " plausible trees." << std::endl;
     this->unfinished.erase(batch.get_name());
     batch.finalize();
-    this->total_plausible_trees += batch.get_plausible_tree_count();
+    this->finalized_plausible_trees += batch.get_plausible_tree_count();
+
+    auto unfinished_plausible = 0;
+    for (auto &batch_ref : this->batches) {
+        if (this->unfinished.find(batch_ref.get_name()) != this->unfinished.cend()) {
+            unfinished_plausible += batch_ref.get_plausible_tree_count();
+        }
+    }
+
+    this->unfinished_plausible_trees = unfinished_plausible;
 }
 
 TunedBatch &BatchQueue::select_next_batch(const MetaParameters &current_parameters, const unsigned int num_workers, const unsigned int num_threads) {
