@@ -84,8 +84,11 @@ public:
 
     /**
      *  Allocate the test statistic arrays for bootstrap replicates for all trees.
+     *
+     *  @param inplace if true, normalized statistics are stored in-place in the statistics array, overwriting
+     *  bootstrap replicates.
      */
-    void allocate_test_statistics();
+    void allocate_test_statistics(bool inplace = true);
 
     /**
      * Run the RELL bootstrapping on the per-site log-likelihood vectors assigned to this instance.

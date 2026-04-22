@@ -7,7 +7,7 @@
 const doubleVector AU_DEFAULT_SCALES = {0.5, 0.6, 0.7, 0.8, 0.9, 1.0, 1.1, 1.2, 1.3, 1.4};
 const uintVector AU_DEFAULT_REPS = {10000, 10000, 10000, 10000, 10000, 10000, 10000, 10000, 10000, 10000};
 
-void AuTest::allocate_test_statistics() {
+void AuTest::allocate_test_statistics(bool inplace) {
     if (!corax_RELL_allocate_multiscale_matrices(&test_statistics,
                                                  num_trees,
                                                  num_replicates.data(),
@@ -16,7 +16,17 @@ void AuTest::allocate_test_statistics() {
         exit(-1);
     }
 
-    normalized_statistics = test_statistics;
+    if (inplace) {
+        normalized_statistics = test_statistics;
+    } else {
+        if (!corax_RELL_allocate_multiscale_matrices(&normalized_statistics,
+                                                     num_trees,
+                                                     num_replicates.data(),
+                                                     num_replicates.size())) {
+            // TODO handle properly
+            exit(-1);
+        }
+    }
 }
 
 
@@ -73,7 +83,8 @@ void AuTest::run_bootstrap(const size_t num_rows, const size_t offset) {
 void AuTest::finalize_test_statistics() {
     LOG_INFO_TS << "Calculating test statistics" << std::endl;
     for (unsigned int id_scale = 0; id_scale < AU_DEFAULT_SCALES.size(); id_scale++) {
-        corax_normalize_lnl_bootstrap(test_statistics[id_scale], normalized_statistics[id_scale], num_replicates[id_scale], num_trees);
+        corax_normalize_lnl_bootstrap(test_statistics[id_scale], normalized_statistics[id_scale],
+                                      num_replicates[id_scale], num_trees);
     }
 
     // mark p values as dirty
