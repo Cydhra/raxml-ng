@@ -236,6 +236,9 @@ void TunedBatch::optimize(RaxmlInstance &instance, const Options &opts, const Ta
     if (context.is_group_leader(worker_id, thread_id)) {
         auto guard = std::lock_guard(*this->topology_access.get());
 
+        // clear previous backups
+        this->tree_topologies.clear();
+
         // backup tree topologies so we can get the plausible trees on demand
         for (auto &batch_tree: this->batch_trees) {
             this->tree_topologies.push_back(batch_tree.at(0).value().tree());
@@ -436,7 +439,6 @@ void TunedBatch::get_plausible_trees(std::vector<Tree> &buffer) const {
 
     for (unsigned int i = 0; i < this->tree_topologies.size(); ++i) {
         if (this->get_p_values()[this->reference_persite_loglh.size() + i] > SIGNIFICANCE_LEVEL) {
-            printf("%s adds tree %lu with p-value %g\n", name.c_str(), buffer.size(), this->get_p_values()[this->reference_persite_loglh.size() + i]);
             buffer.push_back(this->tree_topologies[i]);
         }
     }
