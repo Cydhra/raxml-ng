@@ -264,6 +264,14 @@ public:
      */
     std::vector<double> &get_p_values() const;
 
+    /**
+     * Append the plausible trees of this batch to the end of a vector.
+     * The topologies are copied at the end, possible reallocating the given vector object.
+     *
+     * @param buffer a vector which can be extended with tree topologies.
+     */
+    void get_plausible_trees(std::vector<Tree> &buffer) const;
+
     std::string const &get_name() const {
         return this->name;
     }

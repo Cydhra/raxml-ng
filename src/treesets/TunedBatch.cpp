@@ -276,6 +276,9 @@ void TunedBatch::perform_au_test(const TaskGroup &context, const unsigned int wo
     parallel_au_bootstrap(*au_test, au_assignment, context, worker_id, thread_id);
 
     if (context.is_group_leader(worker_id, thread_id)) {
+        // guard the calculation of AU test p-values with a guard so we don't use partially updated p-values to obtain
+        // tree topologies.
+        auto guard = std::lock_guard(*this->topology_access.get());
         this->au_test->finalize_test_statistics();
         this->au_test->calculate_p_values();
 
@@ -425,4 +428,16 @@ std::vector<double> TunedBatch::get_tree_likelihoods() {
 
 std::vector<double> &TunedBatch::get_p_values() const {
     return this->au_test->get_p_values();
+}
+
+void TunedBatch::get_plausible_trees(std::vector<Tree> &buffer) const {
+    // access to both p-values and topology backups has to be guarded
+    auto guard = std::lock_guard(*this->topology_access.get());
+
+    for (unsigned int i = 0; i < this->tree_topologies.size(); ++i) {
+        if (this->get_p_values()[this->reference_persite_loglh.size() + i] > SIGNIFICANCE_LEVEL) {
+            printf("%s adds tree %lu with p-value %g\n", name.c_str(), buffer.size(), this->get_p_values()[this->reference_persite_loglh.size() + i]);
+            buffer.push_back(this->tree_topologies[i]);
+        }
+    }
 }
