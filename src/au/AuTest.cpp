@@ -15,6 +15,8 @@ void AuTest::allocate_test_statistics() {
         // TODO handle properly
         exit(-1);
     }
+
+    normalized_statistics = test_statistics;
 }
 
 
@@ -71,7 +73,7 @@ void AuTest::run_bootstrap(const size_t num_rows, const size_t offset) {
 void AuTest::finalize_test_statistics() {
     LOG_INFO_TS << "Calculating test statistics" << std::endl;
     for (unsigned int id_scale = 0; id_scale < AU_DEFAULT_SCALES.size(); id_scale++) {
-        corax_normalize_lnl_bootstrap(test_statistics[id_scale], test_statistics[id_scale], num_replicates[id_scale], num_trees);
+        corax_normalize_lnl_bootstrap(test_statistics[id_scale], normalized_statistics[id_scale], num_replicates[id_scale], num_trees);
     }
 
     // mark p values as dirty
