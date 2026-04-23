@@ -28,6 +28,10 @@ public:
                                                 persite_loglh(persite_loglh),
                                                 batch_size(batch_size),
                                                 current_seed(seed) {
+        // initialize the model map for all partitions
+        for (unsigned int part_id = 0; part_id < msa->part_count(); ++part_id) {
+            (*this->backup_model)[part_id] = Model(msa->part_info(part_id).model().to_string());
+        }
     }
 
     /**
