@@ -110,7 +110,7 @@ void AuTest::calculate_p_values() {
     for (unsigned int tree = 0; tree < num_trees; tree++) {
         double d, c;
         double p_value = 0.0;
-        corax_au_p_value(test_statistics,
+        const int status = corax_au_p_value(test_statistics,
                          tree,
                          AU_DEFAULT_SCALES.data(),
                          num_replicates.data(),
@@ -119,6 +119,10 @@ void AuTest::calculate_p_values() {
                          &d,
                          &c,
                          &p_value);
+
+        if (status == AU_MATH_ERROR) {
+            LOG_WARN << "p-value for " << tree << ". tree is unstable." << std::endl;
+        }
 
         p_values[tree] = p_value;
 
