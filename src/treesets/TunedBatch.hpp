@@ -84,12 +84,12 @@ public:
         this->part_assignments = this->thread_load_balancer.get_all_assignments(part_sizes, threads_per_worker);
 
         // load-balance work for AU test, where we have reference trees and trees assigned to one thread need to be
-        // contiguous
+        // contiguous. This is only needed for the first instance of the AU test, afterward we can reuse the bootstrap
+        // values for the reference trees and use the exclusive_tree_access assignment
         const unsigned int total_trees_au = reference_persite_loglh.size() + batch_size;
-        const unsigned int max_assigned_workers = min(total_trees_au, this->num_threads);
         CoarseAssignment au_tree_ids(total_trees_au);
         std::iota(au_tree_ids.begin(), au_tree_ids.end(), 0);
-        this->au_assignment = load_balancer.get_all_assignments(au_tree_ids, max_assigned_workers);
+        this->au_assignment = load_balancer.get_all_assignments(au_tree_ids, num_threads);
 
         // load-balance work where one tree can be manaaged by one thread only
         CoarseAssignment exclusive_tree_access(batch_size);
