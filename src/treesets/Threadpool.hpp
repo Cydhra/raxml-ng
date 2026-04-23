@@ -29,8 +29,10 @@ using TaskGenerator = std::function<BatchTask()>;
  */
 class TaskGroup {
 public:
-    TaskGroup(const unsigned int num_threads, const unsigned int num_workers) : num_threads(num_threads),
-        num_workers(num_workers), task_barrier(num_threads) {
+    TaskGroup(const unsigned int task_group_id, const unsigned int num_threads,
+              const unsigned int num_workers) : task_group_id(task_group_id),
+                                                num_threads(num_threads), num_workers(num_workers),
+                                                task_barrier(num_threads) {
     }
 
     /**
@@ -62,7 +64,7 @@ public:
      *
      * @param task A callable that points to the (bound) task function
      */
-    template <typename F>
+    template<typename F>
     void assign_task(F &&task) {
         this->current_task = std::make_shared<BatchTask>(std::forward<F>(task));
     }
@@ -81,7 +83,19 @@ public:
         this->task_barrier.enter();
     }
 
+    /**
+     * @return the rank-local group id of this TaskGroup
+     */
+    unsigned int group_id() const {
+        return task_group_id;
+    }
+
 protected:
+    /**
+     *  Rank-local id of this task group, among all active groups.
+     */
+    unsigned int task_group_id;
+
     /**
      * Total number of threads in this group. Not threads per worker.
      */
@@ -128,7 +142,7 @@ public:
         auto threads_per_task_group = total_threads / num_task_groups;
 
         for (unsigned int i = 0; i < num_task_groups; ++i) {
-            task_groups.emplace_back(threads_per_task_group, workers_per_task_group);
+            task_groups.emplace_back(i, threads_per_task_group, workers_per_task_group);
         }
     }
 
