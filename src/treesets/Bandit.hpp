@@ -274,7 +274,7 @@ protected:
             this->initialize_variance(over_estimated_variance / 3, 3);
         }
 
-        LOG_INFO_TS << "[" << this->name << "]: Takes measurement: " << (
+        LOG_WORKER_TS(LogLevel::info) << "[" << this->name << "]: Takes measurement: " << batch.get_plausible_tree_count() << " plausible trees at " << (
                     static_cast<double>(batch.get_plausible_tree_count()) / static_cast<double>(batch.
                         elapsed_wall_time()) *
                     1000.0)
