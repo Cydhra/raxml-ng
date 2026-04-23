@@ -123,6 +123,8 @@ public:
 
     /**
      * Reset the test statistics to be able to re-run bootstrapping.
+     * This doesn't affect the normalized statistics, because those are overwritten by subsequent calls to
+     * finalize_test_statistics. Only the bootstrap replicates are additive between subsequent calls.
      */
     void reset_test_statistics();
 
