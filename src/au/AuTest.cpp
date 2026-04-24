@@ -7,6 +7,25 @@
 const doubleVector AU_DEFAULT_SCALES = {0.5, 0.6, 0.7, 0.8, 0.9, 1.0, 1.1, 1.2, 1.3, 1.4};
 const uintVector AU_DEFAULT_REPS = {10000, 10000, 10000, 10000, 10000, 10000, 10000, 10000, 10000, 10000};
 
+void AuTest::replace_persite_loglh(const unsigned int start_index, const std::vector<std::vector<doubleVector> > &new_vectors) {
+    assert(start_index + new_vectors.size() <= this->persite_loglh.size());
+    finished = false;
+
+    unsigned int current_index = start_index;
+    for (auto &partitions: new_vectors) {
+        std::vector<const double *> partition_logh;
+        partition_logh.reserve(partitions.size());
+        for (auto &partition: partitions) {
+            partition_logh.push_back(partition.data());
+        }
+        this->persite_loglh[current_index++] = partition_logh;
+    }
+
+    for (unsigned int scale = 0; scale < scales.size(); scale++) {
+        memset(test_statistics[scale], sizeof(double) * start_index * num_replicates[scale], sizeof(double) * new_vectors.size() * num_replicates[scale]);
+    }
+}
+
 void AuTest::allocate_test_statistics(bool inplace) {
     if (!corax_RELL_allocate_multiscale_matrices(&test_statistics,
                                                  num_trees,
