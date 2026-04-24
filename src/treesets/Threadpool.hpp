@@ -52,6 +52,18 @@ public:
      * effectively.
      *
      * @param worker_id global (rank local) worker id
+     * @return thread id of contiguous ids in the TaskGroup
+     */
+    unsigned int get_group_worker_id(const unsigned int worker_id) const {
+        return worker_id % num_workers;
+    }
+
+    /**
+     * Get the thread id of the current thread local to the TaskGroup: That is, all threads assigned in a task group are
+     * numbered from 0 to n. For assignments that cannot be handled by workers, those ids can be used to share work
+     * effectively.
+     *
+     * @param worker_id global (rank local) worker id
      * @param thread_id local (worker local) thread id
      * @return thread id of contiguous ids in the TaskGroup
      */

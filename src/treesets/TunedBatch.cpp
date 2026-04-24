@@ -15,8 +15,8 @@ using namespace std::placeholders;
  * @param worker_id group-local worker id
  */
 void parallel_au_bootstrap(AuTest &tester, const CoarseAssignmentList &assignment_list, const TaskGroup &context,
-                           const unsigned int worker_id, unsigned int) {
-    auto &tree_ids = assignment_list.at(worker_id);
+                           const unsigned int worker_id, unsigned int thread_id) {
+    auto &tree_ids = assignment_list.at(context.get_group_thread_id(worker_id, thread_id));
 
     const auto slice_start = *tree_ids.begin();
 
@@ -47,7 +47,7 @@ void TunedBatch::generate_starting_trees(RaxmlInstance &instance, const Options 
     std::iota(seeds.begin(), seeds.end(), this->starting_seed);
 
     // generate trees from seeds
-    for (const auto id: this->exclusive_assignment.at(worker_id)) {
+    for (const auto id: this->exclusive_assignment.at(context.get_group_thread_id(worker_id, thread_id))) {
         (*this->batch_start_trees)[id] = generate_tree(instance, StartingTree::parsimony, seeds[id], false);
         this->num_trees_generated.fetch_add(1);
     }

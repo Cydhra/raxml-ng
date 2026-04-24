@@ -17,7 +17,7 @@ void ThreadPool::thread_main() {
     const auto task_id = worker_id / this->workers_per_task_group;
     TaskGroup &context = this->task_groups[task_id];
 
-    const auto group_worker_id = context.get_group_thread_id(worker_id, local_thread_id);
+    const auto group_worker_id = context.get_group_worker_id(worker_id);
 
     while (this->running) {
         // obtain new task for this thread
