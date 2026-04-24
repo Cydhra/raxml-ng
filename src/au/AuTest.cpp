@@ -110,12 +110,12 @@ void AuTest::calculate_p_values() {
     for (unsigned int tree = 0; tree < num_trees; tree++) {
         double d, c;
         double p_value = 0.0;
-        const int status = corax_au_p_value(test_statistics,
+        const int status = corax_au_p_value(normalized_statistics,
                          tree,
                          AU_DEFAULT_SCALES.data(),
                          num_replicates.data(),
                          AU_DEFAULT_SCALES.size(),
-                         corax_bootstrap_expectation(test_statistics[best_index], num_replicates[best_index], tree),
+                         corax_bootstrap_expectation(normalized_statistics[best_index], num_replicates[best_index], tree),
                          &d,
                          &c,
                          &p_value);
