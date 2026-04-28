@@ -8,37 +8,12 @@
 
 using namespace std::placeholders;
 
-/**
- * Parallel kernel of the AU test bootstrapping, given to pthreads as their main function.
- * @param tester AuTest instance
- * @param assignment_list assignment of trees to workers
- * @param worker_id group-local worker id
- */
-void parallel_au_bootstrap(AuTest &tester, const CoarseAssignmentList &assignment_list, const TaskGroup &context,
-                           const unsigned int worker_id, unsigned int thread_id) {
-    auto &tree_ids = assignment_list.at(context.get_group_thread_id(worker_id, thread_id));
-
-    const auto slice_start = *tree_ids.begin();
-
-    tester.run_bootstrap(tree_ids.size(), slice_start);
-
-    context.enter_barrier();
-}
-
-void TunedBatch::mark_p_values_dirty() {
-    this->au_test_dirty = true;
-}
-
 unsigned int TunedBatch::get_batch_size() const {
     return this->batch_start_trees->size();
 }
 
 void TunedBatch::generate_starting_trees(RaxmlInstance &instance, const Options &opts, const TaskGroup &context,
                                          const unsigned int worker_id, const unsigned int thread_id) {
-    if (context.is_group_leader(worker_id, thread_id)) {
-        this->mark_p_values_dirty();
-    }
-
     // time measurement
     const auto begin = std::chrono::steady_clock::now();
 
@@ -100,9 +75,6 @@ void TunedBatch::optimize_topology(const Options &opts, const TaskGroup &context
 
             // make sure the spr-params are set correctly for fast/slow rounds
             this->auto_configure(opts);
-
-            // make sure the AU test is invalidated
-            this->mark_p_values_dirty();
         }
 
         context.enter_barrier(); // required to propagate auto-configuration
@@ -156,10 +128,6 @@ void TunedBatch::optimize_parameters(const TaskGroup &context, const unsigned in
                                      const bool branches, const bool force) {
     const auto &tree_ids = this->coarse_assignments.at(worker_id);
 
-    if (context.is_group_leader(worker_id, thread_id)) {
-        this->mark_p_values_dirty();
-    }
-
     const auto opt_model = model && (!this->meta_parameters->skip_model || force);
     const auto opt_branches = branches;
 
@@ -210,8 +178,8 @@ void TunedBatch::optimize_parameters(const TaskGroup &context, const unsigned in
     }
 }
 
-void TunedBatch::optimize(RaxmlInstance &instance, const Options &opts, const TaskGroup &context,
-                          const unsigned int worker_id, const unsigned int thread_id) {
+void TunedBatch::optimize(RaxmlInstance &instance, const Options &opts, SharedBatchResources &resources,
+                          const TaskGroup &context, const unsigned int worker_id, const unsigned int thread_id) {
     if (!meta_parameters_set) {
         throw RaxmlException("TunedBatch has not been configured with meta heuristics");
     }
@@ -238,7 +206,9 @@ void TunedBatch::optimize(RaxmlInstance &instance, const Options &opts, const Ta
         LOG_INFO_TS << this->name << ": total batch time after heuristics: " << this->wall_time << "ms." << std::endl;
     }
 
-    perform_plausibility_check(context, worker_id, thread_id);
+    auto &au_test = resources.get_au_test(context);
+    perform_plausibility_check(au_test, resources.is_initialized(context), context, worker_id, thread_id);
+    resources.set_initialized(context);
 
     if (context.is_group_leader(worker_id, thread_id)) {
         auto guard = std::lock_guard(*this->topology_access.get());
@@ -253,15 +223,8 @@ void TunedBatch::optimize(RaxmlInstance &instance, const Options &opts, const Ta
     }
 }
 
-void TunedBatch::perform_au_test(const TaskGroup &context, const unsigned int worker_id, const unsigned int thread_id) {
-    if (!this->au_test_dirty) {
-        return;
-    }
-
-    if (context.is_group_leader(worker_id, thread_id)) {
-        this->au_test->reset_test_statistics();
-    }
-
+void TunedBatch::perform_au_test(AuTest &au_test, const bool initialized, const TaskGroup &context,
+                                 const unsigned int worker_id, const unsigned int thread_id) {
     const auto trees = this->coarse_assignments.at(worker_id);
     for (const auto tree_id: trees) {
         // collect the sub-partitions for the local worker
@@ -283,33 +246,45 @@ void TunedBatch::perform_au_test(const TaskGroup &context, const unsigned int wo
     // trees, this sucks, but currently AU doesn't support per-partition parallelization because that would require
     // synchronizing accesses to the bootstrap replicate likelihood sums.
     // we therefore use as many workers as possible with one thread each now.
-    parallel_au_bootstrap(*au_test, au_assignment, context, worker_id, thread_id);
+    const std::vector<size_t> &tree_ids =
+            initialized ? exclusive_assignment.at(context.get_group_thread_id(worker_id, thread_id)) : au_assignment.at(context.get_group_thread_id(worker_id, thread_id));
+    const unsigned int slice_start = initialized
+                                         ? *tree_ids.begin() + reference_persite_loglh.size()
+                                         : *tree_ids.begin();
+
+    au_test.run_bootstrap(tree_ids.size(), slice_start);
+    context.enter_barrier();
 
     if (context.is_group_leader(worker_id, thread_id)) {
         // guard the calculation of AU test p-values with a guard so we don't use partially updated p-values to obtain
         // tree topologies.
         auto guard = std::lock_guard(*this->topology_access.get());
-        this->au_test->finalize_test_statistics();
-        this->au_test->calculate_p_values();
-
-        // mark AU test as valid
-        this->au_test_dirty = false;
+        au_test.finalize_test_statistics();
+        au_test.calculate_p_values();
     }
 }
 
-void TunedBatch::perform_plausibility_check(const TaskGroup &context, const unsigned int worker_id,
+void TunedBatch::perform_plausibility_check(AuTest &au_test, const bool initialized,
+                                            const TaskGroup &context, const unsigned int worker_id,
                                             const unsigned int thread_id) {
+    if (context.is_group_leader(worker_id, thread_id)) {
+        if (!initialized) {
+            au_test.allocate_test_statistics(false);
+        }
+        au_test.replace_persite_loglh(reference_persite_loglh.size(), batch_persite_logh);
+    }
+
     // TODO should we backup the less optimized model or just accept that we overspecify the model
     const auto begin = std::chrono::steady_clock::now();
     this->optimize_parameters(context, worker_id, thread_id, 0.1, true, true, true);
 
-    this->perform_au_test(context, worker_id, thread_id);
+    this->perform_au_test(au_test, initialized, context, worker_id, thread_id);
 
     // no barrier required, since batch leader is the one who finishes the AU test
     if (context.is_group_leader(worker_id, thread_id)) {
         this->plausible_tree_count = 0;
-        auto first = this->au_test->get_p_values().begin() + reference_persite_loglh.size();
-        for (const auto last = this->au_test->get_p_values().end(); first != last; ++first) {
+        auto first = au_test.get_p_values().begin() + reference_persite_loglh.size();
+        for (const auto last = au_test.get_p_values().end(); first != last; ++first) {
             if (*first > SIGNIFICANCE_LEVEL) {
                 this->plausible_tree_count += 1;
             }
@@ -394,7 +369,6 @@ void TunedBatch::assign_batch_models(const ModelMap &other) {
 
 void TunedBatch::finalize() {
     LOG_DEBUG << "Finalized " << name << "." << std::endl;
-    this->au_test->free_test_statistics();
 
     // delete corax allocations
     this->batch_trees.clear();
@@ -432,8 +406,8 @@ std::vector<double> TunedBatch::get_tree_likelihoods() {
     return result;
 }
 
-std::vector<double> &TunedBatch::get_p_values() const {
-    return this->au_test->get_p_values();
+doubleVector TunedBatch::get_p_values() const {
+    return this->p_values;
 }
 
 void TunedBatch::get_plausible_trees(std::vector<Tree> &buffer) const {

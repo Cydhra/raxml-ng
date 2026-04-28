@@ -5,6 +5,7 @@
 #include <optional>
 #include <utility>
 #include "MetaParameters.hpp"
+#include "SharedBatchResources.hpp"
 #include "Threadpool.hpp"
 #include "../loadbalance/LoadBalancer.hpp"
 #include "../loadbalance/CoarseLoadBalancer.hpp"
@@ -25,10 +26,6 @@ struct RaxmlInstance;
 // changes signature, just update this declaration as well.
 Tree generate_tree(const RaxmlInstance &instance, StartingTree type, int random_seed, bool bootstrap);
 
-// TODO we should reuse bootstrap resamplings of the reference trees for the AU test, since they stay the same.
-/**
- * A batch of local searches tuned with a specific set of parameters chosen by a {@link TreesetHeuristic} instance.
- */
 class TunedBatch final {
 public:
     TunedBatch(string name,
@@ -54,11 +51,6 @@ public:
             for (const auto &pinfo: msa->part_list())
                 tree_slh.emplace_back(pinfo.msa().length());
         }
-
-        // we can initialize au_test only after initializing the per-site lnl partition vectors
-        this->au_test = std::make_shared<AuTest>(msa, reference_persite_loglh, batch_persite_logh, AU_DEFAULT_SCALES,
-                                                 AU_DEFAULT_REPS, starting_seed);
-        this->au_test->allocate_test_statistics();
 
         // prepare space for the tree-info objects
         this->batch_trees = std::vector<std::vector<std::optional<TreeInfo> > >(batch_size);
@@ -123,10 +115,8 @@ public:
           tree_topologies(std::move(other.tree_topologies)),
           batch_trees(std::move(other.batch_trees)),
           batch_persite_logh(std::move(other.batch_persite_logh)),
-          au_test(std::move(other.au_test)),
           meta_parameters_set(other.meta_parameters_set),
           initial_model_optimized(other.initial_model_optimized),
-          au_test_dirty(other.au_test_dirty.load()),
           plausible_tree_count(other.plausible_tree_count),
           wall_time(other.wall_time) {
     }
@@ -157,10 +147,8 @@ public:
         tree_topologies = std::move(other.tree_topologies);
         batch_trees = std::move(other.batch_trees);
         batch_persite_logh = std::move(other.batch_persite_logh);
-        au_test = std::move(other.au_test);
         meta_parameters_set = other.meta_parameters_set;
         initial_model_optimized = other.initial_model_optimized;
-        au_test_dirty = other.au_test_dirty.load();
         plausible_tree_count = other.plausible_tree_count;
         wall_time = other.wall_time;
         return *this;
@@ -176,17 +164,25 @@ public:
      *
      * @param instance Raxml instance, required for tree generation
      * @param opts command line options, required for parameter optimization
+     * @param resources
+     * @param resources
      */
-    void optimize(RaxmlInstance &instance, const Options &opts, const TaskGroup &context, unsigned int worker_id,
-                  unsigned int thread_id);
+    void optimize(RaxmlInstance &instance, const Options &opts, SharedBatchResources &resources,
+                  const TaskGroup &context,
+                  unsigned int worker_id, unsigned int thread_id);
 
     /**
      * Perform the AU test on the trees in the batch, as well as the supplied reference trees,
      * but backup the model before, optimize the model fully, and then restore the original model.
      *
+     * @param au_test test instance
+     * @param initialized if false, the au_test instance is not initialized and memory will be allocated, and the
+     * reference trees included in the bootstrap. Otherwise, only the batch trees are included.
+     *
      * @return The number of plausible trees.
      */
-    void perform_plausibility_check(const TaskGroup &context, unsigned int worker_id, unsigned int thread_id);
+    void perform_plausibility_check(AuTest &au_test, bool initialized, const TaskGroup &context, unsigned int worker_id,
+                                    unsigned int thread_id);
 
     /**
      * Update the meta heuristical parameters of the batch, reconfiguring the search parameters from them.
@@ -262,7 +258,7 @@ public:
     /**
      * @return the p-values of the last performed AU-Test
      */
-    std::vector<double> &get_p_values() const;
+    doubleVector get_p_values() const;
 
     /**
      * Append the plausible trees of this batch to the end of a vector.
@@ -347,9 +343,7 @@ protected:
     /**
      * Assignment of trees to threads for the AU test. The AU test cannot split between partitions, and so no tree
      * can have more than one thread assigned.
-     * This assignment is generated for a virtual threadpool where all threads are workers.
-     * This means, for the actual threadpool, the virtual assignment id has to be calculated as
-     * worker_id * threads_per_worker + thread_id.
+     * This assignment includes the reference trees of the AU test.
      */
     CoarseAssignmentList au_assignment;
 
@@ -401,11 +395,6 @@ protected:
     std::vector<std::vector<doubleVector> > batch_persite_logh;
 
     /**
-    * AU test instance
-    */
-    shared_ptr<AuTest> au_test;
-
-    /**
      * Initial model parameters that get loaded into the tree info objects upon creation.
      * This is initialized after creating the TunedBatch with a call to assign_batch_models.
      */
@@ -429,10 +418,10 @@ protected:
     bool initial_model_optimized{false};
 
     /**
-     * Flag indicating whether the au_test instance is outdated.
-     * The class must set the flag to true whenever the per-site log-likelihoods for the batch trees change.
+     * The finished AU test p values, which are updated whenever the AU test is run. These values refer to the backup
+     * topologies at all times, since the batch might have progressed since the last AU test.
      */
-    atomic_bool au_test_dirty{true};
+    doubleVector p_values;
 
     /**
      * Number of plausible trees as determined by the last AU test.
@@ -515,13 +504,13 @@ protected:
 
     /**
      * Perform the AU test on the trees in the batch, as well as the supplied reference trees.
+     *
+     * @param au_test test instance
+     * @param initialized if false, the au_test instance is not initialized and memory will be allocated, and the
+     * reference trees included in the bootstrap. Otherwise, only the batch trees are included.
      */
-    void perform_au_test(const TaskGroup &context, unsigned int worker_id, unsigned int thread_id);
-
-    /**
-     * Called when the per-site log-likelihoods change, overriding the results of the AU-test
-     */
-    void mark_p_values_dirty();
+    void perform_au_test(AuTest &au_test, bool initialized, const TaskGroup &context, unsigned int worker_id,
+                         unsigned int thread_id);
 };
 
 #endif //RAXML_TUNEDBATCH_HPP_
