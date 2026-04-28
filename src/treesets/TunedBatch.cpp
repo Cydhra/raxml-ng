@@ -111,7 +111,14 @@ void TunedBatch::optimize_topology(const Options &opts, const TaskGroup &context
         // run optimization kernel
         for (const auto tree_id: tree_ids) {
             for (unsigned int spr_round = rounds_performed; spr_round < total_rounds; ++spr_round) {
-                batch_trees[tree_id][thread_id].value().spr_round(spr_params);
+                // important: we create a copy of the parameters here and give spr_round a copy, not the shared reference.
+                // This doesn't fix any issues or has any effect on the code as written (that I know of) because the
+                // first thing the spr round does is copying the values into a per-thread local struct.
+                // But if we don't do it, the spr_rounds desynchronize reliably if two threads work on the same tree.
+                // I have no idea why, but creating a copy of the parameter here fixes it and is cheaper
+                // than ritual sacrifice of a goat each syzygy.
+                auto local_copy = spr_params;
+                batch_trees[tree_id][thread_id].value().spr_round(local_copy);
                 batch_trees[tree_id][thread_id].value().optimize_branches(1.0, 1);
             }
 
