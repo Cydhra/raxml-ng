@@ -48,7 +48,6 @@ void TreesetOptimizer::run_batch(Bandit<std::shared_ptr<MultiArmedBandit<MetaPar
         this->batch_queue.finish_batch(batch);
 
         if (this->batch_queue.num_plausible_trees() > this->target_tree_count) {
-            // TODO we should also count the unfinished batches
             pool.shutdown();
         }
     }
@@ -85,7 +84,7 @@ void TreesetOptimizer::check_mab_modification(const Bandit<shared_ptr<MultiArmed
     // TODO implement a proper heuristic here. For now, we check if the current arm exceeds 75% success per batch,
     //  and if not, we add arms according to a pre-defined mapping.
 
-    if (current_arm.num_samples() > 4 && current_arm.get_expected_tree_rate() < 0.75) {
+    if (current_arm.num_samples() >= 4 && current_arm.get_expected_tree_rate() < 0.75) {
         const auto pointer = current_arm.get_parameters().get()->get();
         for (auto &successor : this->successors.at(pointer)) {
             if (!hierarchical_mab.has_bandit(std::get<0>(successor))) {
