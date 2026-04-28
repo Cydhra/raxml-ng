@@ -22,7 +22,7 @@ void AuTest::replace_persite_loglh(const unsigned int start_index, const std::ve
     }
 
     for (unsigned int scale = 0; scale < scales.size(); scale++) {
-        memset(test_statistics[scale], sizeof(double) * start_index * num_replicates[scale], sizeof(double) * new_vectors.size() * num_replicates[scale]);
+        memset(&test_statistics[scale][start_index * num_replicates[scale]], 0, sizeof(double) * new_vectors.size() * num_replicates[scale]);
     }
 }
 
