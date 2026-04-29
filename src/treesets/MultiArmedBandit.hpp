@@ -152,7 +152,14 @@ public:
         // if the current bandit is not the best one, check if the best one has to be updated
         if (current_bandit.get_parameters() != this->bandits[best_known_bandit].get_parameters()) {
             if (current_bandit.get_mean_throughput() > this->bandits[best_known_bandit].get_mean_throughput()) {
-                best_known_bandit = bandit_cursor;
+                // find which index is the current bandit. We cannot rely on the cursor since that has been advanced by
+                // concurrent batch groups
+                auto cursor = std::find_if(this->bandits.begin(), this->bandits.end(), [current_bandit](const Bandit<Heuristic>& element) { return element.get_parameters() == current_bandit.get_parameters(); });
+                if (cursor != this->bandits.end()) {
+                    best_known_bandit = std::distance(this->bandits.begin(), cursor);
+                } else {
+                    LOG_WARN << "measured bandit is not in list" << std::endl;
+                }
             }
         }
 
