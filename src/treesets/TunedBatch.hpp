@@ -256,11 +256,6 @@ public:
     std::vector<double> get_tree_likelihoods();
 
     /**
-     * @return the p-values of the last performed AU-Test
-     */
-    doubleVector get_p_values() const;
-
-    /**
      * Append the plausible trees of this batch to the end of a vector.
      * The topologies are copied at the end, possible reallocating the given vector object.
      *
@@ -420,6 +415,9 @@ protected:
     /**
      * The finished AU test p values, which are updated whenever the AU test is run. These values refer to the backup
      * topologies at all times, since the batch might have progressed since the last AU test.
+     * Access to this member has to be guarded with the topology_access mutex to avoid concurrent reading and
+     * modification.
+     * The vector only contains p-value for the batch trees, the p-values of the reference topologies are not included.
      */
     doubleVector p_values;
 

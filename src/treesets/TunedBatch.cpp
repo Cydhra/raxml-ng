@@ -283,8 +283,10 @@ void TunedBatch::perform_plausibility_check(AuTest &au_test, const bool initiali
     // no barrier required, since batch leader is the one who finishes the AU test
     if (context.is_group_leader(worker_id, thread_id)) {
         this->plausible_tree_count = 0;
+        this->p_values.clear();
         auto first = au_test.get_p_values().begin() + reference_persite_loglh.size();
         for (const auto last = au_test.get_p_values().end(); first != last; ++first) {
+            this->p_values.push_back(*first);
             if (*first > SIGNIFICANCE_LEVEL) {
                 this->plausible_tree_count += 1;
             }
@@ -406,16 +408,12 @@ std::vector<double> TunedBatch::get_tree_likelihoods() {
     return result;
 }
 
-doubleVector TunedBatch::get_p_values() const {
-    return this->p_values;
-}
-
 void TunedBatch::get_plausible_trees(std::vector<Tree> &buffer) const {
     // access to both p-values and topology backups has to be guarded
     auto guard = std::lock_guard(*this->topology_access.get());
 
     for (unsigned int i = 0; i < this->tree_topologies.size(); ++i) {
-        if (this->get_p_values()[this->reference_persite_loglh.size() + i] > SIGNIFICANCE_LEVEL) {
+        if (this->p_values[i] > SIGNIFICANCE_LEVEL) {
             buffer.push_back(this->tree_topologies[i]);
         }
     }
