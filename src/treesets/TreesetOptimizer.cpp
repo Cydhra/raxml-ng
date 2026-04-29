@@ -86,10 +86,12 @@ void TreesetOptimizer::check_mab_modification(const Bandit<shared_ptr<MultiArmed
 
     if (current_arm.num_samples() >= 4 && current_arm.get_expected_tree_rate() < 0.75) {
         const auto pointer = current_arm.get_parameters().get()->get();
-        for (auto &successor : this->successors.at(pointer)) {
-            if (!hierarchical_mab.has_bandit(std::get<0>(successor))) {
-                LOG_INFO << "Adding bandit " << std::get<0>(successor) << " to algorithm." << std::endl;
-                hierarchical_mab.emplace_back(std::get<0>(successor), std::get<1>(successor));
+        if (this->successors.find(pointer) != this->successors.end()) {
+            for (auto &successor : this->successors.at(pointer)) {
+                if (!hierarchical_mab.has_bandit(std::get<0>(successor))) {
+                    LOG_INFO << "Adding bandit " << std::get<0>(successor) << " to algorithm." << std::endl;
+                    hierarchical_mab.emplace_back(std::get<0>(successor), std::get<1>(successor));
+                }
             }
         }
     }
