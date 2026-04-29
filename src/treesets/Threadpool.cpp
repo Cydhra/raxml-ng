@@ -1,7 +1,12 @@
 #include "Threadpool.hpp"
 
+#include "../log.hpp"
+
 void ThreadPool::work(const Options &opts) {
     const auto num_workers = this->workers_per_task_group * task_groups.size();
+
+    LOG_INFO << "Thread configuration: " << task_groups.size() << " groups x " << workers_per_task_group << " workers x " <<
+        threads_per_task() / workers_per_task_group << " threads" << std::endl;
 
     const auto main_method = [this] { this->thread_main(); };
     ParallelContext::init_pthreads_custom(opts, main_method, this->total_threads, num_workers);

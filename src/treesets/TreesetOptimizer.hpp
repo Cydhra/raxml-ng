@@ -124,9 +124,9 @@ public:
                      const unsigned long long starting_seed) : pool(ThreadPool(
                                                                    [this] {
                                                                        return this->next_work_unit();
-                                                                   }, 8, 4, 2)),
+                                                                   }, opts.treeset_threads, opts.treeset_workers, opts.treeset_groups)),
                                                                shared_batch_resources(
-                                                                   1, msa, persite_loglh, DEFAULT_BATCH_SIZE,
+                                                                   opts.treeset_groups, msa, persite_loglh, DEFAULT_BATCH_SIZE,
                                                                    AU_DEFAULT_SCALES, AU_DEFAULT_REPS, starting_seed),
                                                                instance(instance),
                                                                opts(opts),
