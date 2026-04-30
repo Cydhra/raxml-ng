@@ -13,10 +13,10 @@ void guarded_backup_batch_model(const TunedBatch &batch, ModelMap &backup_model,
 TunedBatch &BatchQueue::generate_batch(const unsigned int num_workers, const unsigned int num_threads) {
     const std::string name_prefix = "Batch";
 
-    auto batch_name_index = next_batch_index.fetch_add(1);
-
     // lock the mutex for the batch queue
     const std::lock_guard<std::mutex> lock(batch_mutex);
+
+    auto batch_name_index = this->batches.size();
 
     // place new batches at the end of the queue, and mark them as unfinished
     std::string batch_name = name_prefix + std::to_string(batch_name_index);

@@ -177,12 +177,6 @@ protected:
     double pythia_score;
 
     /**
-     * The index of the batch generated next. This is independent of the size of the batch vector because multiple
-     * batches might be generated at the same time
-     */
-    std::atomic_uint32_t next_batch_index{0};
-
-    /**
      * The current seed for starting tree generation. Offset that by the number of generated trees whenever it is used
      * to generate a batch of trees.
      */
