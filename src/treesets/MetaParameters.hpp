@@ -41,13 +41,20 @@ public:
      */
     const bool early_commit;
 
+    /**
+     * Maximum SPR radius
+     */
+    const unsigned int max_radius;
+
     MetaParameters(const unsigned int keep_top_k_topol, const bool skip_model, const unsigned int num_fast_spr,
                    const unsigned int num_slow_spr,
-                   const bool accept_starting_trees,
-                   const bool early_commit) : keep_top_k_topol(keep_top_k_topol), skip_model(skip_model),
-                                                       num_fast_spr(num_fast_spr), num_slow_spr(num_slow_spr),
-                                                       accept_starting_trees(accept_starting_trees),
-                                                       early_commit(early_commit) {
+                   const bool accept_starting_trees = false,
+                   const bool early_commit = false,
+                   const unsigned int max_radius = 14) : keep_top_k_topol(keep_top_k_topol), skip_model(skip_model),
+                                                         num_fast_spr(num_fast_spr), num_slow_spr(num_slow_spr),
+                                                         accept_starting_trees(accept_starting_trees),
+                                                         early_commit(early_commit),
+                                                         max_radius(max_radius) {
     }
 
     friend bool operator==(const MetaParameters &lhs, const MetaParameters &rhs) {

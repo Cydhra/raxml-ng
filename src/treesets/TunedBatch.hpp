@@ -449,7 +449,7 @@ protected:
         spr_params.ntopol_keep = this->meta_parameters->keep_top_k_topol;
         spr_params.subtree_cutoff = opts.spr_cutoff;
         spr_params.radius_min = 1;
-        spr_params.radius_max = 20;
+        spr_params.radius_max = meta_parameters->max_radius;
         // if all fast spr rounds have been performed, set thorough to true, so further spr rounds are slow
         spr_params.thorough = this->num_fast_spr_performed >= this->meta_parameters->num_fast_spr;
         spr_params.lh_epsilon_brlen_full = opts.lh_epsilon;
