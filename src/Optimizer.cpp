@@ -832,17 +832,19 @@ double Optimizer::evaluate(TreeInfo& treeinfo, CheckpointManager& cm)
   return loglh;
 }
 
-int Optimizer::adaptive_radius(double difficulty){
+int Optimizer::adaptive_radius(const double difficulty){
   
   assert (difficulty >= 0);
 
   if (difficulty < 0.4) {
-    return (int) ( 12.5*difficulty + 5);
-  } else if (difficulty <= 0.6){
-    return 10;
-  } else {
-    return (int) ((-12.5)*difficulty + 17.5);
+    return static_cast<int>(12.5 * difficulty + 5);
   }
+
+  if (difficulty <= 0.6){
+    return 10;
+  }
+
+  return static_cast<int>((-12.5) * difficulty + 17.5);
 }
 
 bool Optimizer::check_impr(TreeInfo& treeinfo, double loglh, double old_loglh, double old_loglh_kh,

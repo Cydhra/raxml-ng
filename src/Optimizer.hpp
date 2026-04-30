@@ -47,7 +47,7 @@ private:
   std::shared_ptr<StoppingCriterion> _stop_criterion;
 
   // functions for adaptive mode
-  int adaptive_radius(double difficulty);
+  static int adaptive_radius(double difficulty);
   bool check_impr(TreeInfo& treeinfo, double loglh, double old_loglh, double old_loglh_kh,
                   bool use_kh_test, vector<double*> persite_lnl_new, unsigned long int * increasing_moves);
 };
