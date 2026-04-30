@@ -25,7 +25,6 @@ TunedBatch &BatchQueue::generate_batch(const unsigned int num_workers, const uns
                              this->batch_size,
                              num_threads,
                              num_workers,
-                             pythia_score,
                              msa,
                              load_balancer,
                              tip_msa_idmap,

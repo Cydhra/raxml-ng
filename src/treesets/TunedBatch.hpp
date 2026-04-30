@@ -33,7 +33,6 @@ public:
                const unsigned int batch_size,
                const unsigned int num_threads,
                const unsigned int num_workers,
-               const double pythia_score,
                const std::shared_ptr<PartitionedMSA> &msa,
                LoadBalancer &thread_load_balancer,
                IDVector &tip_msa_idmap,
@@ -41,7 +40,6 @@ public:
         : name(std::move(name)),
           reference_persite_loglh(reference_persite_loglh),
           msa(msa),
-          pythia_score(pythia_score),
           starting_seed(starting_seed),
           batch_start_trees(new TreeList(batch_size)),
           tip_msa_idmap(tip_msa_idmap),
@@ -280,11 +278,6 @@ protected:
     shared_ptr<PartitionedMSA> msa;
 
     /**
-     * Pythia score of the MSA or -1.0 if pythia is disabled.
-     */
-    double pythia_score;
-
-    /**
      * The starting seed (starting from 0) for this batch. Batches infer starting trees with ascending seeds, so this
      * number is the number of starting trees in previous batches.
      */
@@ -432,17 +425,10 @@ protected:
         // update options according to MetaParameters:
         spr_params.ntopol_keep = this->meta_parameters->keep_top_k_topol;
         spr_params.subtree_cutoff = opts.spr_cutoff;
-
+        spr_params.radius_min = 1;
+        spr_params.radius_max = meta_parameters->max_adaptive_radius;
         // if all fast spr rounds have been performed, set thorough to true, so further spr rounds are slow
         spr_params.thorough = this->num_fast_spr_performed >= this->meta_parameters->num_fast_spr;
-
-        spr_params.radius_min = 1;
-
-        if (pythia_score >= 0.0) {
-            // those values were taken from the adaptive heuristic. But we likely want to change these factors as well
-            spr_params.radius_max = (spr_params.thorough ? 1 : 3) * meta_parameters->max_adaptive_radius;
-        }
-
         spr_params.lh_epsilon_brlen_full = opts.lh_epsilon;
         spr_params.lh_epsilon_brlen_triplet = opts.lh_epsilon_brlen_triplet;
 
