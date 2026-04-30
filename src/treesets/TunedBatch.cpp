@@ -313,6 +313,10 @@ bool TunedBatch::is_compatible(const MetaParameters &new_parameters) const {
         return false;
     }
 
+    if (this->meta_parameters->max_adaptive_radius != new_parameters.max_adaptive_radius) {
+        return false;
+    }
+
     // if the current parameters do the bare minimum, we can always continue with new parameters
     if (this->meta_parameters->accept_starting_trees) {
         return true;
