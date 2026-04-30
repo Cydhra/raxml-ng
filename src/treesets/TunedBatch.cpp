@@ -1,7 +1,6 @@
 #include "TunedBatch.hpp"
 
 #include "../coraxlib/src/corax/optimize/opt_generic.h"
-#include "../loadbalance/CoarseLoadBalancer.hpp"
 #include <chrono>
 #include "Bandit.hpp"
 #include "Threadpool.hpp"

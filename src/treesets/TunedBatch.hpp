@@ -38,13 +38,10 @@ public:
                IDVector &tip_msa_idmap,
                std::vector<std::vector<doubleVector> > &reference_persite_loglh)
         : name(std::move(name)),
-          starting_seed(starting_seed),
-          num_threads(num_threads),
-          num_workers(num_workers),
-          batch_start_trees(new TreeList(batch_size)),
-          msa(msa),
           reference_persite_loglh(reference_persite_loglh),
-          thread_load_balancer(thread_load_balancer),
+          msa(msa),
+          starting_seed(starting_seed),
+          batch_start_trees(new TreeList(batch_size)),
           tip_msa_idmap(tip_msa_idmap),
           batch_persite_logh(std::vector<std::vector<doubleVector> >(batch_size)) {
         for (auto &tree_slh: batch_persite_logh) {
@@ -52,18 +49,20 @@ public:
                 tree_slh.emplace_back(pinfo.msa().length());
         }
 
+        const auto threads_per_worker = num_threads / num_workers;
+
         // prepare space for the tree-info objects
         this->batch_trees = std::vector<std::vector<std::optional<TreeInfo> > >(batch_size);
         for (auto &vector: batch_trees) {
-            vector.resize(this->num_threads_per_worker());
+            vector.resize(threads_per_worker);
         }
 
         // load balance tasks where one tree may be split between multiple threads
-        assert(this->num_workers <= this->get_batch_size());
+        assert(num_workers <= this->get_batch_size());
         ContiguousCoarseLoadBalancer load_balancer;
         CoarseAssignment tree_ids(batch_size);
         std::iota(tree_ids.begin(), tree_ids.end(), 0);
-        this->coarse_assignments = load_balancer.get_all_assignments(tree_ids, this->num_workers);
+        this->coarse_assignments = load_balancer.get_all_assignments(tree_ids, num_workers);
 
         // load balance partitions for such tasks between threads
         PartitionAssignment part_sizes;
@@ -72,8 +71,8 @@ public:
             auto pinfo = &this->msa->part_list()[i];
             part_sizes.assign_sites(i, 0, pinfo->length(), pinfo->model().clv_entry_size());
         }
-        const auto threads_per_worker = this->num_threads_per_worker();
-        this->part_assignments = this->thread_load_balancer.get_all_assignments(part_sizes, threads_per_worker);
+
+        this->part_assignments = thread_load_balancer.get_all_assignments(part_sizes, threads_per_worker);
 
         // load-balance work for AU test, where we have reference trees and trees assigned to one thread need to be
         // contiguous. This is only needed for the first instance of the AU test, afterward we can reuse the bootstrap
@@ -96,29 +95,26 @@ public:
     TunedBatch(TunedBatch &&other) noexcept
         : reuse_attempts(other.reuse_attempts),
           name(std::move(other.name)),
-          meta_parameters(std::move(other.meta_parameters)),
-          starting_seed(other.starting_seed),
-          num_threads(other.num_threads),
-          num_workers(other.num_workers),
-          batch_start_trees(std::move(other.batch_start_trees)),
+          reference_persite_loglh(other.reference_persite_loglh),
           msa(std::move(other.msa)),
+          starting_seed(other.starting_seed),
+          meta_parameters(std::move(other.meta_parameters)),
+          batch_start_trees(std::move(other.batch_start_trees)),
           spr_params(other.spr_params),
           num_fast_spr_performed(other.num_fast_spr_performed),
           num_slow_spr_performed(other.num_slow_spr_performed),
-          reference_persite_loglh(other.reference_persite_loglh),
-          thread_load_balancer(other.thread_load_balancer),
           au_assignment(std::move(other.au_assignment)),
           exclusive_assignment(std::move(other.exclusive_assignment)),
           coarse_assignments(std::move(other.coarse_assignments)),
           part_assignments(std::move(other.part_assignments)),
           tip_msa_idmap(other.tip_msa_idmap),
-          tree_topologies(std::move(other.tree_topologies)),
           batch_trees(std::move(other.batch_trees)),
           batch_persite_logh(std::move(other.batch_persite_logh)),
           meta_parameters_set(other.meta_parameters_set),
           initial_model_optimized(other.initial_model_optimized),
           plausible_tree_count(other.plausible_tree_count),
-          wall_time(other.wall_time) {
+          wall_time(other.wall_time),
+          tree_topologies(std::move(other.tree_topologies)) {
     }
 
     // explicitly implement move-assign to avoid implicit deletion
@@ -130,15 +126,12 @@ public:
         name = std::move(other.name);
         meta_parameters = std::move(other.meta_parameters);
         starting_seed = other.starting_seed;
-        num_threads = other.num_threads;
-        num_workers = other.num_workers;
         batch_start_trees = std::move(other.batch_start_trees);
         msa = std::move(other.msa);
         spr_params = other.spr_params;
         num_fast_spr_performed = other.num_fast_spr_performed;
         num_slow_spr_performed = other.num_slow_spr_performed;
         reference_persite_loglh = other.reference_persite_loglh;
-        thread_load_balancer = std::move(other.thread_load_balancer);
         au_assignment = std::move(other.au_assignment);
         exclusive_assignment = std::move(other.exclusive_assignment);
         coarse_assignments = std::move(other.coarse_assignments);
@@ -274,10 +267,15 @@ protected:
     string name;
 
     /**
-     * The meta-heuristic parameters for inferring trees. These are not the model parameters, but settings of the
-     * inference heuristics which are being optimized for plausible tree throughput during tree set inference.
+     * Per-site log-likelihoods of the reference trees already inferred before the treeset heuristic kicked in.
+     * These cannot change, and constitute the first part of the AU test input.
      */
-    shared_ptr<MetaParameters> meta_parameters;
+    std::vector<std::vector<doubleVector> > &reference_persite_loglh;
+
+    /**
+     * A reference to the MSA used in inference. We need it for the AU test.
+     */
+    shared_ptr<PartitionedMSA> msa;
 
     /**
      * The starting seed (starting from 0) for this batch. Batches infer starting trees with ascending seeds, so this
@@ -286,24 +284,15 @@ protected:
     unsigned int starting_seed;
 
     /**
-     * How many threads are used in this batch. Divisible by the number of workers.
+     * The meta-heuristic parameters for inferring trees. These are not the model parameters, but settings of the
+     * inference heuristics which are being optimized for plausible tree throughput during tree set inference.
      */
-    unsigned int num_threads;
-
-    /**
-     * Number of workers assigned to this batch.
-     */
-    unsigned int num_workers;
+    shared_ptr<MetaParameters> meta_parameters;
 
     /**
      * Starting trees for this inference batch
      */
     shared_ptr<TreeList> batch_start_trees;
-
-    /**
-     * A reference to the MSA used in inference. We need it for the AU test.
-     */
-    shared_ptr<PartitionedMSA> msa;
 
     /**
      * SPR round parameters inherited from the default checkpoint manager. They will be updated by the batch according
@@ -322,18 +311,6 @@ protected:
      * method.
      */
     unsigned int num_slow_spr_performed{0};
-
-    /**
-     * Per-site log-likelihoods of the reference trees already inferred before the treeset heuristic kicked in.
-     * These cannot change, and constitute the first part of the AU test input.
-     */
-    std::vector<std::vector<doubleVector> > &reference_persite_loglh;
-
-    /**
-     * Load balancer inherited from the main algorithm that handles fine-grained load balancing of threads within
-     * workers.
-     */
-    LoadBalancer &thread_load_balancer;
 
     /**
      * Assignment of trees to threads for the AU test. The AU test cannot split between partitions, and so no tree
@@ -363,18 +340,6 @@ protected:
      * Vector mapping sequence IDs to the MSA.
      */
     IDVector &tip_msa_idmap;
-
-    /**
-     * Mutex guard for the topologies vector, where the topologies of previous optimize() calls are backed up, in case
-     * we end the algorithm before the current call to optimize() is finished.
-     * Unique pointer to provide inner mutability. Const so the move constructors don't touch it.
-     */
-    const std::unique_ptr<std::mutex> topology_access = make_unique<std::mutex>();
-
-    /**
-     * The final tree topologies. This vector is populated by a call to `finalize()` and is otherwise empty.
-     */
-    std::vector<Tree> tree_topologies{};
 
     /**
      * Treeinfo objects for the trees inferred in this batch. These objects are updated by the inference algorithm.
@@ -413,18 +378,9 @@ protected:
     bool initial_model_optimized{false};
 
     /**
-     * The finished AU test p values, which are updated whenever the AU test is run. These values refer to the backup
-     * topologies at all times, since the batch might have progressed since the last AU test.
-     * Access to this member has to be guarded with the topology_access mutex to avoid concurrent reading and
-     * modification.
-     * The vector only contains p-value for the batch trees, the p-values of the reference topologies are not included.
-     */
-    doubleVector p_values;
-
-    /**
      * Number of plausible trees as determined by the last AU test.
      */
-    unsigned int plausible_tree_count = 0;
+    unsigned int plausible_tree_count{0};
 
     /**
      * Time spent on this batch. Does not include overhead that could be largely avoided on batches outside the tuning
@@ -440,6 +396,27 @@ protected:
      * batch reusing should not double-count the AU test time.
      */
     unsigned int au_wall_time{0};
+
+    /**
+     * Mutex guard for the topologies vector, where the topologies of previous optimize() calls are backed up, in case
+     * we end the algorithm before the current call to optimize() is finished.
+     * Unique pointer to provide inner mutability. Const so the move constructors don't touch it.
+     */
+    const std::unique_ptr<std::mutex> topology_access = make_unique<std::mutex>();
+
+    /**
+     * The final tree topologies. This vector is populated by a call to `finalize()` and is otherwise empty.
+     */
+    std::vector<Tree> tree_topologies{};
+
+    /**
+     * The finished AU test p values, which are updated whenever the AU test is run. These values refer to the backup
+     * topologies at all times, since the batch might have progressed since the last AU test.
+     * Access to this member has to be guarded with the topology_access mutex to avoid concurrent reading and
+     * modification.
+     * The vector only contains p-value for the batch trees, the p-values of the reference topologies are not included.
+     */
+    doubleVector p_values;
 
     /**
      * Update spr_params instance according to the meta_parameters
@@ -458,13 +435,6 @@ protected:
         // we don't need those
         spr_params.increasing_moves = nullptr;
         spr_params.total_moves = nullptr;
-    }
-
-    /**
-     * Get the number of threads per worker
-     */
-    unsigned int num_threads_per_worker() const {
-        return num_threads / num_workers;
     }
 
     /**
