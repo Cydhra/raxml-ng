@@ -111,6 +111,7 @@ public:
      * @param tip_msa_idmap Reference to the tip ID mapping of the MSA.
      * @param persite_loglh reference to the per-site log likelihoods of the originally computed trees
      * @param load_balancer Reference to the user-configured fine-grained load balancer.
+     * @param pythia_score the pythia difficulty score or -1.0 if it was disabled by the user
      * @param target_tree_count The number of plausible trees to infer
      * @param starting_seed the tree generating seed for the first tree. Subsequent seeds are incremented by one.
      */
@@ -120,19 +121,23 @@ public:
                      IDVector &tip_msa_idmap,
                      const std::vector<std::vector<doubleVector> > &persite_loglh,
                      LoadBalancer &load_balancer,
+                     const double pythia_score,
                      const unsigned int target_tree_count,
                      const unsigned long long starting_seed) : pool(ThreadPool(
                                                                    [this] {
                                                                        return this->next_work_unit();
-                                                                   }, opts.treeset_threads, opts.treeset_workers, opts.treeset_groups)),
+                                                                   }, opts.treeset_threads, opts.treeset_workers,
+                                                                   opts.treeset_groups)),
                                                                shared_batch_resources(
-                                                                   opts.treeset_groups, msa, persite_loglh, DEFAULT_BATCH_SIZE,
+                                                                   opts.treeset_groups, msa, persite_loglh,
+                                                                   DEFAULT_BATCH_SIZE,
                                                                    AU_DEFAULT_SCALES, AU_DEFAULT_REPS, starting_seed),
                                                                instance(instance),
                                                                opts(opts),
                                                                batch_queue(
                                                                    instance, opts, tip_msa_idmap, load_balancer, msa,
-                                                                   persite_loglh, starting_seed, DEFAULT_BATCH_SIZE),
+                                                                   persite_loglh, pythia_score, starting_seed,
+                                                                   DEFAULT_BATCH_SIZE),
                                                                target_tree_count(target_tree_count) {
     }
 

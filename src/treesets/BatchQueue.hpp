@@ -19,6 +19,7 @@ public:
                LoadBalancer &load_balancer,
                const std::shared_ptr<PartitionedMSA> &msa,
                const std::vector<std::vector<doubleVector> > &persite_loglh,
+               const double pythia_score,
                const unsigned long long seed,
                const unsigned int batch_size) : instance(instance),
                                                 opts(opts),
@@ -27,6 +28,7 @@ public:
                                                 load_balancer(load_balancer),
                                                 persite_loglh(persite_loglh),
                                                 batch_size(batch_size),
+                                                pythia_score(pythia_score),
                                                 current_seed(seed) {
         // initialize the model map for all partitions
         for (unsigned int part_id = 0; part_id < msa->part_count(); ++part_id) {
@@ -56,7 +58,8 @@ public:
      * are compatible with the parameters used for that batch before, that batch is returned.
      * Otherwise, a new batch is generated and returned.
      */
-    TunedBatch &select_next_batch(const MetaParameters &current_parameters, unsigned int num_workers, unsigned int num_threads);
+    TunedBatch &select_next_batch(const MetaParameters &current_parameters, unsigned int num_workers,
+                                  unsigned int num_threads);
 
     /**
      * Return a batch to the queue after inference is completed.
@@ -167,6 +170,11 @@ protected:
      * The number of trees to generate per batch.
      */
     unsigned int batch_size;
+
+    /**
+     * Pythia score of the MSA or -1.0 if pythia is disabled.
+     */
+    double pythia_score;
 
     /**
      * The index of the batch generated next. This is independent of the size of the batch vector because multiple

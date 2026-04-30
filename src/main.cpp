@@ -2413,12 +2413,12 @@ void autoselect_models(RaxmlInstance& instance, CheckpointManager &cm)
   write_binary_msa_file(instance, true);
 }
 
-void init_treeset_optimizer(RaxmlInstance &instance) {
+void init_treeset_optimizer(RaxmlInstance &instance, CheckpointManager &cm) {
   auto& opts = instance.opts;
   if (opts.command != Command::treeset)
     return;
 
-  instance.treeset_optimizer.reset(new TreesetOptimizer(instance, opts, instance.parted_msa, instance.tip_msa_idmap, instance.persite_loglh, *instance.load_balancer, 300, opts.random_seed + 1));
+  instance.treeset_optimizer.reset(new TreesetOptimizer(instance, opts, instance.parted_msa, instance.tip_msa_idmap, instance.persite_loglh, *instance.load_balancer, cm.pythia_score(), 300, opts.random_seed + 1));
 }
 
 unsigned int read_newick_trees_custom(SplitsTree& ref_tree, const std::string& fname,
@@ -4234,7 +4234,7 @@ void master_main(RaxmlInstance& instance, CheckpointManager& cm)
   // heuristics
   if (opts.command == Command::treeset) {
     /* initialize treeset optimizer here, after the persite lnl are already calculated */
-    init_treeset_optimizer(instance);
+    init_treeset_optimizer(instance, cm);
 
     ParallelContext::finalize_threads();
     instance.treeset_optimizer->run();
