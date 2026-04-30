@@ -76,7 +76,6 @@ public:
 
         selection_mutex.lock();
         // select next participating bandit
-        // TODO guard against all bandits no longer participating, while the top-level bandit still does (that shouldnt happen, but maybe verify this)
         do {
             this->bandit_cursor += 1;
             this->bandit_cursor %= this->bandits.size();
