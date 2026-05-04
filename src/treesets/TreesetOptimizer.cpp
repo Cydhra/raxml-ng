@@ -1,28 +1,31 @@
 #include "TreesetOptimizer.hpp"
 #include "TunedBatch.hpp"
+#include "../Optimizer.hpp"
 
 void TreesetOptimizer::initialize_bandits() {
     this->parsimony->emplace_back("Parsimony", MetaParameters(1, false, 0, 0, true, false));
 
-    // init default bandits
-    this->light_mab->emplace_back("Greedy,DoModel,2spr", MetaParameters(1, false, 2, 0, false, false));
-    this->light_mab->emplace_back("Greedy,DoModel,4spr", MetaParameters(1, false, 4, 0, false, false));
-    this->light_mab->emplace_back("Greedy,NoModel,2spr", MetaParameters(1, true, 2, 0, false, false));
+    const auto adaptive_radius = pythia_score >= 0.0 ? Optimizer::adaptive_radius(pythia_score) : DEFAULT_ADAPTIVE_RADIUS;
 
-    this->light_mab->emplace_back("Fast,DoModel,2spr", MetaParameters(20, false, 2, 0, false, false));
-    this->light_mab->emplace_back("Fast,DoModel,4spr", MetaParameters(20, false, 4, 0, false, false));
-    this->light_mab->emplace_back("Fast,NoModel,2spr", MetaParameters(20, true, 2, 0, false, false));
+    // init default bandits
+    this->light_mab->emplace_back("Greedy,DoModel,2spr", MetaParameters(1, false, 2, 0, false, false, adaptive_radius));
+    this->light_mab->emplace_back("Greedy,DoModel,4spr", MetaParameters(1, false, 4, 0, false, false, adaptive_radius));
+    this->light_mab->emplace_back("Greedy,NoModel,2spr", MetaParameters(1, true, 2, 0, false, false, adaptive_radius));
+
+    this->light_mab->emplace_back("Fast,DoModel,2spr", MetaParameters(20, false, 2, 0, false, false, adaptive_radius));
+    this->light_mab->emplace_back("Fast,DoModel,4spr", MetaParameters(20, false, 4, 0, false, false, adaptive_radius));
+    this->light_mab->emplace_back("Fast,NoModel,2spr", MetaParameters(20, true, 2, 0, false, false, adaptive_radius));
 
     // heavy heuristics
-    this->heavy_mab->emplace_back("Slow,2spr", MetaParameters(20, false, 0, 2, false, false));
-    this->heavy_mab->emplace_back("Mixed,2+2spr", MetaParameters(20, false, 2, 2, false, false));
-    this->heavy_mab->emplace_back("Mixed,4+2spr", MetaParameters(20, false, 4, 2, false, false));
+    this->heavy_mab->emplace_back("Slow,2spr", MetaParameters(20, false, 0, 2, false, false, adaptive_radius));
+    this->heavy_mab->emplace_back("Mixed,2+2spr", MetaParameters(20, false, 2, 2, false, false, adaptive_radius));
+    this->heavy_mab->emplace_back("Mixed,4+2spr", MetaParameters(20, false, 4, 2, false, false, adaptive_radius));
 
     // early commitment
-    this->commitment_mab->emplace_back("Commit,Greedy,DoModel,2spr", MetaParameters(1, false, 2, 0, false, true));
-    this->commitment_mab->emplace_back("Commit,Greedy,DoModel,4spr", MetaParameters(1, false, 4, 0, false, true));
-    this->commitment_mab->emplace_back("Commit,Fast,DoModel,2spr", MetaParameters(20, false, 2, 0, false, true));
-    this->commitment_mab->emplace_back("Commit,Fast,DoModel,4spr", MetaParameters(20, false, 4, 0, false, true));
+    this->commitment_mab->emplace_back("Commit,Greedy,DoModel,2spr", MetaParameters(1, false, 2, 0, false, true, adaptive_radius));
+    this->commitment_mab->emplace_back("Commit,Greedy,DoModel,4spr", MetaParameters(1, false, 4, 0, false, true, adaptive_radius));
+    this->commitment_mab->emplace_back("Commit,Fast,DoModel,2spr", MetaParameters(20, false, 2, 0, false, true, adaptive_radius));
+    this->commitment_mab->emplace_back("Commit,Fast,DoModel,4spr", MetaParameters(20, false, 4, 0, false, true, adaptive_radius));
 
     // set up successors
     this->successors[this->parsimony.get()] = { make_tuple("Light", this->light_mab), make_tuple("Commitment", this->commitment_mab) };

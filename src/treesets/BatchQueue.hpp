@@ -19,7 +19,6 @@ public:
                LoadBalancer &load_balancer,
                const std::shared_ptr<PartitionedMSA> &msa,
                const std::vector<std::vector<doubleVector> > &persite_loglh,
-               const double pythia_score,
                const unsigned long long seed,
                const unsigned int batch_size) : instance(instance),
                                                 opts(opts),
@@ -28,7 +27,6 @@ public:
                                                 load_balancer(load_balancer),
                                                 persite_loglh(persite_loglh),
                                                 batch_size(batch_size),
-                                                pythia_score(pythia_score),
                                                 current_seed(seed) {
         // initialize the model map for all partitions
         for (unsigned int part_id = 0; part_id < msa->part_count(); ++part_id) {
@@ -170,11 +168,6 @@ protected:
      * The number of trees to generate per batch.
      */
     unsigned int batch_size;
-
-    /**
-     * Pythia score of the MSA or -1.0 if pythia is disabled.
-     */
-    double pythia_score;
 
     /**
      * The current seed for starting tree generation. Offset that by the number of generated trees whenever it is used

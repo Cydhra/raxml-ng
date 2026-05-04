@@ -12,6 +12,11 @@
 
 constexpr unsigned int DEFAULT_BATCH_SIZE = 16;
 
+/**
+ * SPR radius used when pythia is disabled. Fast SPR will multiply this radius with 2.
+ */
+constexpr unsigned int DEFAULT_ADAPTIVE_RADIUS = 10;
+
 class TreesetOptimizer {
 protected:
     /**
@@ -40,6 +45,11 @@ protected:
      * Manages the available batches that can be used by the bandits.
      */
     BatchQueue batch_queue;
+
+    /**
+     * Pythia score of the MSA or -1.0 if pythia is disabled.
+     */
+    double pythia_score;
 
     /**
      * The number of plausible trees to infer in total.
@@ -136,8 +146,9 @@ public:
                                                                opts(opts),
                                                                batch_queue(
                                                                    instance, opts, tip_msa_idmap, load_balancer, msa,
-                                                                   persite_loglh, pythia_score, starting_seed,
+                                                                   persite_loglh, starting_seed,
                                                                    DEFAULT_BATCH_SIZE),
+                                                               pythia_score(pythia_score),
                                                                target_tree_count(target_tree_count) {
     }
 

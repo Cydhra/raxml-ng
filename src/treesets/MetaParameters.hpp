@@ -50,7 +50,7 @@ public:
                    const unsigned int num_slow_spr,
                    const bool accept_starting_trees = false,
                    const bool early_commit = false,
-                   const unsigned int max_radius = 14) : keep_top_k_topol(keep_top_k_topol), skip_model(skip_model),
+                   const int max_radius = 20) : keep_top_k_topol(keep_top_k_topol), skip_model(skip_model),
                                                          num_fast_spr(num_fast_spr), num_slow_spr(num_slow_spr),
                                                          accept_starting_trees(accept_starting_trees),
                                                          early_commit(early_commit),
