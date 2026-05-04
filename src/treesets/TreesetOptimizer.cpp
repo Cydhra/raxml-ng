@@ -5,7 +5,9 @@
 void TreesetOptimizer::initialize_bandits() {
     this->parsimony->emplace_back("Parsimony", MetaParameters(1, false, 0, 0, true, false));
 
-    const auto adaptive_radius = pythia_score >= 0.0 ? Optimizer::adaptive_radius(pythia_score) : DEFAULT_ADAPTIVE_RADIUS;
+    const auto adaptive_radius = pythia_score >= 0.0
+                                     ? Optimizer::adaptive_radius(pythia_score)
+                                     : DEFAULT_ADAPTIVE_RADIUS;
 
     // init default bandits
     this->light_mab->emplace_back("Greedy,DoModel,2spr", MetaParameters(1, false, 2, 0, false, false, adaptive_radius));
@@ -22,22 +24,30 @@ void TreesetOptimizer::initialize_bandits() {
     this->heavy_mab->emplace_back("Mixed,4+2spr", MetaParameters(20, false, 4, 2, false, false, adaptive_radius));
 
     // early commitment
-    this->commitment_mab->emplace_back("Commit,Greedy,DoModel,2spr", MetaParameters(1, false, 2, 0, false, true, adaptive_radius));
-    this->commitment_mab->emplace_back("Commit,Greedy,DoModel,4spr", MetaParameters(1, false, 4, 0, false, true, adaptive_radius));
-    this->commitment_mab->emplace_back("Commit,Fast,DoModel,2spr", MetaParameters(20, false, 2, 0, false, true, adaptive_radius));
-    this->commitment_mab->emplace_back("Commit,Fast,DoModel,4spr", MetaParameters(20, false, 4, 0, false, true, adaptive_radius));
+    this->commitment_mab->emplace_back("Commit,Greedy,DoModel,2spr",
+                                       MetaParameters(1, false, 2, 0, false, true, adaptive_radius));
+    this->commitment_mab->emplace_back("Commit,Greedy,DoModel,4spr",
+                                       MetaParameters(1, false, 4, 0, false, true, adaptive_radius));
+    this->commitment_mab->emplace_back("Commit,Fast,DoModel,2spr",
+                                       MetaParameters(20, false, 2, 0, false, true, adaptive_radius));
+    this->commitment_mab->emplace_back("Commit,Fast,DoModel,4spr",
+                                       MetaParameters(20, false, 4, 0, false, true, adaptive_radius));
 
     // set up successors
-    this->successors[this->parsimony.get()] = { make_tuple("Light", this->light_mab), make_tuple("Commitment", this->commitment_mab) };
-    this->successors[this->light_mab.get()] = { make_tuple("Heavy", this->heavy_mab) };
-    this->successors[this->commitment_mab.get()] = { make_tuple("Heavy", this->heavy_mab) };
+    this->successors[this->parsimony.get()] = {
+        make_tuple("Light", this->light_mab), make_tuple("Commitment", this->commitment_mab)
+    };
+    this->successors[this->light_mab.get()] = {make_tuple("Heavy", this->heavy_mab)};
+    this->successors[this->commitment_mab.get()] = {make_tuple("Heavy", this->heavy_mab)};
 
     // second-level MAB
     this->hierarchical_mab.emplace_back("Starting Trees", parsimony);
 }
 
-void TreesetOptimizer::run_batch(Bandit<std::shared_ptr<MultiArmedBandit<MetaParameters> > > &mab, Bandit<MetaParameters> &bandit,
-                   TunedBatch &batch, TaskGroup &context, unsigned int worker_id, unsigned int thread_id) {
+void TreesetOptimizer::run_batch(Bandit<std::shared_ptr<MultiArmedBandit<MetaParameters> > > &mab,
+                                 Bandit<MetaParameters> &bandit,
+                                 TunedBatch &batch, TaskGroup &context, unsigned int worker_id,
+                                 unsigned int thread_id) {
     batch.optimize(instance, opts, shared_batch_resources, context, worker_id, thread_id);
 
     if (context.is_group_leader(worker_id, thread_id)) {
@@ -50,7 +60,7 @@ void TreesetOptimizer::run_batch(Bandit<std::shared_ptr<MultiArmedBandit<MetaPar
         // inform the batch queue that the batch has been inferred
         this->batch_queue.finish_batch(batch);
 
-        if (this->batch_queue.num_plausible_trees() > this->target_tree_count) {
+        if (this->batch_queue.num_plausible_trees() > this->target_tree_count || this->batch_queue.view_batches().size() >= 250) {
             pool.shutdown();
         }
     }
@@ -59,10 +69,12 @@ void TreesetOptimizer::run_batch(Bandit<std::shared_ptr<MultiArmedBandit<MetaPar
 BatchTask TreesetOptimizer::next_work_unit() {
     auto &mab = this->hierarchical_mab.select_next_bandit();
     auto &current_bandit = mab.get_parameters().get()->get()->select_next_bandit();
-    auto &current_batch = this->batch_queue.select_next_batch(*current_bandit.get_parameters(), pool.workers_per_task(), pool.threads_per_task());
+    auto &current_batch = this->batch_queue.select_next_batch(*current_bandit.get_parameters(), pool.workers_per_task(),
+                                                              pool.threads_per_task());
     current_batch.update_meta_parameters(opts, current_bandit.get_parameters());
 
-    BatchTask runner = [this, &mab, &current_bandit, &current_batch](TaskGroup &context, const unsigned int worker_id, const unsigned int thread_id) {
+    BatchTask runner = [this, &mab, &current_bandit, &current_batch](TaskGroup &context, const unsigned int worker_id,
+                                                                     const unsigned int thread_id) {
         this->run_batch(mab, current_bandit, current_batch, context, worker_id, thread_id);
     };
 
@@ -79,18 +91,20 @@ void TreesetOptimizer::run() {
 
     pool.work(opts);
 
-    LOG_INFO_TS << "Inferred " << this->batch_queue.num_plausible_trees() << " plausible trees in " << this->batch_queue.num_batches() <<
+    LOG_INFO_TS << "Inferred " << this->batch_queue.num_plausible_trees() << " plausible trees in " << this->batch_queue
+            .num_batches() <<
             " batches." << std::endl;
 }
 
-void TreesetOptimizer::check_mab_modification(const Bandit<shared_ptr<MultiArmedBandit<MetaParameters> > > &current_arm) {
+void TreesetOptimizer::check_mab_modification(
+    const Bandit<shared_ptr<MultiArmedBandit<MetaParameters> > > &current_arm) {
     // TODO implement a proper heuristic here. For now, we check if the current arm exceeds 75% success per batch,
     //  and if not, we add arms according to a pre-defined mapping.
 
     if (current_arm.num_samples() >= 4 && current_arm.get_expected_tree_rate() < 0.75) {
         const auto pointer = current_arm.get_parameters().get()->get();
         if (this->successors.find(pointer) != this->successors.end()) {
-            for (auto &successor : this->successors.at(pointer)) {
+            for (auto &successor: this->successors.at(pointer)) {
                 if (!hierarchical_mab.has_bandit(std::get<0>(successor))) {
                     LOG_INFO << "Adding bandit " << std::get<0>(successor) << " to algorithm." << std::endl;
                     hierarchical_mab.emplace_back(std::get<0>(successor), std::get<1>(successor));
@@ -103,7 +117,7 @@ void TreesetOptimizer::check_mab_modification(const Bandit<shared_ptr<MultiArmed
 std::vector<Tree> TreesetOptimizer::get_all_trees() const {
     auto full_set = std::vector<Tree>();
 
-    for (auto &batch : batch_queue.view_batches()) {
+    for (auto &batch: batch_queue.view_batches()) {
         for (unsigned int tree_id = 0; tree_id < batch.get_batch_size(); ++tree_id) {
             full_set.push_back(batch.get_tree(tree_id));
         }
@@ -116,7 +130,7 @@ std::vector<Tree> TreesetOptimizer::get_all_trees() const {
 std::vector<Tree> TreesetOptimizer::get_plausible_trees() const {
     auto plausible_set = std::vector<Tree>();
 
-    for (auto &batch : batch_queue.view_batches()) {
+    for (auto &batch: batch_queue.view_batches()) {
         batch.get_plausible_trees(plausible_set);
     }
 
