@@ -63,11 +63,31 @@ public:
                && lhs.num_fast_spr == rhs.num_fast_spr
                && lhs.num_slow_spr == rhs.num_slow_spr
                && lhs.accept_starting_trees == rhs.accept_starting_trees
-               && lhs.early_commit == rhs.early_commit;
+               && lhs.early_commit == rhs.early_commit
+               && lhs.max_adaptive_radius == rhs.max_adaptive_radius;
     }
 
     friend bool operator!=(const MetaParameters &lhs, const MetaParameters &rhs) {
         return !(lhs == rhs);
+    }
+
+    friend std::size_t hash_value(const MetaParameters &obj) {
+        std::size_t seed = 0x1C4E9B69;
+        seed ^= (seed << 6) + (seed >> 2) + 0x51B2DA55 + static_cast<std::size_t>(obj.keep_top_k_topol);
+        seed ^= (seed << 6) + (seed >> 2) + 0x4004D301 + static_cast<std::size_t>(obj.skip_model);
+        seed ^= (seed << 6) + (seed >> 2) + 0x12513366 + static_cast<std::size_t>(obj.num_fast_spr);
+        seed ^= (seed << 6) + (seed >> 2) + 0x0634217E + static_cast<std::size_t>(obj.num_slow_spr);
+        seed ^= (seed << 6) + (seed >> 2) + 0x360C41B9 + static_cast<std::size_t>(obj.accept_starting_trees);
+        seed ^= (seed << 6) + (seed >> 2) + 0x0E9C6D22 + static_cast<std::size_t>(obj.early_commit);
+        seed ^= (seed << 6) + (seed >> 2) + 0x01EAFBD5 + static_cast<std::size_t>(obj.max_adaptive_radius);
+        return seed;
+    }
+};
+
+template<>
+struct std::hash<MetaParameters> {
+    size_t operator()(const MetaParameters &p) const noexcept {
+        return hash_value(p);
     }
 };
 
