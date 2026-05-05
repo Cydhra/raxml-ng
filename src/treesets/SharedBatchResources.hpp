@@ -2,6 +2,7 @@
 #define RAXML_SHAREDBATCHRESOURCES_HPP_
 
 #include "Threadpool.hpp"
+#include "TreesetProfiling.hpp"
 #include "../au/AuTest.hpp"
 
 /**
@@ -29,6 +30,13 @@ public:
             au_tests.emplace_back(msa, reference_logh_matrix, batch_loglh_dummy, scales, num_replicates, seed);
             initialized.emplace_back(false);
         }
+    }
+
+    /**
+     * Get the profiling instance. The instance is thread-safe, so there is only one global profiler.
+     */
+    TreesetProfiling &get_profiling() {
+        return profiling;
     }
 
     /**
@@ -62,6 +70,12 @@ public:
     }
 
 protected:
+
+    /**
+     * Handles fine-grained profiling of batch optimization
+     */
+    TreesetProfiling profiling;
+
     /**
      * Shared AU test instances, one for each thread group.
      */

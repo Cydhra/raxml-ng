@@ -3,7 +3,9 @@
 #include "../coraxlib/src/corax/optimize/opt_generic.h"
 #include <chrono>
 #include "Bandit.hpp"
+#include "SharedBatchResources.hpp"
 #include "Threadpool.hpp"
+#include "TreesetProfiling.hpp"
 
 using namespace std::placeholders;
 
@@ -49,8 +51,8 @@ void TunedBatch::generate_starting_trees(RaxmlInstance &instance, const Options 
     }
 }
 
-void TunedBatch::optimize_topology(const Options &opts, const TaskGroup &context, const unsigned int worker_id,
-                                   const unsigned int thread_id) {
+void TunedBatch::optimize_topology(const Options &opts, const TaskGroup &context, SharedBatchResources &resources,
+                                   const unsigned int worker_id, const unsigned int thread_id) {
     const auto &tree_ids = this->coarse_assignments.at(worker_id);
 
     // copy current status into local variables. This is simpler than putting those states into atomic counters and add
@@ -77,11 +79,21 @@ void TunedBatch::optimize_topology(const Options &opts, const TaskGroup &context
         }
 
         context.enter_barrier(); // required to propagate auto-configuration
-        const auto begin = std::chrono::steady_clock::now();
+        auto begin = std::chrono::steady_clock::now();
 
         // run optimization kernel
         for (const auto tree_id: tree_ids) {
             for (unsigned int spr_round = rounds_performed; spr_round < total_rounds; ++spr_round) {
+                InferencePhase phase = spr_params.thorough
+                                 ? SlowSprRound{spr_round}
+                                 : (meta_parameters->keep_top_k_topol == 1
+                                        ? static_cast<InferencePhase>(GreedySprRound{spr_round})
+                                        : static_cast<InferencePhase>(FastSprRound{spr_round}));
+                if (context.is_group_leader(worker_id, thread_id)) {
+                    resources.get_profiling().start_measurement(*this, phase);
+                    begin = std::chrono::steady_clock::now();
+                }
+
                 // important: we create a copy of the parameters here and give spr_round a copy, not the shared reference.
                 // This doesn't fix any issues or has any effect on the code as written (that I know of) because the
                 // first thing the spr round does is copying the values into a per-thread local struct.
@@ -91,6 +103,16 @@ void TunedBatch::optimize_topology(const Options &opts, const TaskGroup &context
                 auto local_copy = spr_params;
                 batch_trees[tree_id][thread_id].value().spr_round(local_copy);
                 batch_trees[tree_id][thread_id].value().optimize_branches(1.0, 1);
+
+                if (context.is_group_leader(worker_id, thread_id)) {
+                    const auto end = std::chrono::steady_clock::now();
+
+                    const unsigned int elapsed = static_cast<unsigned int>(std::chrono::duration_cast<
+                        std::chrono::milliseconds>(end - begin).count());
+                    this->wall_time += elapsed;
+
+                    resources.get_profiling().finish_measurement(*this, phase);
+                }
             }
 
             LOG_WORKER_TS(LogLevel::debug) << "performed " << (total_rounds - rounds_performed)
@@ -122,9 +144,9 @@ void TunedBatch::optimize_topology(const Options &opts, const TaskGroup &context
     }
 }
 
-void TunedBatch::optimize_parameters(const TaskGroup &context, const unsigned int worker_id,
-                                     const unsigned int thread_id, double epsilon, const bool model,
-                                     const bool branches, const bool force) {
+void TunedBatch::optimize_parameters(SharedBatchResources &resources, const TaskGroup &context,
+                                     const unsigned int worker_id, const unsigned int thread_id, double epsilon,
+                                     const bool model, const bool branches, const bool force) {
     const auto &tree_ids = this->coarse_assignments.at(worker_id);
 
     const auto opt_model = model && (!this->meta_parameters->skip_model || force);
@@ -140,6 +162,9 @@ void TunedBatch::optimize_parameters(const TaskGroup &context, const unsigned in
     if (opt_model && opt_branches) {
         if (context.is_group_leader(worker_id, thread_id)) {
             LOG_INFO_TS << this->name << ": Optimizing all params (eps: " << epsilon << ")" << std::endl;
+
+            resources.get_profiling().start_measurement(*this, BranchOptimization {epsilon});
+            if (!force) resources.get_profiling().start_measurement(*this, ModelOptimization {epsilon});
         }
 
         // run all parameters optimization
@@ -149,6 +174,8 @@ void TunedBatch::optimize_parameters(const TaskGroup &context, const unsigned in
     } else if (opt_model) {
         if (context.is_group_leader(worker_id, thread_id)) {
             LOG_INFO_TS << this->name << ": Optimizing model (eps: " << epsilon << ")" << std::endl;
+
+            if (!force) resources.get_profiling().start_measurement(*this, ModelOptimization {epsilon});
         }
 
         // run model optimization
@@ -158,6 +185,8 @@ void TunedBatch::optimize_parameters(const TaskGroup &context, const unsigned in
     } else if (branches) {
         if (context.is_group_leader(worker_id, thread_id)) {
             LOG_INFO_TS << this->name << ": Optimizing branches (eps: " << epsilon << ")" << std::endl;
+
+            resources.get_profiling().start_measurement(*this, BranchOptimization {epsilon});
         }
 
         // run model optimization
@@ -173,6 +202,9 @@ void TunedBatch::optimize_parameters(const TaskGroup &context, const unsigned in
                 std::chrono::milliseconds>(end - begin).count());
         }
 
+        if (opt_branches) resources.get_profiling().finish_measurement(*this, BranchOptimization {epsilon});
+        if (opt_model && !force) resources.get_profiling().finish_measurement(*this, ModelOptimization {epsilon});
+
         LOG_INFO_TS << this->name << ": Model Opt complete (eps: " << epsilon << ")" << std::endl;
     }
 }
@@ -183,6 +215,8 @@ void TunedBatch::optimize(RaxmlInstance &instance, const Options &opts, SharedBa
         throw RaxmlException("TunedBatch has not been configured with meta heuristics");
     }
 
+    resources.get_profiling().start_measurement(*this, CompleteInference {});
+
     if (!this->start_trees_generated()) {
         this->generate_starting_trees(instance, opts, context, worker_id, thread_id);
     }
@@ -190,7 +224,7 @@ void TunedBatch::optimize(RaxmlInstance &instance, const Options &opts, SharedBa
     if (!meta_parameters->accept_starting_trees) {
         // do initial model and branch length optimization
         if (!this->initial_model_optimized) {
-            this->optimize_parameters(context, worker_id, thread_id, 3.0);
+            this->optimize_parameters(resources, context, worker_id, thread_id, 3.0);
 
             if (context.is_group_leader(worker_id, thread_id)) {
                 this->initial_model_optimized = true;
@@ -198,15 +232,14 @@ void TunedBatch::optimize(RaxmlInstance &instance, const Options &opts, SharedBa
         }
 
         // compute all required SPR rounds
-        this->optimize_topology(opts, context, worker_id, thread_id);
+        this->optimize_topology(opts, context, resources, worker_id, thread_id);
     }
 
     if (context.is_group_leader(worker_id, thread_id)) {
         LOG_INFO_TS << this->name << ": total batch time after heuristics: " << this->wall_time << "ms." << std::endl;
     }
 
-    auto &au_test = resources.get_au_test(context);
-    perform_plausibility_check(au_test, resources.is_initialized(context), context, worker_id, thread_id);
+    perform_plausibility_check(resources, resources.is_initialized(context), context, worker_id, thread_id);
     resources.set_initialized(context);
 
     if (context.is_group_leader(worker_id, thread_id)) {
@@ -220,6 +253,8 @@ void TunedBatch::optimize(RaxmlInstance &instance, const Options &opts, SharedBa
             this->tree_topologies.push_back(batch_tree.at(0).value().tree());
         }
     }
+
+    resources.get_profiling().finish_measurement(*this, CompleteInference{});
 }
 
 void TunedBatch::perform_au_test(AuTest &au_test, const bool initialized, const TaskGroup &context,
@@ -246,7 +281,9 @@ void TunedBatch::perform_au_test(AuTest &au_test, const bool initialized, const 
     // synchronizing accesses to the bootstrap replicate likelihood sums.
     // we therefore use as many workers as possible with one thread each now.
     const std::vector<size_t> &tree_ids =
-            initialized ? exclusive_assignment.at(context.get_group_thread_id(worker_id, thread_id)) : au_assignment.at(context.get_group_thread_id(worker_id, thread_id));
+            initialized
+                ? exclusive_assignment.at(context.get_group_thread_id(worker_id, thread_id))
+                : au_assignment.at(context.get_group_thread_id(worker_id, thread_id));
     const unsigned int slice_start = initialized
                                          ? *tree_ids.begin() + reference_persite_loglh.size()
                                          : *tree_ids.begin();
@@ -263,9 +300,11 @@ void TunedBatch::perform_au_test(AuTest &au_test, const bool initialized, const 
     }
 }
 
-void TunedBatch::perform_plausibility_check(AuTest &au_test, const bool initialized,
+void TunedBatch::perform_plausibility_check(SharedBatchResources &resources, const bool initialized,
                                             const TaskGroup &context, const unsigned int worker_id,
                                             const unsigned int thread_id) {
+    auto &au_test = resources.get_au_test(context);
+
     if (context.is_group_leader(worker_id, thread_id)) {
         if (!initialized) {
             au_test.allocate_test_statistics(false);
@@ -275,7 +314,7 @@ void TunedBatch::perform_plausibility_check(AuTest &au_test, const bool initiali
 
     // TODO should we backup the less optimized model or just accept that we overspecify the model
     const auto begin = std::chrono::steady_clock::now();
-    this->optimize_parameters(context, worker_id, thread_id, 0.1, true, true, true);
+    this->optimize_parameters(resources, context, worker_id, thread_id, 0.1, true, true, true);
 
     this->perform_au_test(au_test, initialized, context, worker_id, thread_id);
 

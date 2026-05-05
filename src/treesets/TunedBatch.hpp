@@ -5,12 +5,14 @@
 #include <optional>
 #include <utility>
 #include "MetaParameters.hpp"
-#include "SharedBatchResources.hpp"
 #include "Threadpool.hpp"
 #include "../loadbalance/LoadBalancer.hpp"
 #include "../loadbalance/CoarseLoadBalancer.hpp"
 #include "../au/AuTest.hpp"
 #include "../Checkpoint.hpp"
+
+// forward declaration to avoid cyclic header inclusion
+class SharedBatchResources;
 
 /**
  * Probability to reject a tree even if it is plausible.
@@ -168,13 +170,14 @@ public:
      * Perform the AU test on the trees in the batch, as well as the supplied reference trees,
      * but backup the model before, optimize the model fully, and then restore the original model.
      *
-     * @param au_test test instance
+     * @param resources au test instance and profiling, shared between batches
      * @param initialized if false, the au_test instance is not initialized and memory will be allocated, and the
      * reference trees included in the bootstrap. Otherwise, only the batch trees are included.
      *
      * @return The number of plausible trees.
      */
-    void perform_plausibility_check(AuTest &au_test, bool initialized, const TaskGroup &context, unsigned int worker_id,
+    void perform_plausibility_check(SharedBatchResources &resources, bool initialized, const TaskGroup &context,
+                                    unsigned int worker_id,
                                     unsigned int thread_id);
 
     /**
@@ -457,21 +460,23 @@ protected:
      * Perform model and branch length optimization according to the current tuning parameters and the given epsilon.
      * If model optimization is currently disabled, load models from a backup.
      *
+     * @param resources
      * @param epsilon the likelihood threshold when to stop optimizing
      * @param model if true, optimize model parameters
      * @param branches if true, optimize branch lengths
      * @param force if true, model optimization is forced, even if batch tuning parameters turn it off
      */
-    void optimize_parameters(const TaskGroup &context, unsigned int worker_id, unsigned int thread_id, double epsilon,
-                             bool model = true, bool branches = true, bool force = false);
+    void optimize_parameters(SharedBatchResources &resources, const TaskGroup &context, unsigned int worker_id,
+                             unsigned int thread_id,
+                             double epsilon, bool model = true, bool branches = true, bool force = false);
 
     /**
      * Perform SPR rounds up to the target count, with meta-parameters according to the batch settings.
      *
      * @param opts parsed command line options and forced RAxML settings
      */
-    void optimize_topology(const Options &opts, const TaskGroup &context, unsigned int worker_id,
-                           unsigned int thread_id);
+    void optimize_topology(const Options &opts, const TaskGroup &context, SharedBatchResources &resources,
+                           unsigned int worker_id, unsigned int thread_id);
 
     /**
      * Perform the AU test on the trees in the batch, as well as the supplied reference trees.
