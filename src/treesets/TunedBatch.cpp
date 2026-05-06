@@ -129,12 +129,6 @@ void TunedBatch::optimize_topology(const Options &opts, const TaskGroup &context
 
         // update the TunedBatch status
         if (context.is_group_leader(worker_id, thread_id)) {
-            const auto end = std::chrono::steady_clock::now();
-
-            const unsigned int elapsed = static_cast<unsigned int>(std::chrono::duration_cast<
-                std::chrono::milliseconds>(end - begin).count());
-            this->wall_time += elapsed;
-
             if (fast) {
                 this->num_fast_spr_performed = current_spr_fast;
             } else {
