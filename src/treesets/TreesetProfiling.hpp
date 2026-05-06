@@ -185,6 +185,8 @@ public:
     void start_measurement(const TunedBatch &batch, const InferencePhase &phase);
 
     void finish_measurement(const TunedBatch &batch, const InferencePhase &phase);
+
+    void print_report() const;
 };
 
 #endif //RAXML_TREESETPROFILER_HPP_
