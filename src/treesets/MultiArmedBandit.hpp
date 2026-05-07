@@ -88,7 +88,7 @@ public:
             LOG_INFO << std::endl;
             LOG_WORKER_TS(LogLevel::info) << "Initial estimation of " << selected_bandit.get_name() << "." << std::endl;
         } else {
-            if (this->bandit_cursor != this->best_known_bandit && selected_bandit.is_worse_than(
+            if (this->bandit_cursor != this->best_known_bandit && !std::isnan(this->bandits[this->best_known_bandit].get_mean_throughput()) && selected_bandit.is_worse_than(
                     best_bandit, iterations_completed)) {
                 LOG_INFO << std::endl;
                 LOG_WORKER_TS(LogLevel::info) << "Switching to best bandit " << best_bandit.get_name() <<
@@ -149,7 +149,7 @@ public:
         current_bandit.take_measurement(batch);
 
         // if the current bandit is not the best one, check if the best one has to be updated
-        if (current_bandit.get_parameters() != this->bandits[best_known_bandit].get_parameters()) {
+        if (current_bandit.get_parameters() != this->bandits[best_known_bandit].get_parameters() && !std::isnan(this->bandits[best_known_bandit].get_mean_throughput())) {
             if (current_bandit.get_mean_throughput() > this->bandits[best_known_bandit].get_mean_throughput()) {
                 // find which index is the current bandit. We cannot rely on the cursor since that has been advanced by
                 // concurrent batch groups
