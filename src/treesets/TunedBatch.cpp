@@ -58,20 +58,27 @@ void TunedBatch::optimize_nni(const Options &opts, SharedBatchResources &resourc
 
     if (meta_parameters->nni_round) {
         if (context.is_group_leader(worker_id, thread_id)) {
-            LOG_INFO_TS << this->name << ": Performing NNI round [eps: " << opts.nni_epsilon << ", tol: " << opts.nni_tolerance << "]." << std::endl;
+            LOG_INFO_TS << this->name << ": Performing NNI round."  << std::endl;
         }
 
-        nni_round_params nni_round_params;
-        nni_round_params.lh_epsilon = opts.nni_epsilon;
-        nni_round_params.tolerance = opts.nni_tolerance;
+        if (context.is_group_leader(worker_id, thread_id)) {
+            this->auto_configure(opts);
+            spr_params.radius_max = 1;
+            spr_params.thorough = false;
+            spr_params.ntopol_keep = 1;
+        }
+
+        // propagate spr_params
+        context.enter_barrier();
 
         for (const auto tree_id: tree_ids) {
             if (context.is_group_leader(worker_id, thread_id)) {
                 resources.get_profiling().start_measurement(*this, NNIOptimization{});
+                begin = std::chrono::steady_clock::now();
             }
 
-            batch_trees[tree_id][thread_id].value().nni_round(nni_round_params);
-            batch_trees[tree_id][thread_id].value().optimize_branches(1.0, 1);
+            auto local_copy = spr_params;
+            batch_trees[tree_id][thread_id].value().spr_round(local_copy);
 
             if (context.is_group_leader(worker_id, thread_id)) {
                 const auto end = std::chrono::steady_clock::now();
