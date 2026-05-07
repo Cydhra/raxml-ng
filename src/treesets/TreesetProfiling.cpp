@@ -31,6 +31,7 @@ void TreesetProfiling::print_report() const {
     }
     LOG_INFO << "\t]" << std::endl;
 
+    LOG_INFO << "NNI Round timings:\t" << nni_profiler->get_mean_wall_time() << ";" << std::endl;
     LOG_INFO << "Model Optimizer round timings:\t" << model_opt_profiler->get_mean_wall_time() << ";" << std::endl;
     LOG_INFO << "Branch Optimizer round timings:\t" << branch_opt_profiler->get_mean_wall_time() << ";" << std::endl;
 }

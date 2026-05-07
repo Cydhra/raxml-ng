@@ -27,7 +27,8 @@ protected:
     ThreadPool pool;
 
     /**
-     * Thread-local resources shared between batches.
+     * Resources shared between batches, either group-local or thread-safe resources that aren't specific to the batch
+     * (like AU test instances that can be reused, or profiler that need to be shared).
      */
     SharedBatchResources shared_batch_resources;
 
@@ -60,6 +61,9 @@ protected:
     MultiArmedBandit<std::shared_ptr<MultiArmedBandit<MetaParameters> > > hierarchical_mab;
 
     std::shared_ptr<MultiArmedBandit<MetaParameters> > parsimony = std::make_shared<MultiArmedBandit<
+        MetaParameters> >();
+
+    std::shared_ptr<MultiArmedBandit<MetaParameters> > nni_mab = std::make_shared<MultiArmedBandit<
         MetaParameters> >();
 
     /**

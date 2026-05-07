@@ -51,6 +51,41 @@ void TunedBatch::generate_starting_trees(RaxmlInstance &instance, const Options 
     }
 }
 
+void TunedBatch::optimize_nni(const Options &opts, SharedBatchResources &resources, const TaskGroup &context, unsigned int worker_id, unsigned int thread_id) {
+    const auto &tree_ids = this->coarse_assignments.at(worker_id);
+
+    auto begin = std::chrono::steady_clock::now();
+
+    if (meta_parameters->nni_round) {
+        if (context.is_group_leader(worker_id, thread_id)) {
+            LOG_INFO_TS << this->name << ": Performing NNI round [eps: " << opts.nni_epsilon << ", tol: " << opts.nni_tolerance << "]." << std::endl;
+        }
+
+        nni_round_params nni_round_params;
+        nni_round_params.lh_epsilon = opts.nni_epsilon;
+        nni_round_params.tolerance = opts.nni_tolerance;
+
+        for (const auto tree_id: tree_ids) {
+            if (context.is_group_leader(worker_id, thread_id)) {
+                resources.get_profiling().start_measurement(*this, NNIOptimization{});
+            }
+
+            batch_trees[tree_id][thread_id].value().nni_round(nni_round_params);
+            batch_trees[tree_id][thread_id].value().optimize_branches(1.0, 1);
+
+            if (context.is_group_leader(worker_id, thread_id)) {
+                const auto end = std::chrono::steady_clock::now();
+
+                const unsigned int elapsed = static_cast<unsigned int>(std::chrono::duration_cast<
+                    std::chrono::milliseconds>(end - begin).count());
+                this->wall_time += elapsed;
+
+                resources.get_profiling().finish_measurement(*this, NNIOptimization{});
+            }
+        }
+    }
+}
+
 void TunedBatch::optimize_topology(const Options &opts, const TaskGroup &context, SharedBatchResources &resources,
                                    const unsigned int worker_id, const unsigned int thread_id) {
     const auto &tree_ids = this->coarse_assignments.at(worker_id);
@@ -226,6 +261,7 @@ void TunedBatch::optimize(RaxmlInstance &instance, const Options &opts, SharedBa
         }
 
         // compute all required SPR rounds
+        this->optimize_nni(opts, resources, context, worker_id, thread_id);
         this->optimize_topology(opts, context, resources, worker_id, thread_id);
     }
 

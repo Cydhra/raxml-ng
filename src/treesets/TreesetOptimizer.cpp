@@ -10,6 +10,9 @@ void TreesetOptimizer::initialize_bandits() {
                                      : DEFAULT_ADAPTIVE_RADIUS;
 
     // init default bandits
+    this->nni_mab->emplace_back("NNI,DoModel", MetaParameters(20, false, 0, 0, false, false, adaptive_radius, true));
+    this->nni_mab->emplace_back("NNI,NoModel", MetaParameters(20, true, 0, 0, false, false, adaptive_radius, true));
+
     this->light_mab->emplace_back("Greedy,DoModel,2spr", MetaParameters(1, false, 2, 0, false, false, adaptive_radius));
     this->light_mab->emplace_back("Greedy,DoModel,4spr", MetaParameters(1, false, 4, 0, false, false, adaptive_radius));
     this->light_mab->emplace_back("Greedy,NoModel,2spr", MetaParameters(1, true, 2, 0, false, false, adaptive_radius));
@@ -35,6 +38,9 @@ void TreesetOptimizer::initialize_bandits() {
 
     // set up successors
     this->successors[this->parsimony.get()] = {
+        make_tuple("NNI", this->nni_mab)
+    };
+    this->successors[this->nni_mab.get()] = {
         make_tuple("Light", this->light_mab), make_tuple("Commitment", this->commitment_mab)
     };
     this->successors[this->light_mab.get()] = {make_tuple("Heavy", this->heavy_mab)};

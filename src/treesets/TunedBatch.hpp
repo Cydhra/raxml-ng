@@ -423,6 +423,8 @@ protected:
 
     /**
      * Update spr_params instance according to the meta_parameters
+     *
+     * @param opts parsed command line options with defaults and user-mandated search parameters
      */
     void auto_configure(const Options &opts) {
         // update options according to MetaParameters:
@@ -452,6 +454,9 @@ protected:
 
     /**
      * Generate parsimony starting trees for this batch, and initialize the tree inference.
+     *
+     * @param instance RaxmlInstance which is required for tree generation
+     * @param opts parsed command line options with defaults and user-mandated search parameters
      */
     void generate_starting_trees(RaxmlInstance &instance, const Options &opts, const TaskGroup &context,
                                  unsigned int worker_id, unsigned int thread_id);
@@ -460,7 +465,7 @@ protected:
      * Perform model and branch length optimization according to the current tuning parameters and the given epsilon.
      * If model optimization is currently disabled, load models from a backup.
      *
-     * @param resources
+     * @param resources Resources shared between batches, either group-local or thread-safe
      * @param epsilon the likelihood threshold when to stop optimizing
      * @param model if true, optimize model parameters
      * @param branches if true, optimize branch lengths
@@ -471,9 +476,20 @@ protected:
                              double epsilon, bool model = true, bool branches = true, bool force = false);
 
     /**
+     * Perform an NNI round if the meta-parameters say so.
+     * @param opts parsed command line options with defaults and user-mandated search parameters
+     * @param resources Resources shared between batches, either group-local or thread-safe
+     * @param context
+     * @param worker_id
+     * @param thread_id
+     */
+    void optimize_nni(const Options &opts, SharedBatchResources &resources, const TaskGroup &context,
+                      unsigned int worker_id, unsigned int thread_id);
+
+    /**
      * Perform SPR rounds up to the target count, with meta-parameters according to the batch settings.
      *
-     * @param opts parsed command line options and forced RAxML settings
+     * @param opts opts parsed command line options with defaults and user-mandated search parameters
      */
     void optimize_topology(const Options &opts, const TaskGroup &context, SharedBatchResources &resources,
                            unsigned int worker_id, unsigned int thread_id);

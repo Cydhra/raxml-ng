@@ -36,7 +36,10 @@ struct BranchOptimization : ParameterOptimization {
 struct CompleteInference {
 };
 
-typedef std::variant<FastSprRound, SlowSprRound, GreedySprRound, ModelOptimization, BranchOptimization, CompleteInference> InferencePhase;
+struct NNIOptimization {
+};
+
+typedef std::variant<FastSprRound, SlowSprRound, GreedySprRound, NNIOptimization, ModelOptimization, BranchOptimization, CompleteInference> InferencePhase;
 
 class Profiler {
 public:
@@ -172,6 +175,8 @@ public:
         ModelOptimization> >();
     std::shared_ptr<SimpleTimeProfiler<BranchOptimization> > branch_opt_profiler = std::make_shared<SimpleTimeProfiler<
         BranchOptimization> >();
+    std::shared_ptr<SimpleTimeProfiler<NNIOptimization> > nni_profiler = std::make_shared<SimpleTimeProfiler<
+        NNIOptimization> >();
 
 
     TreesetProfiling() {
@@ -180,10 +185,21 @@ public:
         registered_profilers.push_back(greedy_spr_profiler);
         registered_profilers.push_back(model_opt_profiler);
         registered_profilers.push_back(branch_opt_profiler);
+        registered_profilers.push_back(nni_profiler);
     }
 
+    /**
+     * Notify all profilers that a new phase of optimization is starting.
+     * This method reads the wall-time measurement of the input batch, so it should reflect the current combined
+     * wall-time spent before the newly started phase.
+     */
     void start_measurement(const TunedBatch &batch, const InferencePhase &phase);
 
+    /**
+     * Notify all profilers that a previously started phase is now finished.
+     * This method relies on the fact that the wall-time of the TunedBatch is updated, so the caller must make sure
+     * the wall-time measurements in TunedBatch are updated before calling this method.
+     */
     void finish_measurement(const TunedBatch &batch, const InferencePhase &phase);
 
     void print_report() const;
