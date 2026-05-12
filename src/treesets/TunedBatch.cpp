@@ -9,8 +9,85 @@
 
 using namespace std::placeholders;
 
+Tree get_reverse_backbone(TreeInfo &tree) {
+    // obtain the topology with negative branch lengths to invert the order of branch lengths.
+    tree.scale_branches(-1.0);
+    Tree constraint = tree.tree();
+    tree.scale_branches(-1.0);
+
+    // threshold for the reverse-backbone
+    constexpr auto cutoff_threshold = -RAXML_BRLEN_MIN - CORAX_ONE_EPSILON;
+
+    const auto tip_list = constraint.tip_labels_list();
+    const auto tip_id_map = constraint.tip_ids();
+    NameList remove_list;
+
+    for (auto &label: tip_list) {
+        const auto tip_id = tip_id_map.at(label);
+        assert(CORAX_UTREE_IS_TIP(constraint.pll_utree().nodes[tip_id]));
+        if (constraint.pll_utree().nodes[tip_id]->length < cutoff_threshold) {
+            remove_list.push_back(label);
+        }
+    }
+
+    // at least 4 tips need to remain in the dataset
+    assert(remove_list.size() < tip_list.size() - 3);
+
+    constraint.remove_tips(remove_list);
+
+    // TODO verify that we do not obtain a constraint containing all or no branches, but only a certain portion are in
+    //  the constraint.
+
+    // collapse all non-short branches (that is why the branch lengths are negative). This has to be done AFTER
+    // removing leaves because the method cannot handle polytomies.
+    // collapse_short_branches adds the CORAX_ONE_EPSILON threshold to the cutoff_threshold since it expects the cutoff
+    // to be positive. therefore we subtract it again here:
+    constraint.collapse_short_branches(cutoff_threshold - CORAX_ONE_EPSILON);
+
+    return constraint;
+}
+
 unsigned int TunedBatch::get_batch_size() const {
     return this->batch_start_trees->size();
+}
+
+void TunedBatch::apply_tree_constraint(Tree &constraint, const Options &opts, const unsigned int tree_id,
+                                       const unsigned int thread_id) {
+    // make sure the trees from the current worker are not being accessed by delayed threads.
+    ParallelContext::barrier();
+
+    if (thread_id == 0) {
+        // sort the tip ids so the constrained ids come first:
+        NameIdMap new_label_id_map;
+        IDVector new_tip_msa_map;
+        new_tip_msa_map.resize(msa->taxon_count());
+        auto cons_name_map = constraint.tip_ids();
+        size_t seq_id = 0;
+        size_t cons_tip_id = 0;
+        size_t free_tip_id = constraint.num_tips();
+        for (const auto &tip_name: msa->taxon_names()) {
+            auto tip_id = cons_name_map.count(tip_name) ? cons_tip_id++ : free_tip_id++;
+            new_label_id_map[tip_name] = tip_id;
+            new_tip_msa_map[tip_id] = seq_id++;
+        }
+        assert(cons_tip_id == constraint.num_tips());
+        assert(free_tip_id == new_tip_msa_map.size());
+        assert(new_label_id_map.size() == msa->taxon_count());
+
+        auto topology = batch_trees[tree_id][0]->tree();
+        topology.reset_tip_ids(new_label_id_map);
+        constraint.reset_tip_ids(new_label_id_map);
+
+        for (unsigned int i = 0; i < this->batch_trees[tree_id].size(); ++i) {
+            this->batch_trees[tree_id][i].
+                    emplace(opts, topology, *msa, new_tip_msa_map, part_assignments.at(i));
+            this->batch_trees[tree_id][i]->set_topology_constraint(constraint);
+            assert(constraint.compatible(this->batch_trees[tree_id][i]->tree()));
+        }
+    }
+
+    // make sure the trees aren't used until all constraints are applied
+    ParallelContext::barrier();
 }
 
 void TunedBatch::generate_starting_trees(RaxmlInstance &instance, const Options &opts, const TaskGroup &context,
@@ -129,10 +206,10 @@ void TunedBatch::optimize_topology(const Options &opts, const TaskGroup &context
         for (const auto tree_id: tree_ids) {
             for (unsigned int spr_round = rounds_performed; spr_round < total_rounds; ++spr_round) {
                 InferencePhase phase = spr_params.thorough
-                                 ? SlowSprRound{spr_round}
-                                 : (meta_parameters->keep_top_k_topol == 1
-                                        ? static_cast<InferencePhase>(GreedySprRound{spr_round})
-                                        : static_cast<InferencePhase>(FastSprRound{spr_round}));
+                                           ? SlowSprRound{spr_round}
+                                           : (meta_parameters->keep_top_k_topol == 1
+                                                  ? static_cast<InferencePhase>(GreedySprRound{spr_round})
+                                                  : static_cast<InferencePhase>(FastSprRound{spr_round}));
                 if (context.is_group_leader(worker_id, thread_id)) {
                     resources.get_profiling().start_measurement(*this, phase);
                     begin = std::chrono::steady_clock::now();
@@ -201,8 +278,8 @@ void TunedBatch::optimize_parameters(SharedBatchResources &resources, const Task
         if (context.is_group_leader(worker_id, thread_id)) {
             LOG_INFO_TS << this->name << ": Optimizing all params (eps: " << epsilon << ")" << std::endl;
 
-            resources.get_profiling().start_measurement(*this, BranchOptimization {epsilon});
-            if (!force) resources.get_profiling().start_measurement(*this, ModelOptimization {epsilon});
+            resources.get_profiling().start_measurement(*this, BranchOptimization{epsilon});
+            if (!force) resources.get_profiling().start_measurement(*this, ModelOptimization{epsilon});
         }
 
         // run all parameters optimization
@@ -213,7 +290,7 @@ void TunedBatch::optimize_parameters(SharedBatchResources &resources, const Task
         if (context.is_group_leader(worker_id, thread_id)) {
             LOG_INFO_TS << this->name << ": Optimizing model (eps: " << epsilon << ")" << std::endl;
 
-            if (!force) resources.get_profiling().start_measurement(*this, ModelOptimization {epsilon});
+            if (!force) resources.get_profiling().start_measurement(*this, ModelOptimization{epsilon});
         }
 
         // run model optimization
@@ -224,7 +301,7 @@ void TunedBatch::optimize_parameters(SharedBatchResources &resources, const Task
         if (context.is_group_leader(worker_id, thread_id)) {
             LOG_INFO_TS << this->name << ": Optimizing branches (eps: " << epsilon << ")" << std::endl;
 
-            resources.get_profiling().start_measurement(*this, BranchOptimization {epsilon});
+            resources.get_profiling().start_measurement(*this, BranchOptimization{epsilon});
         }
 
         // run model optimization
@@ -240,8 +317,8 @@ void TunedBatch::optimize_parameters(SharedBatchResources &resources, const Task
                 std::chrono::milliseconds>(end - begin).count());
         }
 
-        if (opt_branches) resources.get_profiling().finish_measurement(*this, BranchOptimization {epsilon});
-        if (opt_model && !force) resources.get_profiling().finish_measurement(*this, ModelOptimization {epsilon});
+        if (opt_branches) resources.get_profiling().finish_measurement(*this, BranchOptimization{epsilon});
+        if (opt_model && !force) resources.get_profiling().finish_measurement(*this, ModelOptimization{epsilon});
 
         LOG_INFO_TS << this->name << ": Model Opt complete (eps: " << epsilon << ")" << std::endl;
     }
@@ -253,7 +330,7 @@ void TunedBatch::optimize(RaxmlInstance &instance, const Options &opts, SharedBa
         throw RaxmlException("TunedBatch has not been configured with meta heuristics");
     }
 
-    resources.get_profiling().start_measurement(*this, CompleteInference {});
+    resources.get_profiling().start_measurement(*this, CompleteInference{});
 
     if (!this->start_trees_generated()) {
         this->generate_starting_trees(instance, opts, context, worker_id, thread_id);
@@ -269,8 +346,19 @@ void TunedBatch::optimize(RaxmlInstance &instance, const Options &opts, SharedBa
             }
         }
 
-        // compute all required SPR rounds
+        // pre-optimize
         this->optimize_nni(opts, resources, context, worker_id, thread_id);
+
+        // apply constraint
+        if (meta_parameters->constrain) {
+            const auto my_trees = coarse_assignments.at(worker_id);
+            for (const auto tree_id: my_trees) {
+                auto constraint = get_reverse_backbone(this->batch_trees[tree_id][0].value());
+                this->apply_tree_constraint(constraint, opts, tree_id, thread_id);
+            }
+        }
+
+        // compute all required SPR rounds
         this->optimize_topology(opts, context, resources, worker_id, thread_id);
     }
 

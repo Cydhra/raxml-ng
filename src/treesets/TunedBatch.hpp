@@ -452,6 +452,8 @@ protected:
         return this->num_trees_generated == get_batch_size();
     }
 
+    void apply_tree_constraint(Tree &constraint, const Options &opts, unsigned int tree_id, unsigned int thread_id);
+
     /**
      * Generate parsimony starting trees for this batch, and initialize the tree inference.
      *
