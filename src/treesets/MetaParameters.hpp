@@ -51,17 +51,24 @@ public:
      */
     const bool nni_round;
 
+    /**
+     * If true, constrain the tree to ignore parts of the tree that are probably unresolvable.
+     */
+    const bool constrain;
+
     MetaParameters(const unsigned int keep_top_k_topol, const bool skip_model, const unsigned int num_fast_spr,
                    const unsigned int num_slow_spr,
                    const bool accept_starting_trees = false,
                    const bool early_commit = false,
                    const int max_radius = 20,
-                   const bool nni_round = false) : keep_top_k_topol(keep_top_k_topol), skip_model(skip_model),
+                   const bool nni_round = false,
+                   const bool constrain = false) : keep_top_k_topol(keep_top_k_topol), skip_model(skip_model),
                                                    num_fast_spr(num_fast_spr), num_slow_spr(num_slow_spr),
                                                    accept_starting_trees(accept_starting_trees),
                                                    early_commit(early_commit),
                                                    max_adaptive_radius(max_radius),
-                                                   nni_round(nni_round) {
+                                                   nni_round(nni_round),
+                                                   constrain(constrain) {
     }
 
     friend bool operator==(const MetaParameters &lhs, const MetaParameters &rhs) {
@@ -72,7 +79,8 @@ public:
                && lhs.accept_starting_trees == rhs.accept_starting_trees
                && lhs.early_commit == rhs.early_commit
                && lhs.max_adaptive_radius == rhs.max_adaptive_radius
-               && lhs.nni_round == rhs.nni_round;
+               && lhs.nni_round == rhs.nni_round
+               && lhs.constrain == rhs.constrain;
     }
 
     friend bool operator!=(const MetaParameters &lhs, const MetaParameters &rhs) {
@@ -89,6 +97,7 @@ public:
         seed ^= (seed << 6) + (seed >> 2) + 0x0E9C6D22 + static_cast<std::size_t>(obj.early_commit);
         seed ^= (seed << 6) + (seed >> 2) + 0x01EAFBD5 + static_cast<std::size_t>(obj.max_adaptive_radius);
         seed ^= (seed << 6) + (seed >> 2) + 0x7261F290 + static_cast<std::size_t>(obj.nni_round);
+        seed ^= (seed << 6) + (seed >> 2) + 0x0E886F63 + static_cast<std::size_t>(obj.constrain);
         return seed;
     }
 };
