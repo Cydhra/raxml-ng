@@ -600,6 +600,10 @@ double TreeInfo::nni_round(nni_round_params &params) {
   return loglh;
 }
 
+void TreeInfo::scale_branches(double scalar) {
+  corax_treeinfo_scale_branches_all(_pll_treeinfo, scalar);
+}
+
 void TreeInfo::set_topology_constraint(const Tree &cons_tree)
 {
   if (!cons_tree.empty()) {

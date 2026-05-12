@@ -103,6 +103,8 @@ public:
 
   void model(size_t partition_id, const Model &model);
 
+  void scale_branches(double scalar);
+
   void set_topology_constraint(const Tree &cons_tree);
 
   double loglh(bool incremental = false);
