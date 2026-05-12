@@ -51,14 +51,15 @@ void TunedBatch::generate_starting_trees(RaxmlInstance &instance, const Options 
     }
 }
 
-void TunedBatch::optimize_nni(const Options &opts, SharedBatchResources &resources, const TaskGroup &context, unsigned int worker_id, unsigned int thread_id) {
+void TunedBatch::optimize_nni(const Options &opts, SharedBatchResources &resources, const TaskGroup &context,
+                              unsigned int worker_id, unsigned int thread_id) {
     const auto &tree_ids = this->coarse_assignments.at(worker_id);
 
     auto begin = std::chrono::steady_clock::now();
 
     if (meta_parameters->nni_round) {
         if (context.is_group_leader(worker_id, thread_id)) {
-            LOG_INFO_TS << this->name << ": Performing NNI round."  << std::endl;
+            LOG_INFO_TS << this->name << ": Performing NNI round." << std::endl;
         }
 
         if (context.is_group_leader(worker_id, thread_id)) {
@@ -79,6 +80,7 @@ void TunedBatch::optimize_nni(const Options &opts, SharedBatchResources &resourc
 
             auto local_copy = spr_params;
             batch_trees[tree_id][thread_id].value().spr_round(local_copy);
+            batch_trees[tree_id][thread_id].value().optimize_branches(1.0, 1);
 
             if (context.is_group_leader(worker_id, thread_id)) {
                 const auto end = std::chrono::steady_clock::now();
