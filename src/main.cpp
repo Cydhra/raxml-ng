@@ -3021,8 +3021,15 @@ void save_ml_trees(const RaxmlInstance& instance, const CheckpointFile& checkp)
     }
 
     // plausible treeset only
-    // TODO add plausible reference trees
+    // TODO only add plausible reference trees
     NewickStream nw(instance.opts.plausible_trees_file(), std::ios::out);
+    for (auto& topol : checkp.ml_trees) {
+      Tree ml_tree = checkp.tree();
+      ml_tree.topology(topol.second.second);
+      postprocess_tree(instance, ml_tree);
+      nw << ml_tree;
+    }
+
     auto plausible_trees = instance.treeset_optimizer->get_plausible_trees();
     for (auto& topol : plausible_trees) {
       postprocess_tree(instance, topol);
