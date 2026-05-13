@@ -110,9 +110,15 @@ void TunedBatch::generate_starting_trees(RaxmlInstance &instance, const Options 
 
     // create context for tree inference and assign the initial model
     for (const auto id: this->coarse_assignments.at(worker_id)) {
-        this->batch_trees[id][thread_id].emplace(opts, this->batch_start_trees->at(id), *this->msa,
-                                                 this->tip_msa_idmap, this->part_assignments[thread_id]);
-        assign_models(batch_trees[id][thread_id].value(), this->initial_model);
+        if (meta_parameters->model_override.has_value()) {
+            const auto model = Model(*meta_parameters->model_override);
+            this->batch_trees[id][thread_id].emplace(opts, this->batch_start_trees->at(id), *this->msa,
+                                                     this->tip_msa_idmap, this->part_assignments[thread_id], &model);
+        } else {
+            this->batch_trees[id][thread_id].emplace(opts, this->batch_start_trees->at(id), *this->msa,
+                                                     this->tip_msa_idmap, this->part_assignments[thread_id]);
+            assign_models(batch_trees[id][thread_id].value(), this->initial_model);
+        }
     }
 
     if (context.is_group_leader(worker_id, thread_id)) {
@@ -366,7 +372,7 @@ void TunedBatch::optimize(RaxmlInstance &instance, const Options &opts, SharedBa
         LOG_INFO_TS << this->name << ": total batch time after heuristics: " << this->wall_time << "ms." << std::endl;
     }
 
-    perform_plausibility_check(resources, resources.is_initialized(context), context, worker_id, thread_id);
+    perform_plausibility_check(opts, resources, resources.is_initialized(context), context, worker_id, thread_id);
     resources.set_initialized(context);
 
     if (context.is_group_leader(worker_id, thread_id)) {
@@ -397,7 +403,7 @@ void TunedBatch::perform_au_test(AuTest &au_test, const bool initialized, const 
         }
 
         // calculate site likelihoods for the assigned sub-partitions
-        batch_trees[tree_id][thread_id].value().persite_loglh(thread_partition_view);
+        batch_trees[tree_id][thread_id]->persite_loglh(thread_partition_view);
     }
 
     // replace with group barrier
@@ -427,7 +433,7 @@ void TunedBatch::perform_au_test(AuTest &au_test, const bool initialized, const 
     }
 }
 
-void TunedBatch::perform_plausibility_check(SharedBatchResources &resources, const bool initialized,
+void TunedBatch::perform_plausibility_check(const Options &opts, SharedBatchResources &resources, const bool initialized,
                                             const TaskGroup &context, const unsigned int worker_id,
                                             const unsigned int thread_id) {
     auto &au_test = resources.get_au_test(context);
@@ -440,6 +446,15 @@ void TunedBatch::perform_plausibility_check(SharedBatchResources &resources, con
     }
 
     // TODO should we backup the less optimized model or just accept that we overspecify the model
+
+    // reset model to original for AU test
+    if (meta_parameters->model_override) {
+        for (auto &tree_id : coarse_assignments.at(worker_id)) {
+            batch_trees[tree_id][thread_id].emplace(opts, batch_trees[tree_id][thread_id]->tree(), *msa, tip_msa_idmap,
+                                   part_assignments.at(thread_id));
+        }
+    }
+
     const auto begin = std::chrono::steady_clock::now();
     this->optimize_parameters(resources, context, worker_id, thread_id, 0.1, true, true, true);
 

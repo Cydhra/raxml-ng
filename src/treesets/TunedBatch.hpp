@@ -176,7 +176,7 @@ public:
      *
      * @return The number of plausible trees.
      */
-    void perform_plausibility_check(SharedBatchResources &resources, bool initialized, const TaskGroup &context,
+    void perform_plausibility_check(const Options &opts, SharedBatchResources &resources, bool initialized, const TaskGroup &context,
                                     unsigned int worker_id,
                                     unsigned int thread_id);
 
