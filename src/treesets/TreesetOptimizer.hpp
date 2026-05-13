@@ -18,6 +18,11 @@ constexpr unsigned int DEFAULT_BATCH_SIZE = 16;
  */
 constexpr unsigned int DEFAULT_ADAPTIVE_RADIUS = 10;
 
+/**
+ * Shallow replication counts for a faster AU test.
+ */
+const uintVector SHALLOW_REPS = {500, 500, 500, 500, 500, 500, 500, 500, 500, 500};
+
 class TreesetOptimizer {
 protected:
     /**
