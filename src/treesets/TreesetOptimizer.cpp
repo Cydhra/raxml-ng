@@ -38,7 +38,7 @@ void TreesetOptimizer::initialize_bandits() {
 
     // set up successors
     this->successors[this->parsimony.get()] = {
-        make_tuple("NNI", this->nni_mab)
+        make_tuple("NNI", this->nni_mab), make_tuple("Light", this->light_mab)
     };
     this->successors[this->nni_mab.get()] = {
         make_tuple("Light", this->light_mab), make_tuple("Commitment", this->commitment_mab)
