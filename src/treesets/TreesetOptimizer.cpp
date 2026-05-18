@@ -14,10 +14,10 @@ void TreesetOptimizer::initialize_bandits() {
     this->nni_mab->emplace_back("NNI,NoModel", MetaParameters(20, true, 0, 0, false, false, adaptive_radius, true));
 
     // init test heuristic
-    this->bench_mab->emplace_back("Constrain,Greedy,NoModel,2spr", MetaParameters(1, true, 2, 0, false, false, adaptive_radius, false, true));
-    this->bench_mab->emplace_back("Constrain,Greedy,DoModel,2spr", MetaParameters(1, false, 2, 0, false, false, adaptive_radius, false, true));
-    this->bench_mab->emplace_back("Constrain,Fast,DoModel,2spr", MetaParameters(20, false, 2, 0, false, false, adaptive_radius, false, true));
-    this->bench_mab->emplace_back("Constrain,Fast,DoModel,2+2spr", MetaParameters(20, false, 2, 2, false, false, adaptive_radius, false, true));
+    this->bench_mab->emplace_back("Constrain+Downgrade,Greedy,NoModel,2spr", MetaParameters(1, true, 2, 0, false, false, adaptive_radius, false, true, "JC"));
+    this->bench_mab->emplace_back("Constrain+Downgrade,Greedy,DoModel,2spr", MetaParameters(1, false, 2, 0, false, false, adaptive_radius, false, true, "JC"));
+    this->bench_mab->emplace_back("Constrain+Downgrade,Fast,DoModel,2spr", MetaParameters(20, false, 2, 0, false, false, adaptive_radius, false, true, "JC"));
+    this->bench_mab->emplace_back("Constrain+Downgrade,Fast,DoModel,2+2spr", MetaParameters(20, false, 2, 2, false, false, adaptive_radius, false, true, "JC"));
 
     this->light_mab->emplace_back("Greedy,DoModel,2spr", MetaParameters(1, false, 2, 0, false, false, adaptive_radius));
     this->light_mab->emplace_back("Greedy,DoModel,4spr", MetaParameters(1, false, 4, 0, false, false, adaptive_radius));
