@@ -13,6 +13,12 @@ void TreesetOptimizer::initialize_bandits() {
     this->nni_mab->emplace_back("NNI,DoModel", MetaParameters(20, false, 0, 0, false, false, adaptive_radius, true));
     this->nni_mab->emplace_back("NNI,NoModel", MetaParameters(20, true, 0, 0, false, false, adaptive_radius, true));
 
+    // init test heuristic
+    this->bench_mab->emplace_back("Downgrade,Greedy,NoModel,2spr", MetaParameters(1, true, 2, 0, false, false, adaptive_radius, false, false, "JC"));
+    this->bench_mab->emplace_back("Downgrade,Greedy,DoModel,2spr", MetaParameters(1, false, 2, 0, false, false, adaptive_radius, false, false, "JC"));
+    this->bench_mab->emplace_back("Downgrade,Fast,DoModel,2spr", MetaParameters(20, false, 2, 0, false, false, adaptive_radius, false, false, "JC"));
+    this->bench_mab->emplace_back("Downgrade,Fast,DoModel,2+2spr", MetaParameters(20, false, 2, 2, false, false, adaptive_radius, false, false, "JC"));
+
     this->light_mab->emplace_back("Greedy,DoModel,2spr", MetaParameters(1, false, 2, 0, false, false, adaptive_radius));
     this->light_mab->emplace_back("Greedy,DoModel,4spr", MetaParameters(1, false, 4, 0, false, false, adaptive_radius));
     this->light_mab->emplace_back("Greedy,NoModel,2spr", MetaParameters(1, true, 2, 0, false, false, adaptive_radius));
@@ -38,7 +44,7 @@ void TreesetOptimizer::initialize_bandits() {
 
     // set up successors
     this->successors[this->parsimony.get()] = {
-        make_tuple("NNI", this->nni_mab), make_tuple("Light", this->light_mab)
+        make_tuple("NNI", this->nni_mab), make_tuple("Light", this->light_mab), make_tuple("Benchmark", this->bench_mab)
     };
     this->successors[this->nni_mab.get()] = {
         make_tuple("Light", this->light_mab), make_tuple("Commitment", this->commitment_mab)

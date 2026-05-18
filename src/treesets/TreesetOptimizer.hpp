@@ -71,6 +71,10 @@ protected:
     std::shared_ptr<MultiArmedBandit<MetaParameters> > nni_mab = std::make_shared<MultiArmedBandit<
         MetaParameters> >();
 
+    std::shared_ptr<MultiArmedBandit<MetaParameters> > bench_mab = std::make_shared<MultiArmedBandit<
+        MetaParameters> >();
+
+
     /**
      * The multi-armed bandit instance that contains aggressive heuristics
      */
