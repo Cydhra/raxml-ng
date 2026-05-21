@@ -63,40 +63,9 @@ protected:
      */
     const unsigned int target_tree_count;
 
-    MultiArmedBandit<std::shared_ptr<MultiArmedBandit<MetaParameters> > > hierarchical_mab;
+    std::atomic_uint bandit_cursor = 0;
 
-    std::shared_ptr<MultiArmedBandit<MetaParameters> > parsimony = std::make_shared<MultiArmedBandit<
-        MetaParameters> >();
-
-    std::shared_ptr<MultiArmedBandit<MetaParameters> > nni_mab = std::make_shared<MultiArmedBandit<
-        MetaParameters> >();
-
-    /**
-     * The multi-armed bandit instance that contains aggressive heuristics
-     */
-    std::shared_ptr<MultiArmedBandit<MetaParameters> > light_mab = std::make_shared<MultiArmedBandit<
-        MetaParameters> >();
-
-    /**
-    * The multi-armed bandit instance that contains slower heuristics
-    */
-    std::shared_ptr<MultiArmedBandit<MetaParameters> > heavy_mab = std::make_shared<MultiArmedBandit<
-        MetaParameters> >();
-
-    /**
-     * The multi-armed bandit instance that contains light heuristics with fast commitment: we do model optimization to 0.1 EPS before anything
-     * to commit to the local minimum.
-     */
-    std::shared_ptr<MultiArmedBandit<MetaParameters> > commitment_mab = std::make_shared<MultiArmedBandit<
-        MetaParameters> >();
-
-    /**
-     * A mapping of bandit arms that are successors to previous arms in case they are not yet optimal.
-     * For example, the successors to the parsimony arm are the light and commitment arms, so if the parsimony arm
-     * does not find enough plausible trees, the successor arms are added to the algorithm.
-     */
-    unordered_map<MultiArmedBandit<MetaParameters> *, std::vector<std::tuple<std::string, std::shared_ptr<
-        MultiArmedBandit<MetaParameters> > > > > successors;
+    std::deque<MultiArmedBandit<MetaParameters> > benchmark_mabs;
 
     /**
      * Initialize the bandit algorithms we use during the inference. These depend on the parameters derivded from initial
@@ -109,7 +78,7 @@ protected:
      * This method runs one batch and then handles the updates to the MABs.
      * It is bound into a BatchTask by next_work_unit.
      */
-    void run_batch(Bandit<std::shared_ptr<MultiArmedBandit<MetaParameters> > > &mab, Bandit<MetaParameters> &bandit,
+    void run_batch(Bandit<MetaParameters> &bandit,
                    TunedBatch &batch, TaskGroup &context, unsigned int worker_id, unsigned int thread_id);
 
     /**
@@ -146,10 +115,10 @@ public:
                      const unsigned long long starting_seed) : pool(ThreadPool(
                                                                    [this] {
                                                                        return this->next_work_unit();
-                                                                   }, opts.treeset_threads, opts.treeset_workers,
-                                                                   opts.treeset_groups)),
+                                                                   }, 16, 8,
+                                                                   1)),
                                                                shared_batch_resources(
-                                                                   opts.treeset_groups, msa, persite_loglh,
+                                                                   1, msa, persite_loglh,
                                                                    DEFAULT_BATCH_SIZE,
                                                                    AU_DEFAULT_SCALES, AU_DEFAULT_REPS, starting_seed),
                                                                instance(instance),

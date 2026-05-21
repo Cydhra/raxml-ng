@@ -2,86 +2,93 @@
 #include "TunedBatch.hpp"
 #include "../Optimizer.hpp"
 
+void create_mab(std::deque<MultiArmedBandit<MetaParameters> > &target_list, const std::string &name, const MetaParameters &parameters) {
+    target_list.emplace_back();
+    target_list[target_list.size() - 1].emplace_back(name, parameters);
+}
+
 void TreesetOptimizer::initialize_bandits() {
-    this->parsimony->emplace_back("Parsimony", MetaParameters(1, false, 0, 0, true, false));
+
+    create_mab(this->benchmark_mabs, "Parsimony", MetaParameters(1, false, 0, 0, true, false));
+    create_mab(this->benchmark_mabs, "Parsimony+NNI", MetaParameters(1, false, 0, 0, false, false, 10, true));
 
     const auto adaptive_radius = pythia_score >= 0.0
                                      ? Optimizer::adaptive_radius(pythia_score)
                                      : DEFAULT_ADAPTIVE_RADIUS;
 
+    // constrained
+    create_mab(this->benchmark_mabs, "Constrained,Fast,NNI,2spr", MetaParameters(20, false, 2, 0, false, false, adaptive_radius, true, true));
+    create_mab(this->benchmark_mabs, "Constrained,Fast,NNI,4spr", MetaParameters(20, false, 4, 0, false, false, adaptive_radius, true, true));
+    create_mab(this->benchmark_mabs, "Constrained,Fast,2spr", MetaParameters(20, false, 2, 0, false, false, adaptive_radius, false, true));
+
+    // model downgrade
+    create_mab(this->benchmark_mabs, "Fast,2spr,JC", MetaParameters(20, false, 2, 0, false, false, adaptive_radius, false, false, "JC"));
+    create_mab(this->benchmark_mabs, "Greedy,2spr,JC", MetaParameters(1, false, 2, 0, false, false, adaptive_radius, false, false, "JC"));
+    create_mab(this->benchmark_mabs, "Fast,2spr,GTR", MetaParameters(20, false, 2, 0, false, false, adaptive_radius, false, false, "GTR"));
+    create_mab(this->benchmark_mabs, "Greedy,2spr,GTR", MetaParameters(1, false, 2, 0, false, false, adaptive_radius, false, false, "GTR"));
+    create_mab(this->benchmark_mabs, "Constrained,Fast,JC,2spr", MetaParameters(20, false, 2, 0, false, false, adaptive_radius, false, true, "JC"));
+
     // init default bandits
-    this->nni_mab->emplace_back("NNI,DoModel", MetaParameters(20, false, 0, 0, false, false, adaptive_radius, true));
-    this->nni_mab->emplace_back("NNI,NoModel", MetaParameters(20, true, 0, 0, false, false, adaptive_radius, true));
+    create_mab(this->benchmark_mabs, "NNI,DoModel", MetaParameters(20, false, 0, 0, false, false, adaptive_radius, true));
+    create_mab(this->benchmark_mabs, "NNI,NoModel", MetaParameters(20, true, 0, 0, false, false, adaptive_radius, true));
 
-    this->light_mab->emplace_back("Greedy,DoModel,2spr", MetaParameters(1, false, 2, 0, false, false, adaptive_radius));
-    this->light_mab->emplace_back("Greedy,DoModel,4spr", MetaParameters(1, false, 4, 0, false, false, adaptive_radius));
-    this->light_mab->emplace_back("Greedy,NoModel,2spr", MetaParameters(1, true, 2, 0, false, false, adaptive_radius));
+    create_mab(this->benchmark_mabs, "Greedy,DoModel,2spr", MetaParameters(1, false, 2, 0, false, false, adaptive_radius));
+    create_mab(this->benchmark_mabs, "Greedy,DoModel,4spr", MetaParameters(1, false, 4, 0, false, false, adaptive_radius));
+    create_mab(this->benchmark_mabs, "Greedy,NoModel,2spr", MetaParameters(1, true, 2, 0, false, false, adaptive_radius));
 
-    this->light_mab->emplace_back("Fast,DoModel,2spr", MetaParameters(20, false, 2, 0, false, false, adaptive_radius));
-    this->light_mab->emplace_back("Fast,DoModel,4spr", MetaParameters(20, false, 4, 0, false, false, adaptive_radius));
-    this->light_mab->emplace_back("Fast,NoModel,2spr", MetaParameters(20, true, 2, 0, false, false, adaptive_radius));
+    create_mab(this->benchmark_mabs, "Fast,DoModel,2spr", MetaParameters(20, false, 2, 0, false, false, adaptive_radius));
+    create_mab(this->benchmark_mabs, "Fast,DoModel,4spr", MetaParameters(20, false, 4, 0, false, false, adaptive_radius));
+    create_mab(this->benchmark_mabs, "Fast,NoModel,2spr", MetaParameters(20, true, 2, 0, false, false, adaptive_radius));
 
     // heavy heuristics
-    this->heavy_mab->emplace_back("Slow,2spr", MetaParameters(20, false, 0, 2, false, false, adaptive_radius));
-    this->heavy_mab->emplace_back("Mixed,2+2spr", MetaParameters(20, false, 2, 2, false, false, adaptive_radius));
-    this->heavy_mab->emplace_back("Mixed,4+2spr", MetaParameters(20, false, 4, 2, false, false, adaptive_radius));
+    create_mab(this->benchmark_mabs, "Slow,2spr", MetaParameters(20, false, 0, 2, false, false, adaptive_radius));
+    create_mab(this->benchmark_mabs, "Mixed,2+2spr", MetaParameters(20, false, 2, 2, false, false, adaptive_radius));
+    create_mab(this->benchmark_mabs, "Mixed,4+2spr", MetaParameters(20, false, 4, 2, false, false, adaptive_radius));
+    create_mab(this->benchmark_mabs, "Mixed,4+4spr", MetaParameters(20, false, 4, 4, false, false, adaptive_radius));
+    create_mab(this->benchmark_mabs, "Constrained,Mixed,4+2spr,NNI", MetaParameters(20, false, 4, 2, false, false, adaptive_radius, true, true));
 
     // early commitment
-    this->commitment_mab->emplace_back("Commit,Greedy,DoModel,2spr",
+    create_mab(this->benchmark_mabs, "Commit,Greedy,DoModel,2spr",
                                        MetaParameters(1, false, 2, 0, false, true, adaptive_radius));
-    this->commitment_mab->emplace_back("Commit,Greedy,DoModel,4spr",
-                                       MetaParameters(1, false, 4, 0, false, true, adaptive_radius));
-    this->commitment_mab->emplace_back("Commit,Fast,DoModel,2spr",
-                                       MetaParameters(20, false, 2, 0, false, true, adaptive_radius));
-    this->commitment_mab->emplace_back("Commit,Fast,DoModel,4spr",
+    create_mab(this->benchmark_mabs, "Commit,Fast,DoModel,4spr",
                                        MetaParameters(20, false, 4, 0, false, true, adaptive_radius));
-
-    // set up successors
-    this->successors[this->parsimony.get()] = {
-        make_tuple("NNI", this->nni_mab), make_tuple("Light", this->light_mab)
-    };
-    this->successors[this->nni_mab.get()] = {
-        make_tuple("Light", this->light_mab), make_tuple("Commitment", this->commitment_mab)
-    };
-    this->successors[this->light_mab.get()] = {make_tuple("Heavy", this->heavy_mab)};
-    this->successors[this->commitment_mab.get()] = {make_tuple("Heavy", this->heavy_mab)};
-
-    // second-level MAB
-    this->hierarchical_mab.emplace_back("Starting Trees", parsimony);
 }
 
-void TreesetOptimizer::run_batch(Bandit<std::shared_ptr<MultiArmedBandit<MetaParameters> > > &mab,
-                                 Bandit<MetaParameters> &bandit,
+constexpr unsigned int SAMPLES_PER_BANDIT = 10;
+
+void TreesetOptimizer::run_batch(Bandit<MetaParameters> &bandit,
                                  TunedBatch &batch, TaskGroup &context, unsigned int worker_id,
                                  unsigned int thread_id) {
     batch.optimize(instance, opts, shared_batch_resources, context, worker_id, thread_id);
 
     if (context.is_group_leader(worker_id, thread_id)) {
         // take measurements
-        mab.get_parameters()->get()->take_measurement(bandit, batch, true);
-        this->hierarchical_mab.take_measurement(mab, batch, true);
-
-        this->check_mab_modification(mab);
+        bandit.take_measurement(batch);
 
         // inform the batch queue that the batch has been inferred
         this->batch_queue.finish_batch(batch);
 
-        if (this->batch_queue.num_plausible_trees() > this->target_tree_count || this->batch_queue.view_batches().size() >= 250) {
+        if (this->bandit_cursor == this->benchmark_mabs.size() - 1 && bandit.num_samples() >= SAMPLES_PER_BANDIT) {
             pool.shutdown();
         }
     }
 }
 
 BatchTask TreesetOptimizer::next_work_unit() {
-    auto &mab = this->hierarchical_mab.select_next_bandit();
-    auto &current_bandit = mab.get_parameters().get()->get()->select_next_bandit();
+    auto *current_mab = &this->benchmark_mabs[bandit_cursor];
+    if (current_mab->get_bandit(0).num_samples() >= SAMPLES_PER_BANDIT) {
+        bandit_cursor += 1;
+        current_mab = &this->benchmark_mabs[bandit_cursor];
+    }
+
+    auto &current_bandit = current_mab->select_next_bandit();
     auto &current_batch = this->batch_queue.select_next_batch(*current_bandit.get_parameters(), pool.workers_per_task(),
                                                               pool.threads_per_task());
     current_batch.update_meta_parameters(opts, current_bandit.get_parameters());
 
-    BatchTask runner = [this, &mab, &current_bandit, &current_batch](TaskGroup &context, const unsigned int worker_id,
-                                                                     const unsigned int thread_id) {
-        this->run_batch(mab, current_bandit, current_batch, context, worker_id, thread_id);
+    BatchTask runner = [this, &current_bandit, &current_batch](TaskGroup &context, const unsigned int worker_id,
+                                                                                             const unsigned int thread_id) {
+        this->run_batch(current_bandit, current_batch, context, worker_id, thread_id);
     };
 
     return runner;
@@ -109,17 +116,6 @@ void TreesetOptimizer::check_mab_modification(
     // TODO implement a proper heuristic here. For now, we check if the current arm exceeds 75% success per batch,
     //  and if not, we add arms according to a pre-defined mapping.
 
-    if (current_arm.num_samples() >= 4 && current_arm.get_expected_tree_rate() < 0.75) {
-        const auto pointer = current_arm.get_parameters().get()->get();
-        if (this->successors.find(pointer) != this->successors.end()) {
-            for (auto &successor: this->successors.at(pointer)) {
-                if (!hierarchical_mab.has_bandit(std::get<0>(successor))) {
-                    LOG_INFO << "Adding bandit " << std::get<0>(successor) << " to algorithm." << std::endl;
-                    hierarchical_mab.emplace_back(std::get<0>(successor), std::get<1>(successor));
-                }
-            }
-        }
-    }
 }
 
 std::vector<Tree> TreesetOptimizer::get_all_trees() const {

@@ -112,9 +112,6 @@ static struct option long_options[] =
   {"au-test",            no_argument,       0, 0 },  /*  79 */
   {"treeset",            no_argument,       0, 0 },  /*  80 */
   // TODO these three arguments are placeholders since we have no autotuning yet
-  {"ts-groups",            required_argument, 0, 0 },  /*  81 */
-  {"ts-threads",            required_argument, 0, 0 },  /*  82 */
-{"ts-workers",            required_argument, 0, 0 }, /*  83 */
   { 0, 0, 0, 0 }
 };
 
@@ -1626,28 +1623,7 @@ void CommandLineParser::parse_options(int argc, char** argv, Options &opts)
           optarg_tree = "pars{16}"; // TODO this hard-codes the batch size of the initial full inference to 16
         }
 
-        if (opts.treeset_groups == 0) {
-          opts.treeset_groups = 2;
-        }
-
-        if (opts.treeset_threads == 0) {
-          opts.treeset_threads = 8;
-        }
-
-        if (opts.treeset_workers == 0) {
-          opts.treeset_workers = 4;
-        }
-
         num_commands++;
-        break;
-      case 81: /* ts-groups */
-        sscanf(optarg, "%d", &opts.treeset_groups);
-        break;
-      case 82: /* ts-threads */
-        sscanf(optarg, "%d", &opts.treeset_threads);
-        break;
-      case 83: /* ts-workers */
-        sscanf(optarg, "%d", &opts.treeset_workers);
         break;
       default:
         throw  OptionException("Internal error in option parsing");

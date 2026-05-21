@@ -248,6 +248,7 @@ protected:
      */
     unsigned int estimated_variance_weight{0};
 
+public:
     /**
      * Take the benchmark data of a tuned batch which has previously run its inference with the parameters of this
      * bandit.
