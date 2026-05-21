@@ -10,7 +10,6 @@ void create_mab(std::deque<MultiArmedBandit<MetaParameters> > &target_list, cons
 void TreesetOptimizer::initialize_bandits() {
 
     create_mab(this->benchmark_mabs, "Parsimony", MetaParameters(1, false, 0, 0, true, false));
-    create_mab(this->benchmark_mabs, "Parsimony+NNI", MetaParameters(1, false, 0, 0, false, false, 10, true));
 
     const auto adaptive_radius = pythia_score >= 0.0
                                      ? Optimizer::adaptive_radius(pythia_score)
