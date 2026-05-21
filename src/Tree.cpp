@@ -538,10 +538,16 @@ void Tree::reset_brlens(double new_brlen)
   corax_utree_set_length_recursive(_pll_utree.get(), new_brlen, 0);
 }
 
-void Tree::collapse_short_branches(double min_brlen)
+void Tree::collapse_short_branches(const double min_brlen)
 {
   if (!corax_utree_collapse_branches(_pll_utree.get(), min_brlen))
     coraxlib_check_error("Failed to collapse short branches: ", true);
+}
+
+void Tree::collapse_long_branches(double max_brlen)
+{
+  if (!corax_utree_collapse_long_branches(_pll_utree.get(), max_brlen))
+    coraxlib_check_error("Failed to collapse long branches: ", true);
 }
 
 PllNodeVector Tree::subnodes() const
