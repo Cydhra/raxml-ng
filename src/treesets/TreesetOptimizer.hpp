@@ -120,7 +120,7 @@ public:
                                                                shared_batch_resources(
                                                                    1, msa, persite_loglh,
                                                                    DEFAULT_BATCH_SIZE,
-                                                                   AU_DEFAULT_SCALES, AU_DEFAULT_REPS, starting_seed),
+                                                                   AU_DEFAULT_SCALES, SHALLOW_REPS, starting_seed),
                                                                instance(instance),
                                                                opts(opts),
                                                                batch_queue(
