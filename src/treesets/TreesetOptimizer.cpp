@@ -89,7 +89,7 @@ BatchTask TreesetOptimizer::next_work_unit() {
     auto &current_bandit = mab.get_parameters().get()->get()->select_next_bandit();
     auto &current_batch = this->batch_queue.select_next_batch(*current_bandit.get_parameters(), pool.workers_per_task(),
                                                               pool.threads_per_task());
-    current_batch.update_meta_parameters(opts, current_bandit.get_parameters());
+    current_batch.update_meta_parameters(current_bandit.get_parameters());
 
     BatchTask runner = [this, &mab, &current_bandit, &current_batch](TaskGroup &context, const unsigned int worker_id,
                                                                      const unsigned int thread_id) {

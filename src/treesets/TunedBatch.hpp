@@ -103,7 +103,6 @@ public:
           starting_seed(other.starting_seed),
           meta_parameters(std::move(other.meta_parameters)),
           batch_start_trees(std::move(other.batch_start_trees)),
-          spr_params(other.spr_params),
           num_fast_spr_performed(other.num_fast_spr_performed),
           num_slow_spr_performed(other.num_slow_spr_performed),
           au_assignment(std::move(other.au_assignment)),
@@ -131,7 +130,6 @@ public:
         starting_seed = other.starting_seed;
         batch_start_trees = std::move(other.batch_start_trees);
         msa = std::move(other.msa);
-        spr_params = other.spr_params;
         num_fast_spr_performed = other.num_fast_spr_performed;
         num_slow_spr_performed = other.num_slow_spr_performed;
         reference_persite_loglh = other.reference_persite_loglh;
@@ -182,12 +180,12 @@ public:
                                     unsigned int thread_id);
 
     /**
-     * Update the meta heuristical parameters of the batch, reconfiguring the search parameters from them.
+     * Update the meta heuristical parameters of the batch. This will forcibly update them, even if `is_compatible`
+     * returns false.
      *
-     * @param opts Command line options
      * @param new_parameters batch treeset inference meta parameters
      */
-    void update_meta_parameters(const Options &opts, const shared_ptr<MetaParameters> new_parameters);
+    void update_meta_parameters(const shared_ptr<MetaParameters> &new_parameters);
 
     /**
      * Compare the batch's current configuration with a set of new parameters, and check whether the inference can
@@ -297,12 +295,6 @@ protected:
      * Starting trees for this inference batch
      */
     shared_ptr<TreeList> batch_start_trees;
-
-    /**
-     * SPR round parameters inherited from the default checkpoint manager. They will be updated by the batch according
-     * to the batch settings
-     */
-    spr_round_params spr_params;
 
     /**
      * Number of fast SPR rounds that have already been performed on the tree. This is increased by the `infer_batch`
@@ -426,8 +418,10 @@ protected:
      * Update spr_params instance according to the meta_parameters
      *
      * @param opts parsed command line options with defaults and user-mandated search parameters
+     * @param spr_params
+     * @param spr_params
      */
-    void auto_configure(const Options &opts) {
+    void auto_configure(const Options &opts, spr_round_params &spr_params) const {
         // update options according to MetaParameters:
         spr_params.ntopol_keep = this->meta_parameters->keep_top_k_topol;
         spr_params.subtree_cutoff = opts.spr_cutoff;

@@ -150,15 +150,11 @@ void TunedBatch::optimize_nni(const Options &opts, SharedBatchResources &resourc
             LOG_INFO_TS << this->name << ": Performing NNI round." << std::endl;
         }
 
-        if (context.is_group_leader(worker_id, thread_id)) {
-            this->auto_configure(opts);
-            spr_params.radius_max = 1;
-            spr_params.thorough = false;
-            spr_params.ntopol_keep = 1;
-        }
-
-        // propagate spr_params
-        context.enter_barrier();
+        spr_round_params spr_params;
+        this->auto_configure(opts, spr_params);
+        spr_params.radius_max = 1;
+        spr_params.thorough = false;
+        spr_params.ntopol_keep = 1;
 
         for (const auto tree_id: tree_ids) {
             if (context.is_group_leader(worker_id, thread_id)) {
@@ -166,8 +162,12 @@ void TunedBatch::optimize_nni(const Options &opts, SharedBatchResources &resourc
                 begin = std::chrono::steady_clock::now();
             }
 
-            auto local_copy = spr_params;
-            batch_trees[tree_id][thread_id].value().spr_round(local_copy);
+            // reset cutoff info for each tree. This has to be done, even if it is just one tree, to avoid
+            // uninitialized cutoff problems
+            const auto loglh = batch_trees[tree_id][thread_id].value().loglh();
+            spr_params.reset_cutoff_info(loglh, true);
+
+            batch_trees[tree_id][thread_id].value().spr_round(spr_params);
             batch_trees[tree_id][thread_id].value().optimize_branches(1.0, 1);
 
             if (context.is_group_leader(worker_id, thread_id)) {
@@ -199,31 +199,25 @@ void TunedBatch::optimize_topology(const Options &opts, const TaskGroup &context
         auto total_rounds = fast ? meta_parameters->num_fast_spr : meta_parameters->num_slow_spr;
         auto num_rounds = total_rounds - rounds_performed;
 
+        // make sure the spr-params are set correctly for fast/slow rounds
+        spr_round_params spr_params;
+        this->auto_configure(opts, spr_params);
+
         if (context.is_group_leader(worker_id, thread_id)) {
             auto round_name = fast ? "FAST" : "SLOW";
-
-            // make sure the spr-params are set correctly for fast/slow rounds
-            this->auto_configure(opts);
 
             LOG_INFO_TS << this->name << ": Optimizing topology (" << num_rounds << " of " << total_rounds << " total "
                     << round_name << " spr rounds, radius: " << spr_params.radius_max << ")" << std::endl;
         }
 
-        context.enter_barrier(); // required to propagate auto-configuration
-        auto begin = std::chrono::steady_clock::now();
+        // context.enter_barrier(); // required to propagate auto-configuration
 
-        // Fix 1: we must not share spr_params across threads because the struct contains shared out-parameters
-        //        that interfere between threads
-        // Fix 2: we must not create local copies between SPR rounds, since that would destroy the out-parameters
-        //        like cut-off values and thus make SPR rounds less efficient.
-        // TODO instead of manually fixing problems with the spr cutoff, we should get rid of shared parameters, and
-        //  mirror what the optimizer is doing
-        auto local_spr_params = spr_params;
+        auto begin = std::chrono::steady_clock::now();
 
         // run optimization kernel
         for (const auto tree_id: tree_ids) {
             const auto loglh = batch_trees[tree_id][thread_id].value().loglh();
-            local_spr_params.reset_cutoff_info(loglh, true);
+            spr_params.reset_cutoff_info(loglh, true);
 
             for (unsigned int spr_round = rounds_performed; spr_round < total_rounds; ++spr_round) {
                 InferencePhase phase = spr_params.thorough
@@ -236,7 +230,7 @@ void TunedBatch::optimize_topology(const Options &opts, const TaskGroup &context
                     begin = std::chrono::steady_clock::now();
                 }
 
-                batch_trees[tree_id][thread_id].value().spr_round(local_spr_params);
+                batch_trees[tree_id][thread_id].value().spr_round(spr_params);
                 batch_trees[tree_id][thread_id].value().optimize_branches(1.0, 1);
 
                 if (context.is_group_leader(worker_id, thread_id)) {
@@ -550,10 +544,9 @@ void TunedBatch::perform_plausibility_check(const Options &opts, SharedBatchReso
     }
 }
 
-void TunedBatch::update_meta_parameters(const Options &opts, const shared_ptr<MetaParameters> new_parameters) {
+void TunedBatch::update_meta_parameters(const shared_ptr<MetaParameters> &new_parameters) {
     this->meta_parameters = new_parameters;
     this->meta_parameters_set = true;
-    this->auto_configure(opts);
 }
 
 bool TunedBatch::is_compatible(const MetaParameters &new_parameters) const {
