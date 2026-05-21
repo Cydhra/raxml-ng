@@ -11,12 +11,10 @@ using namespace std::placeholders;
 
 Tree get_reverse_backbone(TreeInfo &tree) {
     // obtain the topology with negative branch lengths to invert the order of branch lengths.
-    tree.scale_branches(-1.0);
     Tree constraint = tree.tree();
-    tree.scale_branches(-1.0);
 
     // threshold for the reverse-backbone
-    constexpr auto cutoff_threshold = -RAXML_BRLEN_MIN - CORAX_ONE_EPSILON;
+    constexpr auto cutoff_threshold = RAXML_BRLEN_MIN;
 
     const auto tip_list = constraint.tip_labels_list();
     const auto tip_id_map = constraint.tip_ids();
@@ -25,7 +23,7 @@ Tree get_reverse_backbone(TreeInfo &tree) {
     for (auto &label: tip_list) {
         const auto tip_id = tip_id_map.at(label);
         assert(CORAX_UTREE_IS_TIP(constraint.pll_utree().nodes[tip_id]));
-        if (constraint.pll_utree().nodes[tip_id]->length < cutoff_threshold) {
+        if (constraint.pll_utree().nodes[tip_id]->length > cutoff_threshold + CORAX_ONE_EPSILON) {
             remove_list.push_back(label);
         }
     }
@@ -42,7 +40,7 @@ Tree get_reverse_backbone(TreeInfo &tree) {
     // removing leaves because the method cannot handle polytomies.
     // collapse_short_branches adds the CORAX_ONE_EPSILON threshold to the cutoff_threshold since it expects the cutoff
     // to be positive. therefore we subtract it again here:
-    constraint.collapse_short_branches(cutoff_threshold - CORAX_ONE_EPSILON);
+    constraint.collapse_long_branches(cutoff_threshold);
 
     return constraint;
 }
