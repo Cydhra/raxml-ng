@@ -131,6 +131,7 @@ public:
   void fix_missing_brlens(double new_brlen = RAXML_BRLEN_DEFAULT);
   void reset_brlens(double new_brlen = RAXML_BRLEN_DEFAULT);
   void collapse_short_branches(double min_brlen);
+  void collapse_long_branches(double max_brlen);
   void apply_partition_brlens(size_t partition_idx);
   void apply_avg_brlens(const doubleVector& partition_contributions);
 
