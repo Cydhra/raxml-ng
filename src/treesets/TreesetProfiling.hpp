@@ -69,12 +69,9 @@ class CountingProfiler : public Profiler {
 public:
     void finish_measurement(const TunedBatch &batch, const InferencePhase &phase) override {
         if (std::holds_alternative<CompleteInference>(phase)) {
-            LOG_INFO << ">>> measuring batch [" << batch.get_name() << "]" << std::endl;
             std::lock_guard lock(this->m);
             const auto count = count_profile(batch);
-            LOG_INFO << ">>> samples has " << samples.size() << " elements before adding the measurement (" << count << ")" << std::endl;
             samples.push_back(count);
-            LOG_INFO << ">>> samples has " << samples.size() << " elements after adding the measurement." << std::endl;
         }
     }
 
@@ -88,7 +85,6 @@ public:
 
         double average = 0.0;
         for (const auto count: measurements) {
-            printf(">>>> SAMPLE: %d\n", count);
             average += static_cast<double>(count);
         }
         average /= static_cast<double>(measurements.size());
