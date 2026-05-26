@@ -1,6 +1,7 @@
 #include "TreesetOptimizer.hpp"
 #include "TunedBatch.hpp"
 #include "../Optimizer.hpp"
+#include <regex>
 
 void create_mab(std::deque<MultiArmedBandit<MetaParameters> > &target_list, const std::string &name, const MetaParameters &parameters) {
     target_list.emplace_back();
@@ -10,7 +11,6 @@ void create_mab(std::deque<MultiArmedBandit<MetaParameters> > &target_list, cons
 void TreesetOptimizer::initialize_bandits() {
 
     create_mab(this->benchmark_mabs, "Parsimony", MetaParameters(1, false, 0, 0, true, false));
-    create_mab(this->benchmark_mabs, "Parsimony+NNI", MetaParameters(1, false, 0, 0, false, false, 10, true));
 
     const auto adaptive_radius = pythia_score >= 0.0
                                      ? Optimizer::adaptive_radius(pythia_score)
@@ -77,6 +77,14 @@ void TreesetOptimizer::run_batch(Bandit<MetaParameters> &bandit,
 BatchTask TreesetOptimizer::next_work_unit() {
     auto *current_mab = &this->benchmark_mabs[bandit_cursor];
     if (current_mab->get_bandit(0).num_samples() >= SAMPLES_PER_BANDIT) {
+        // serialize work unit by writing a report from the profiler into a special file (one per bandit). This allows
+        // restoring progress (tell snakemake to keep files). Remember to clear the profiler after the report.
+        auto file_name = string();
+        string bandit_name = current_mab->get_bandit(0).get_name();
+        bandit_name = std::regex_replace(bandit_name, std::regex("[,+]"), "_");
+        file_name.append(opts.outfile_prefix).append(".").append(bandit_name).append(".txt");
+        shared_batch_resources.get_profiling().write_report_and_reset(file_name);
+
         bandit_cursor += 1;
         current_mab = &this->benchmark_mabs[bandit_cursor];
     }
