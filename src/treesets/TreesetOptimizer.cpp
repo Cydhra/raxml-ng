@@ -80,6 +80,16 @@ std::string get_report_filename(std::string output_prefix, std::string bandit_na
     return file_name;
 }
 
+void shutdown(ThreadPool &pool, std::string outfile_prefix) {
+    pool.shutdown();
+    auto fin_file_name = string();
+    fin_file_name.append(outfile_prefix);
+    fin_file_name.append(".finished");
+    std::ofstream finished(fin_file_name);
+    finished << std::endl;
+    finished.close();
+}
+
 void TreesetOptimizer::run_batch(Bandit<MetaParameters> &bandit,
                                  TunedBatch &batch, TaskGroup &context, unsigned int worker_id,
                                  unsigned int thread_id) {
@@ -105,7 +115,7 @@ void TreesetOptimizer::run_batch(Bandit<MetaParameters> &bandit,
             // Warning: this only works if we have a single TaskGroup, so we
             // if this was the last bandit
             if (this->bandit_cursor == this->benchmark_mabs.size() - 1) {
-                pool.shutdown();
+                shutdown(pool, opts.outfile_prefix);
             } else {
                 bandit_cursor += 1;
             }
@@ -124,9 +134,8 @@ BatchTask TreesetOptimizer::next_work_unit() {
         bandit_cursor += 1;
 
         if (bandit_cursor == this->benchmark_mabs.size()) {
-            pool.shutdown();
-            return [](TaskGroup &context, const unsigned int worker_id,
-                                                               const unsigned int thread_id) {
+            shutdown(pool, opts.outfile_prefix);
+            return [](TaskGroup &, const unsigned int, const unsigned int) {
                 // do nothing
             };
         }
