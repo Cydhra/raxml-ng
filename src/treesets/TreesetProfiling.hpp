@@ -52,6 +52,8 @@ public:
 
     virtual void finish_measurement(const TunedBatch &, const InferencePhase &) {
     }
+
+    virtual void clear() = 0;
 };
 
 template<class SprType>
@@ -83,6 +85,12 @@ public:
             const auto time = batch.elapsed_wall_time() - this->start_times[batch.get_name()];
             samples.push_back(time);
         }
+    }
+
+    void clear() override {
+        std::lock_guard lock(this->m);
+        samples.clear();
+        this->start_times.clear();
     }
 
     /**
@@ -130,6 +138,12 @@ public:
                 throw RaxmlException("SprRoundProfiler has not been implemented for this type");
             }
         }
+    }
+
+    void clear() override {
+        std::lock_guard lock(this->m);
+        samples.clear();
+        this->start_times.clear();
     }
 
     /**
@@ -203,6 +217,8 @@ public:
     void finish_measurement(const TunedBatch &batch, const InferencePhase &phase);
 
     void print_report() const;
+
+    void write_report_and_reset(string path);
 };
 
 #endif //RAXML_TREESETPROFILER_HPP_
