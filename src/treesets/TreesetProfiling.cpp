@@ -64,5 +64,8 @@ void TreesetProfiling::write_report_and_reset(string path) {
     file << "MO" << "\t" << model_opt_profiler->get_mean_wall_time() << std::endl;
     model_opt_profiler->clear();
 
+    file << "Success" << "\t" << success_profiler->get_average_count() << std::endl;
+    success_profiler->clear();
+
     file.close();
 }
