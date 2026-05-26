@@ -60,6 +60,58 @@ public:
     virtual void clear() = 0;
 };
 
+/**
+ * A profiler which counts a discrete event after a batch has finished processing.
+ */
+class CountingProfiler : public Profiler {
+    std::vector<unsigned int> samples{};
+
+public:
+    void finish_measurement(const TunedBatch &batch, const InferencePhase &phase) override {
+        if (std::holds_alternative<CompleteInference>(phase)) {
+            std::lock_guard lock(this->m);
+            const auto count = count_profile(batch);
+            samples.push_back(count);
+        }
+    }
+
+    double get_average_count() {
+        std::lock_guard lock(this->m);
+        const auto &measurements = samples;
+
+        if (measurements.empty()) {
+            return -1.0;
+        }
+
+        double average = 0.0;
+        for (const auto time: measurements) {
+            average += static_cast<double>(time);
+        }
+        average /= measurements.size();
+
+        return average;
+    }
+
+    void clear() override {
+        std::lock_guard lock(this->m);
+        samples.clear();
+    }
+
+protected:
+    virtual unsigned int count_profile(const TunedBatch &batch) = 0;
+};
+
+class SuccessProfiler : public CountingProfiler {
+protected:
+    unsigned int count_profile(const TunedBatch &batch) override {
+        return batch.get_plausible_tree_count();
+    }
+};
+
+/**
+ * A profiler which measures the walltime of certain operations
+ * @tparam SprType The kind of optimization that is being measured
+ */
 template<class SprType>
 class WallTimeProfiler : public Profiler {
 protected:
@@ -196,6 +248,7 @@ public:
     std::shared_ptr<SimpleTimeProfiler<NNIOptimization> > nni_profiler = std::make_shared<SimpleTimeProfiler<
         NNIOptimization> >();
 
+    std::shared_ptr<SuccessProfiler> success_profiler = std::make_shared<SuccessProfiler>();
 
     TreesetProfiling() {
         registered_profilers.push_back(fast_spr_profiler);
@@ -204,6 +257,7 @@ public:
         registered_profilers.push_back(model_opt_profiler);
         registered_profilers.push_back(branch_opt_profiler);
         registered_profilers.push_back(nni_profiler);
+        registered_profilers.push_back(success_profiler);
     }
 
     /**
