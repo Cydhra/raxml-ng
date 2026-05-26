@@ -122,9 +122,19 @@ BatchTask TreesetOptimizer::next_work_unit() {
         LOG_INFO << "Skipping bandit [" << current_mab->get_bandit(0).get_name() <<
                 "] because we already benchmarked it" << std::endl;
         bandit_cursor += 1;
+
+        if (bandit_cursor == this->benchmark_mabs.size()) {
+            pool.shutdown();
+            return [](TaskGroup &context, const unsigned int worker_id,
+                                                               const unsigned int thread_id) {
+                // do nothing
+            };
+        }
+
         current_mab = &this->benchmark_mabs[bandit_cursor];
         file_name = get_report_filename(opts.outfile_prefix, current_mab->get_bandit(0).get_name());
     }
+
 
     auto &current_bandit = current_mab->select_next_bandit();
     auto &current_batch = this->batch_queue.select_next_batch(*current_bandit.get_parameters(), pool.workers_per_task(),
