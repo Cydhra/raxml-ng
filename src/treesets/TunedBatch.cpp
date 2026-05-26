@@ -539,68 +539,7 @@ void TunedBatch::update_meta_parameters(const shared_ptr<MetaParameters> &new_pa
 }
 
 bool TunedBatch::is_compatible(const MetaParameters &new_parameters) const {
-    // a batch that already optimized with these exact parameters cannot be reused for the same parameters again
-    if (*this->meta_parameters == new_parameters) {
-        return false;
-    }
-
-    // if the current parameters do the bare minimum, we can always continue with new parameters
-    if (this->meta_parameters->accept_starting_trees) {
-        return true;
-        // however if we already did something, the other set need not do the bare minimum.
-    } else if (new_parameters.accept_starting_trees) {
-        return false;
-    }
-
-    // do not reuse batch if it was created with a different model
-    if ((this->num_fast_spr_performed > 0 || this->num_slow_spr_performed > 0) && this->meta_parameters->model_override
-        != new_parameters.model_override) {
-        return false;
-    }
-
-    // if settings of the SPR rounds do not match, and we already completed some SPR rounds,
-    // the new parameters cannot replace the current ones
-    if (this->num_fast_spr_performed > 0) {
-        if (this->meta_parameters->keep_top_k_topol != new_parameters.keep_top_k_topol) {
-            return false;
-        }
-        if (this->meta_parameters->max_adaptive_radius != new_parameters.max_adaptive_radius) {
-            return false;
-        }
-
-        if (this->meta_parameters->num_fast_spr > new_parameters.num_fast_spr) {
-            return false;
-        }
-    }
-
-    if (this->num_slow_spr_performed > 0) {
-        if (this->meta_parameters->keep_top_k_topol != new_parameters.keep_top_k_topol) {
-            return false;
-        }
-        if (this->meta_parameters->max_adaptive_radius != new_parameters.max_adaptive_radius) {
-            return false;
-        }
-
-        // if we already completed some slow rounds, but the other parameter wants to do more fast rounds,
-        // we reject, because order matters
-        if (this->meta_parameters->num_fast_spr != new_parameters.num_fast_spr) {
-            return false;
-        }
-
-        if (this->meta_parameters->num_slow_spr > new_parameters.num_slow_spr) {
-            return false;
-        }
-    }
-
-    // if the way the model is obtained doesn't match, the new parameters cannot replace the current ones
-    if (this->initial_model_optimized && this->meta_parameters->early_commit != new_parameters.early_commit) {
-        return false;
-    }
-    if (this->initial_model_optimized && this->meta_parameters->skip_model != new_parameters.skip_model) {
-        return false;
-    }
-
-    return true;
+    return false;
 }
 
 void TunedBatch::backup_models(ModelMap &target) const {
