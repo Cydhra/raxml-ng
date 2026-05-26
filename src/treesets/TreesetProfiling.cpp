@@ -42,18 +42,18 @@ void TreesetProfiling::write_report_and_reset(string path) {
     std::ofstream file(path);
     for (int i = 0; i < 4; ++i) {
         file << "Fast SPR " << i << "\t" << fast_spr_profiler->get_mean_wall_time(i) << std::endl;
-        fast_spr_profiler->clear();
     }
+    fast_spr_profiler->clear();
 
     for (int i = 0; i < 4; ++i) {
         file << "Slow SPR " << i << "\t" << slow_spr_profiler->get_mean_wall_time(i) << std::endl;
-        slow_spr_profiler->clear();
     }
+    slow_spr_profiler->clear();
 
     for (int i = 0; i < 4; ++i) {
         file << "Greedy SPR " << i << "\t" << greedy_spr_profiler->get_mean_wall_time(i) << std::endl;
-        greedy_spr_profiler->clear();
     }
+    greedy_spr_profiler->clear();
 
     file << "NNI" << "\t" << nni_profiler->get_mean_wall_time() << std::endl;
     nni_profiler->clear();
