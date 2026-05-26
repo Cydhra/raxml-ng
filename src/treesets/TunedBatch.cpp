@@ -492,19 +492,23 @@ bool TunedBatch::is_compatible(const MetaParameters &new_parameters) const {
         return false;
     }
 
-    if (this->meta_parameters->max_adaptive_radius != new_parameters.max_adaptive_radius) {
-        return false;
-    }
-
     // if the current parameters do the bare minimum, we can always continue with new parameters
     if (this->meta_parameters->accept_starting_trees) {
         return true;
+    }
+
+    // do not reuse batch if it was created with a different model
+    if ((this->num_fast_spr_performed > 0 || this->num_slow_spr_performed > 0) && this->meta_parameters->model_override != new_parameters.model_override) {
+        return false;
     }
 
     // if settings of the SPR rounds do not match, and we already completed some SPR rounds,
     // the new parameters cannot replace the current ones
     if (this->num_fast_spr_performed > 0) {
         if (this->meta_parameters->keep_top_k_topol != new_parameters.keep_top_k_topol) {
+            return false;
+        }
+        if (this->meta_parameters->max_adaptive_radius != new_parameters.max_adaptive_radius) {
             return false;
         }
 
@@ -515,6 +519,9 @@ bool TunedBatch::is_compatible(const MetaParameters &new_parameters) const {
 
     if (this->num_slow_spr_performed > 0) {
         if (this->meta_parameters->keep_top_k_topol != new_parameters.keep_top_k_topol) {
+            return false;
+        }
+        if (this->meta_parameters->max_adaptive_radius != new_parameters.max_adaptive_radius) {
             return false;
         }
 
