@@ -68,28 +68,30 @@ void TreesetOptimizer::run_batch(Bandit<MetaParameters> &bandit,
         // inform the batch queue that the batch has been inferred
         this->batch_queue.finish_batch(batch);
 
-        if (this->bandit_cursor == this->benchmark_mabs.size() - 1 && bandit.num_samples() >= SAMPLES_PER_BANDIT) {
-            pool.shutdown();
+        if (bandit.num_samples() >= SAMPLES_PER_BANDIT) {
+            // serialize work unit by writing a report from the profiler into a special file (one per bandit). This allows
+            // restoring progress (tell snakemake to keep files). Remember to clear the profiler after the report.
+            auto file_name = string();
+            string bandit_name = this->benchmark_mabs[bandit_cursor].get_bandit(0).get_name();
+            bandit_name = std::regex_replace(bandit_name, std::regex("[,+]"), "_");
+            file_name.append(opts.outfile_prefix).append(".").append(bandit_name).append(".txt");
+            shared_batch_resources.get_profiling().write_report_and_reset(file_name);
+
+            LOG_INFO << "Wrote results of bandit [" << this->benchmark_mabs[bandit_cursor].get_bandit(0).get_name() << "] to file " << file_name << std::endl;
+
+            // if this was the last bandit
+            if (this->bandit_cursor == this->benchmark_mabs.size() - 1) {
+                pool.shutdown();
+            } else {
+                bandit_cursor += 1;
+            }
         }
     }
 }
 
 BatchTask TreesetOptimizer::next_work_unit() {
-    auto *current_mab = &this->benchmark_mabs[bandit_cursor];
-    if (current_mab->get_bandit(0).num_samples() >= SAMPLES_PER_BANDIT) {
-        // serialize work unit by writing a report from the profiler into a special file (one per bandit). This allows
-        // restoring progress (tell snakemake to keep files). Remember to clear the profiler after the report.
-        auto file_name = string();
-        string bandit_name = current_mab->get_bandit(0).get_name();
-        bandit_name = std::regex_replace(bandit_name, std::regex("[,+]"), "_");
-        file_name.append(opts.outfile_prefix).append(".").append(bandit_name).append(".txt");
-        shared_batch_resources.get_profiling().write_report_and_reset(file_name);
-
-        bandit_cursor += 1;
-        current_mab = &this->benchmark_mabs[bandit_cursor];
-    }
-
-    auto &current_bandit = current_mab->select_next_bandit();
+    auto &current_mab = this->benchmark_mabs[bandit_cursor];
+    auto &current_bandit = current_mab.select_next_bandit();
     auto &current_batch = this->batch_queue.select_next_batch(*current_bandit.get_parameters(), pool.workers_per_task(),
                                                               pool.threads_per_task());
     current_batch.update_meta_parameters(opts, current_bandit.get_parameters());
