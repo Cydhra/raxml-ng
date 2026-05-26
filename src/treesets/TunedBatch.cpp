@@ -334,7 +334,9 @@ void TunedBatch::optimize(RaxmlInstance &instance, const Options &opts, SharedBa
         throw RaxmlException("TunedBatch has not been configured with meta heuristics");
     }
 
-    resources.get_profiling().start_measurement(*this, CompleteInference{});
+    if (context.is_group_leader(worker_id, thread_id)) {
+        resources.get_profiling().start_measurement(*this, CompleteInference{});
+    }
 
     if (!this->start_trees_generated()) {
         this->generate_starting_trees(instance, opts, context, worker_id, thread_id);
@@ -383,9 +385,9 @@ void TunedBatch::optimize(RaxmlInstance &instance, const Options &opts, SharedBa
         for (auto &batch_tree: this->batch_trees) {
             this->tree_topologies.push_back(batch_tree.at(0).value().tree());
         }
-    }
 
-    resources.get_profiling().finish_measurement(*this, CompleteInference{});
+        resources.get_profiling().finish_measurement(*this, CompleteInference{});
+    }
 }
 
 void TunedBatch::perform_au_test(AuTest &au_test, const bool initialized, const TaskGroup &context,
