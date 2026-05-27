@@ -65,10 +65,12 @@ void TreesetOptimizer::initialize_bandits() {
                MetaParameters(20, false, 4, 2, false, false, adaptive_radius, true, true));
 
     // higher radius
+    create_mab(this->benchmark_mabs, "LargeRad,Greedy,NoModel,1spr", MetaParameters(1, true, 1, 0, false, false, 2 * adaptive_radius));
     create_mab(this->benchmark_mabs, "LargeRad,2spr", MetaParameters(20, false, 2, 0, false, false, 2 * adaptive_radius));
     create_mab(this->benchmark_mabs, "LargeRad,2+2spr", MetaParameters(20, false, 2, 2, false, false, 2 * adaptive_radius));
     create_mab(this->benchmark_mabs, "LargeRad,Greedy,2spr", MetaParameters(1, false, 2, 0, false, false, 2 * adaptive_radius));
     create_mab(this->benchmark_mabs, "LargeRad,JC,2spr", MetaParameters(20, false, 2, 2, false, false, 2 * adaptive_radius, false, false, "JC"));
+    create_mab(this->benchmark_mabs, "LargeRad,Greedy,NoModel,1spr", MetaParameters(1, true, 1, 0, false, false, 2 * adaptive_radius));
 
     // early commitment
     create_mab(this->benchmark_mabs, "Commit,Greedy,DoModel,2spr",
