@@ -196,8 +196,7 @@ void TunedBatch::optimize_topology(const Options &opts, const TaskGroup &context
             auto round_name = fast ? "FAST" : "SLOW";
 
             LOG_INFO_TS << this->name << ": Optimizing topology (" << num_rounds << " of " << total_rounds << " total "
-                    <<
-                    round_name << " spr rounds)" << std::endl;
+                    << round_name << " spr rounds, radius: " << spr_params.radius_max << ")" << std::endl;
 
             // make sure the spr-params are set correctly for fast/slow rounds
             this->auto_configure(opts);
@@ -433,7 +432,8 @@ void TunedBatch::perform_au_test(AuTest &au_test, const bool initialized, const 
     }
 }
 
-void TunedBatch::perform_plausibility_check(const Options &opts, SharedBatchResources &resources, const bool initialized,
+void TunedBatch::perform_plausibility_check(const Options &opts, SharedBatchResources &resources,
+                                            const bool initialized,
                                             const TaskGroup &context, const unsigned int worker_id,
                                             const unsigned int thread_id) {
     auto &au_test = resources.get_au_test(context);
@@ -449,9 +449,9 @@ void TunedBatch::perform_plausibility_check(const Options &opts, SharedBatchReso
 
     // reset model to original for AU test
     if (meta_parameters->model_override) {
-        for (auto &tree_id : coarse_assignments.at(worker_id)) {
+        for (auto &tree_id: coarse_assignments.at(worker_id)) {
             batch_trees[tree_id][thread_id].emplace(opts, batch_trees[tree_id][thread_id]->tree(), *msa, tip_msa_idmap,
-                                   part_assignments.at(thread_id));
+                                                    part_assignments.at(thread_id));
         }
     }
 
