@@ -63,8 +63,9 @@ public:
 /**
  * A profiler which counts a discrete event after a batch has finished processing.
  */
+template<class C = unsigned int>
 class CountingProfiler : public Profiler {
-    std::vector<unsigned int> samples{};
+    std::vector<C> samples{};
 
 public:
     void finish_measurement(const TunedBatch &batch, const InferencePhase &phase) override {
@@ -98,13 +99,20 @@ public:
     }
 
 protected:
-    virtual unsigned int count_profile(const TunedBatch &batch) = 0;
+    virtual C count_profile(const TunedBatch &batch) = 0;
 };
 
-class SuccessProfiler : public CountingProfiler {
+class SuccessProfiler : public CountingProfiler<> {
 protected:
     unsigned int count_profile(const TunedBatch &batch) override {
         return batch.get_plausible_tree_count();
+    }
+};
+
+class ThroughputProfiler : public CountingProfiler<double> {
+protected:
+    double count_profile(const TunedBatch &batch) override {
+        return static_cast<double>(batch.get_plausible_tree_count()) / batch.elapsed_wall_time();
     }
 };
 
@@ -249,6 +257,7 @@ public:
         NNIOptimization> >();
 
     std::shared_ptr<SuccessProfiler> success_profiler = std::make_shared<SuccessProfiler>();
+    std::shared_ptr<ThroughputProfiler> throughput_profiler = std::make_shared<ThroughputProfiler>();
 
     TreesetProfiling() {
         registered_profilers.push_back(fast_spr_profiler);
@@ -258,6 +267,7 @@ public:
         registered_profilers.push_back(branch_opt_profiler);
         registered_profilers.push_back(nni_profiler);
         registered_profilers.push_back(success_profiler);
+        registered_profilers.push_back(throughput_profiler);
     }
 
     /**
