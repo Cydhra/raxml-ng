@@ -67,5 +67,8 @@ void TreesetProfiling::write_report_and_reset(string path) {
     file << "Success" << "\t" << success_profiler->get_average_count() << std::endl;
     success_profiler->clear();
 
+    file << "Throughput" << "\t" << throughput_profiler->get_average_count() << std::endl;
+    throughput_profiler->clear();
+
     file.close();
 }
