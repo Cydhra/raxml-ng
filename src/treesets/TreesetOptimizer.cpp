@@ -37,14 +37,13 @@ void TreesetOptimizer::initialize_bandits() {
                                        MetaParameters(20, false, 4, 0, false, true, adaptive_radius));
 
     // set up successors
-    this->successors[this->parsimony.get()] = {
-        make_tuple("NNI", this->nni_mab), make_tuple("Light", this->light_mab)
-    };
-    this->successors[this->nni_mab.get()] = {
-        make_tuple("Light", this->light_mab), make_tuple("Commitment", this->commitment_mab)
-    };
-    this->successors[this->light_mab.get()] = {make_tuple("Heavy", this->heavy_mab)};
-    this->successors[this->commitment_mab.get()] = {make_tuple("Heavy", this->heavy_mab)};
+    this->successors.emplace_back(make_tuple(1, "NNI", this->nni_mab));
+    this->successors.emplace_back(make_tuple(1, "Light", this->light_mab));
+
+    this->successors.emplace_back(make_tuple(3, "Commitment", this->commitment_mab));
+    this->successors.emplace_back(make_tuple(4, "Heavy", this->heavy_mab));
+
+    this->successors.emplace_back(make_tuple(5, "Fallback", this->fallback_fast_mab));
 
     // second-level MAB
     this->hierarchical_mab.emplace_back("Starting Trees", parsimony);
@@ -61,7 +60,7 @@ void TreesetOptimizer::run_batch(Bandit<std::shared_ptr<MultiArmedBandit<MetaPar
         mab.get_parameters()->get()->take_measurement(bandit, batch, true);
         this->hierarchical_mab.take_measurement(mab, batch, true);
 
-        this->check_mab_modification(mab);
+        this->check_mab_modification(this->hierarchical_mab.get_best_bandit());
 
         // inform the batch queue that the batch has been inferred
         this->batch_queue.finish_batch(batch);
@@ -109,13 +108,16 @@ void TreesetOptimizer::check_mab_modification(
     // TODO implement a proper heuristic here. For now, we check if the current arm exceeds 75% success per batch,
     //  and if not, we add arms according to a pre-defined mapping.
 
-    if (current_arm.num_samples() >= 4 && current_arm.get_expected_tree_rate() < 0.75) {
-        const auto pointer = current_arm.get_parameters().get()->get();
-        if (this->successors.find(pointer) != this->successors.end()) {
-            for (auto &successor: this->successors.at(pointer)) {
-                if (!hierarchical_mab.has_bandit(std::get<0>(successor))) {
-                    LOG_INFO << "Adding bandit " << std::get<0>(successor) << " to algorithm." << std::endl;
-                    hierarchical_mab.emplace_back(std::get<0>(successor), std::get<1>(successor));
+    // check if we have more than a trivial amount of data, if the success rate is low, and we had at least 4 batches per bandit
+    if (current_arm.num_samples() >= 4 && current_arm.get_expected_tree_rate() < 0.75 && hierarchical_mab.num_bandits() * 4 <= batch_queue.num_batches()) {
+        const auto current_level = hierarchical_mab.num_bandits();
+
+        // add all bandits of the current level
+        for (auto it = this->successors.begin(); it != this->successors.end(); it += 1) {
+            if (std::get<0>(*it) <= current_level) {
+                if (!hierarchical_mab.has_bandit(std::get<1>(*it))) {
+                    LOG_INFO << "Adding bandit " << std::get<1>(*it) << " to algorithm." << std::endl;
+                    hierarchical_mab.emplace_back(std::get<1>(*it), std::get<2>(*it));
                 }
             }
         }

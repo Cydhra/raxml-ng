@@ -91,12 +91,11 @@ protected:
         MetaParameters> >();
 
     /**
-     * A mapping of bandit arms that are successors to previous arms in case they are not yet optimal.
-     * For example, the successors to the parsimony arm are the light and commitment arms, so if the parsimony arm
-     * does not find enough plausible trees, the successor arms are added to the algorithm.
+     * A list of bandit arms that are successors to previous arms in case they are not yet optimal.
+     * They are each given a rank, and are added if the best performing bandit does not have high success rate.
+     * Each time, all bandits with a rank as high or lower than the number of currently active bandits are added.
      */
-    unordered_map<MultiArmedBandit<MetaParameters> *, std::vector<std::tuple<std::string, std::shared_ptr<
-        MultiArmedBandit<MetaParameters> > > > > successors;
+    std::vector<std::tuple<unsigned int, std::string, std::shared_ptr<MultiArmedBandit<MetaParameters> > > > successors;
 
     /**
      * Initialize the bandit algorithms we use during the inference. These depend on the parameters derivded from initial
