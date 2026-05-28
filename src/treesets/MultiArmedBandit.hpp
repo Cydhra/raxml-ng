@@ -180,6 +180,10 @@ public:
         return false;
     }
 
+    Bandit<shared_ptr<MultiArmedBandit<MetaParameters>>> & get_best_bandit() {
+        return bandits[this->best_known_bandit];
+    }
+
 protected:
     /**
      * Registered bandits in this MAB.
