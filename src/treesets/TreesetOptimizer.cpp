@@ -36,6 +36,12 @@ void TreesetOptimizer::initialize_bandits() {
     this->commitment_mab->emplace_back("Commit,Fast,DoModel,4spr",
                                        MetaParameters(20, false, 4, 0, false, true, adaptive_radius));
 
+    this->constrained_mab->emplace_back("Fast,DoModel,2spr,NNI,Constrained", MetaParameters(20, false, 2, 0, false, false, adaptive_radius, true, true));
+    this->constrained_mab->emplace_back("Fast,DoModel,1+1spr,NNI,Constrained", MetaParameters(20, false, 1, 1, false, false, adaptive_radius, true, true));
+    this->constrained_mab->emplace_back("Greedy,NoModel,2spr,NNI,Constrained", MetaParameters(1, true, 2, 0, false, false, adaptive_radius, true, true));
+    this->constrained_mab->emplace_back("Greedy,DoModel,2spr,NNI,Constrained", MetaParameters(1, false, 2, 0, false, false, adaptive_radius, true, true));
+    this->constrained_mab->emplace_back("Greedy,DoModel,1+1spr,NNI,Constrained", MetaParameters(1, false, 1, 1, false, false, adaptive_radius, true, true));
+
     // fallbacks
     this->fallback_fast_mab->emplace_back("Fast-Raxml", MetaParameters(20, true, 0, 0, false, false, 20, false, false, std::nullopt, true));
 
@@ -44,8 +50,11 @@ void TreesetOptimizer::initialize_bandits() {
     this->successors.emplace_back(make_tuple(1, "Light", this->light_mab));
 
     this->successors.emplace_back(make_tuple(3, "Commitment", this->commitment_mab));
-    this->successors.emplace_back(make_tuple(4, "Heavy", this->heavy_mab));
-    this->successors.emplace_back(make_tuple(4, "Fallback", this->fallback_fast_mab));
+
+    this->successors.emplace_back(make_tuple(4, "Constrained", this->constrained_mab));
+
+    this->successors.emplace_back(make_tuple(5, "Heavy", this->heavy_mab));
+    this->successors.emplace_back(make_tuple(5, "Fallback", this->fallback_fast_mab));
 
     // second-level MAB
     this->hierarchical_mab.emplace_back("Starting Trees", parsimony);

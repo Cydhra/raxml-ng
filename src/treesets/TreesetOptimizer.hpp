@@ -86,6 +86,12 @@ protected:
         MetaParameters> >();
 
     /**
+     * A multi-armed bandit instance that contains light and mixed heuristics with tree constrains
+     */
+    std::shared_ptr<MultiArmedBandit<MetaParameters> > constrained_mab = std::make_shared<MultiArmedBandit<
+        MetaParameters> >();
+
+    /**
      * Fallback to fast raxml
      */
     std::shared_ptr<MultiArmedBandit<MetaParameters> > fallback_fast_mab = std::make_shared<MultiArmedBandit<
