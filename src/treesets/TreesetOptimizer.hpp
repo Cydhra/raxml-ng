@@ -122,6 +122,16 @@ protected:
      */
     BatchTask next_work_unit();
 
+    /**
+     * Check whether we should insert new arms into the MAB depending on the performance of the current bandit arm.
+     * This implements a heuristic that enables exploration for new arms if they have potential to be useful within
+     * the algorithm.
+     * This enables us to skip exploring arms that have no potential gain over currently explored arms.
+     *
+     * @param current_arm the arm of the MAB that was last modified
+     */
+    void check_mab_modification(const Bandit<shared_ptr<MultiArmedBandit<MetaParameters> > > &current_arm);
+
 public:
     /**
      *
@@ -166,16 +176,6 @@ public:
      * Run the treeset optimizer to infer K plausible trees.
      */
     void run();
-
-    /**
-     * Check whether we should insert new arms into the MAB depending on the performance of the current bandit arm.
-     * This implements a heuristic that enables exploration for new arms if they have potential to be useful within
-     * the algorithm.
-     * This enables us to skip exploring arms that have no potential gain over currently explored arms.
-     *
-     * @param current_arm the arm of the MAB that was last modified
-     */
-    void check_mab_modification(const Bandit<shared_ptr<MultiArmedBandit<MetaParameters> > > &current_arm);
 
     /**
      * Obtain all trees (plausible and rejected) inferred during the treeset optimization into a common vector and
