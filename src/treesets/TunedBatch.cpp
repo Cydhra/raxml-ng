@@ -202,11 +202,11 @@ void TunedBatch::optimize_topology(const Options &opts, const TaskGroup &context
         if (context.is_group_leader(worker_id, thread_id)) {
             auto round_name = fast ? "FAST" : "SLOW";
 
-            LOG_INFO_TS << this->name << ": Optimizing topology (" << num_rounds << " of " << total_rounds << " total "
-                    << round_name << " spr rounds, radius: " << spr_params.radius_max << ")" << std::endl;
-
             // make sure the spr-params are set correctly for fast/slow rounds
             this->auto_configure(opts);
+
+            LOG_INFO_TS << this->name << ": Optimizing topology (" << num_rounds << " of " << total_rounds << " total "
+                    << round_name << " spr rounds, radius: " << spr_params.radius_max << ")" << std::endl;
         }
 
         context.enter_barrier(); // required to propagate auto-configuration
