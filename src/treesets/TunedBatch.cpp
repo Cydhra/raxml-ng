@@ -9,7 +9,7 @@
 
 using namespace std::placeholders;
 
-Tree get_reverse_backbone(TreeInfo &tree) {
+std::optional<Tree> get_reverse_backbone(TreeInfo &tree) {
     // obtain the topology with negative branch lengths to invert the order of branch lengths.
     Tree constraint = tree.tree();
 
@@ -29,7 +29,14 @@ Tree get_reverse_backbone(TreeInfo &tree) {
     }
 
     // at least 4 tips need to remain in the dataset
-    assert(remove_list.size() < tip_list.size() - 3);
+    if (remove_list.size() >= tip_list.size() - 3) {
+        return std::nullopt;
+    }
+
+    // if we aren't removing any tips, the constraint is too restrictive
+    if (remove_list.size() < 3) {
+        return std::nullopt;
+    }
 
     constraint.remove_tips(remove_list);
 
@@ -358,8 +365,9 @@ void TunedBatch::optimize(RaxmlInstance &instance, const Options &opts, SharedBa
         if (meta_parameters->constrain) {
             const auto my_trees = coarse_assignments.at(worker_id);
             for (const auto tree_id: my_trees) {
-                auto constraint = get_reverse_backbone(this->batch_trees[tree_id][0].value());
-                this->apply_tree_constraint(constraint, opts, tree_id, thread_id);
+                if (auto constraint = get_reverse_backbone(this->batch_trees[tree_id][0].value()); constraint.has_value()) {
+                    this->apply_tree_constraint(*constraint, opts, tree_id, thread_id);
+                }
             }
         }
 
