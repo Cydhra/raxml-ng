@@ -64,6 +64,11 @@ struct MetaParameters {
      */
     std::optional<std::string> model_override;
 
+    /**
+     * If set, fall back to fast-raxml for inference
+     */
+    bool fallback_fast_raxml;
+
     MetaParameters(const unsigned int keep_top_k_topol,
                    const bool skip_model,
                    const unsigned int num_fast_spr,
@@ -74,16 +79,18 @@ struct MetaParameters {
                    const bool nni_round = false,
                    const bool constrain = false,
                    const std::optional<std::string> &model_override =
-                           std::nullopt) : keep_top_k_topol(keep_top_k_topol),
-                                           skip_model(skip_model),
-                                           num_fast_spr(num_fast_spr),
-                                           num_slow_spr(num_slow_spr),
-                                           accept_starting_trees(accept_starting_trees),
-                                           early_commit(early_commit),
-                                           max_adaptive_radius(max_radius),
-                                           nni_round(nni_round),
-                                           constrain(constrain),
-                                           model_override(model_override) {
+                           std::nullopt,
+                   const bool fallback_fast_raxml = false) : keep_top_k_topol(keep_top_k_topol),
+                                                             skip_model(skip_model),
+                                                             num_fast_spr(num_fast_spr),
+                                                             num_slow_spr(num_slow_spr),
+                                                             accept_starting_trees(accept_starting_trees),
+                                                             early_commit(early_commit),
+                                                             max_adaptive_radius(max_radius),
+                                                             nni_round(nni_round),
+                                                             constrain(constrain),
+                                                             model_override(model_override),
+                                                             fallback_fast_raxml(fallback_fast_raxml) {
     }
 
     friend bool operator==(const MetaParameters &lhs, const MetaParameters &rhs) {

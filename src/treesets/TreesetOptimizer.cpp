@@ -36,14 +36,15 @@ void TreesetOptimizer::initialize_bandits() {
     this->commitment_mab->emplace_back("Commit,Fast,DoModel,4spr",
                                        MetaParameters(20, false, 4, 0, false, true, adaptive_radius));
 
+    // fallbacks
+    this->fallback_fast_mab->emplace_back("Fast-Raxml", MetaParameters(20, true, 0, 0, false, false, 20, false, false, std::nullopt, true));
+
     // set up successors
     this->successors.emplace_back(make_tuple(1, "NNI", this->nni_mab));
     this->successors.emplace_back(make_tuple(1, "Light", this->light_mab));
 
     this->successors.emplace_back(make_tuple(3, "Commitment", this->commitment_mab));
     this->successors.emplace_back(make_tuple(4, "Heavy", this->heavy_mab));
-
-    this->successors.emplace_back(make_tuple(5, "Fallback", this->fallback_fast_mab));
 
     // second-level MAB
     this->hierarchical_mab.emplace_back("Starting Trees", parsimony);
