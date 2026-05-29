@@ -167,6 +167,7 @@ public:
                                                                shared_batch_resources(
                                                                    opts.treeset_groups,
                                                                    opts.treeset_workers,
+                                                                   opts.treeset_threads,
                                                                    opts, msa, ml_tree,
                                                                    persite_loglh,
                                                                    DEFAULT_BATCH_SIZE,

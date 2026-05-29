@@ -13,6 +13,7 @@ class SharedBatchResources {
 public:
     SharedBatchResources(const unsigned int num_task_groups,
                          const unsigned int workers_per_group,
+                         const unsigned int total_threads,
                          const Options &opts,
                          std::shared_ptr<PartitionedMSA> msa,
                          const MLTree &ml_tree,
@@ -42,6 +43,14 @@ public:
         // initialize an optimizer and checkpoint manager for raxml-fast.
         fast_optimizer = make_shared<Optimizer>(*fast_options);
         fast_checkpoint_manager = make_shared<CheckpointManager>(*fast_options);
+
+        fast_stop = make_shared<KHStoppingTest>(msa,
+                                                workers_per_group * num_task_groups,
+                                                total_threads,
+                                                true,
+                                                opts.random_seed,
+                                                opts.lh_epsilon);
+        fast_optimizer->set_stopping_criterion(fast_stop);
 
         // unfortunately this method wants a tree. Please do not ask why it wants that, it doesn't deserve the tree.
         // But we have to comply, so we give it one of the reference trees since
@@ -124,6 +133,12 @@ protected:
      * This instance is shared with fast_optimizer and local_fast_cm, but they do not own it, so we store it here.
      */
     shared_ptr<Options> fast_options;
+
+    /**
+     * An instance of the kh stopping criterion used for raxml-fast. It is used in the optimizer but not owned by it,
+     * so we store it here.
+     */
+    shared_ptr<StoppingCriterion> fast_stop;
 
     /**
      * Batch-local instance of the standard RAxML optimizer. This is instanced for the raxml-fast fallback bandit.
