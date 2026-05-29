@@ -4,7 +4,7 @@
 #include "Threadpool.hpp"
 #include "TreesetProfiling.hpp"
 #include "../au/AuTest.hpp"
-
+#include "../Optimizer.hpp"
 /**
  * We share AUTest instances between batches, one per TaskGroup of the threadpool, to save on resource and reuse
  * the computed likelihood values for the reference trees.
@@ -12,16 +12,18 @@
 class SharedBatchResources {
 public:
     SharedBatchResources(const unsigned int num_task_groups,
-                                  std::shared_ptr<PartitionedMSA> msa,
-                                  const std::vector<std::vector<doubleVector> > &reference_logh_matrix,
-                                  const unsigned int batch_size,
-                                  const doubleVector &scales,
-                                  const uintVector &num_replicates,
-                                  long seed) {
-
+                         const unsigned int workers_per_group,
+                         const Options &opts,
+                         std::shared_ptr<PartitionedMSA> msa,
+                         const MLTree &ml_tree,
+                         const std::vector<std::vector<doubleVector> > &reference_logh_matrix,
+                         const unsigned int batch_size,
+                         const doubleVector &scales,
+                         const uintVector &num_replicates,
+                         long seed) {
         // prepare a dummy matrix with empty vectors to correctly initialize the AU-Test. These dummy vectors
         // will be replaced by the TunedBatch instance before the AU test is called.
-        std::vector<std::vector<doubleVector>> batch_loglh_dummy(batch_size);
+        std::vector<std::vector<doubleVector> > batch_loglh_dummy(batch_size);
         for (unsigned int i = 0; i < batch_size; ++i) {
             batch_loglh_dummy[i] = std::vector<doubleVector>(reference_logh_matrix[i].size());
         }
@@ -30,6 +32,21 @@ public:
             au_tests.emplace_back(msa, reference_logh_matrix, batch_loglh_dummy, scales, num_replicates, seed);
             initialized.emplace_back(false);
         }
+
+        // configure options for the raxml-fast optimizer
+        fast_options = make_shared<Options>(opts);
+        fast_options->topology_opt_method = TopologyOptMethod::simplified;
+        fast_options->stopping_rule = StoppingRule::kh;
+        fast_options->nofiles_mode = true;
+
+        // initialize an optimizer and checkpoint manager for raxml-fast.
+        fast_optimizer = make_shared<Optimizer>(*fast_options);
+        fast_checkpoint_manager = make_shared<CheckpointManager>(*fast_options);
+
+        // unfortunately this method wants a tree. Please do not ask why it wants that, it doesn't deserve the tree.
+        // But we have to comply, so we give it one of the reference trees since
+        // any tree that conforms to the MSA will do.
+        fast_checkpoint_manager->init_checkpoints(ml_tree.tree, msa->models(), num_task_groups * workers_per_group);
     }
 
     /**
@@ -37,6 +54,21 @@ public:
      */
     TreesetProfiling &get_profiling() {
         return profiling;
+    }
+
+    /**
+     *
+     * @return An Optimizer instance pre-configured to run `RAxML-ng --fast` inference
+     */
+    Optimizer &get_fast_optimizer() const {
+        return *fast_optimizer;
+    }
+
+    /**
+     * @return an instance of the CheckpointManager that is configured to work for raxml fast inference
+     */
+    CheckpointManager &get_fast_cm() const {
+        return *fast_checkpoint_manager;
     }
 
     /**
@@ -70,7 +102,6 @@ public:
     }
 
 protected:
-
     /**
      * Handles fine-grained profiling of batch optimization
      */
@@ -87,6 +118,24 @@ protected:
      * context.
      */
     std::vector<bool> initialized;
+
+    /**
+     * A copy of the CLI Options instance, with every option required to run raxml-fast forcibly enabled.
+     * This instance is shared with fast_optimizer and local_fast_cm, but they do not own it, so we store it here.
+     */
+    shared_ptr<Options> fast_options;
+
+    /**
+     * Batch-local instance of the standard RAxML optimizer. This is instanced for the raxml-fast fallback bandit.
+     * The options passed to this optimizer are forced to perform the --fast heuristic.
+     */
+    shared_ptr<Optimizer> fast_optimizer;
+
+    /**
+     * Batch-local instance of the standard RAxML checkpoint manager configured for raxml-fast.
+     * This is instanced for the raxml-fast fallback bandit.
+     */
+    shared_ptr<CheckpointManager> fast_checkpoint_manager;
 };
 
 #endif //RAXML_SHAREDBATCHRESOURCES_HPP_
