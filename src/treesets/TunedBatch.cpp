@@ -353,11 +353,6 @@ void TunedBatch::optimize(RaxmlInstance &instance, const Options &opts, SharedBa
                 // reset search state
                 auto &cm = resources.get_fast_cm();
                 cm.reset_search_state();
-                Checkpoint& checkp = cm.checkpoint();
-
-                if (thread_id == 0) {
-                    checkp.tree_index = tree_id;
-                }
 
                 // initialize stop criterion
                 stop_criterion->initialize_persite_lnl_vectors(&tree_info);
