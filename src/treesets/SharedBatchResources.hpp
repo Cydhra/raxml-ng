@@ -37,8 +37,9 @@ public:
         // configure options for the raxml-fast optimizer
         fast_options = make_shared<Options>(opts);
         fast_options->topology_opt_method = TopologyOptMethod::simplified;
-        fast_options->stopping_rule = StoppingRule::kh;
+        fast_options->stopping_rule = StoppingRule::kh_mult;
         fast_options->nofiles_mode = true;
+        fast_options->num_searches = 16; // TODO sync with batch size
 
         // initialize an optimizer and checkpoint manager for raxml-fast.
         fast_optimizer = make_shared<Optimizer>(*fast_options);
@@ -50,7 +51,6 @@ public:
                                                 true,
                                                 opts.random_seed,
                                                 opts.lh_epsilon);
-        fast_optimizer->set_stopping_criterion(fast_stop);
 
         // unfortunately this method wants a tree. Please do not ask why it wants that, it doesn't deserve the tree.
         // But we have to comply, so we give it one of the reference trees since
@@ -70,6 +70,13 @@ public:
      */
     Optimizer &get_fast_optimizer() const {
         return *fast_optimizer;
+    }
+
+    /**
+     * @return The KH stopping criterion instance pre-configured to run `RAxML-ng --fast` inference
+     */
+    std::shared_ptr<KHStoppingTest> get_fast_stop_criterion() {
+        return fast_stop;
     }
 
     /**
@@ -137,13 +144,13 @@ protected:
      * An instance of the kh stopping criterion used for raxml-fast. It is used in the optimizer but not owned by it,
      * so we store it here.
      */
-    shared_ptr<StoppingCriterion> fast_stop;
+    std::shared_ptr<KHStoppingTest> fast_stop;
 
     /**
      * Batch-local instance of the standard RAxML optimizer. This is instanced for the raxml-fast fallback bandit.
      * The options passed to this optimizer are forced to perform the --fast heuristic.
      */
-    shared_ptr<Optimizer> fast_optimizer;
+    std::shared_ptr<Optimizer> fast_optimizer;
 
     /**
      * Batch-local instance of the standard RAxML checkpoint manager configured for raxml-fast.
