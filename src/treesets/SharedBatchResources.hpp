@@ -16,7 +16,7 @@ public:
                          const unsigned int total_threads,
                          const Options &opts,
                          std::shared_ptr<PartitionedMSA> msa,
-                         const MLTree &ml_tree,
+                         const Tree &tree,
                          const std::vector<std::vector<doubleVector> > &reference_logh_matrix,
                          const unsigned int batch_size,
                          const doubleVector &scales,
@@ -55,7 +55,7 @@ public:
         // unfortunately this method wants a tree. Please do not ask why it wants that, it doesn't deserve the tree.
         // But we have to comply, so we give it one of the reference trees since
         // any tree that conforms to the MSA will do.
-        fast_checkpoint_manager->init_checkpoints(ml_tree.tree, msa->models(), num_task_groups * workers_per_group);
+        fast_checkpoint_manager->init_checkpoints(tree, msa->models(), num_task_groups * workers_per_group);
     }
 
     /**
@@ -66,7 +66,6 @@ public:
     }
 
     /**
-     *
      * @return An Optimizer instance pre-configured to run `RAxML-ng --fast` inference
      */
     Optimizer &get_fast_optimizer() const {
