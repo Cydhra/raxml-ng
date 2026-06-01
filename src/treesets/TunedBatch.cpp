@@ -342,29 +342,56 @@ void TunedBatch::optimize(RaxmlInstance &instance, const Options &opts, SharedBa
     }
 
     if (!meta_parameters->accept_starting_trees) {
-        // do initial model and branch length optimization
-        if (!this->initial_model_optimized) {
-            this->optimize_parameters(resources, context, worker_id, thread_id, 3.0);
+        if (meta_parameters->fallback_fast_raxml) {
+            auto &optimizer = resources.get_fast_optimizer();
+            const auto stop_criterion = resources.get_fast_stop_criterion();
 
-            if (context.is_group_leader(worker_id, thread_id)) {
-                this->initial_model_optimized = true;
+            const auto &tree_ids = coarse_assignments.at(worker_id);
+            for (const auto tree_id: tree_ids) {
+                auto &tree_info = this->batch_trees[tree_id][thread_id].value();
+
+                // reset search state
+                auto &cm = resources.get_fast_cm();
+                cm.reset_search_state();
+                Checkpoint& checkp = cm.checkpoint();
+
+                if (thread_id == 0) {
+                    checkp.tree_index = tree_id;
+                }
+
+                // initialize stop criterion
+                stop_criterion->initialize_persite_lnl_vectors(&tree_info);
+                stop_criterion->set_thread_offset(&tree_info, part_assignments.at(thread_id), ParallelContext::local_proc_id());
+                optimizer.set_stopping_criterion(stop_criterion);
+
+                // optimize using standard raxml
+                optimizer.optimize_topology(tree_info, cm);
             }
-        }
+        } else {
+            // do initial model and branch length optimization
+            if (!this->initial_model_optimized) {
+                this->optimize_parameters(resources, context, worker_id, thread_id, 3.0);
 
-        // pre-optimize
-        this->optimize_nni(opts, resources, context, worker_id, thread_id);
-
-        // apply constraint
-        if (meta_parameters->constrain) {
-            const auto my_trees = coarse_assignments.at(worker_id);
-            for (const auto tree_id: my_trees) {
-                auto constraint = get_reverse_backbone(this->batch_trees[tree_id][0].value());
-                this->apply_tree_constraint(constraint, opts, tree_id, thread_id);
+                if (context.is_group_leader(worker_id, thread_id)) {
+                    this->initial_model_optimized = true;
+                }
             }
-        }
 
-        // compute all required SPR rounds
-        this->optimize_topology(opts, context, resources, worker_id, thread_id);
+            // pre-optimize
+            this->optimize_nni(opts, resources, context, worker_id, thread_id);
+
+            // apply constraint
+            if (meta_parameters->constrain) {
+                const auto my_trees = coarse_assignments.at(worker_id);
+                for (const auto tree_id: my_trees) {
+                    auto constraint = get_reverse_backbone(this->batch_trees[tree_id][0].value());
+                    this->apply_tree_constraint(constraint, opts, tree_id, thread_id);
+                }
+            }
+
+            // compute all required SPR rounds
+            this->optimize_topology(opts, context, resources, worker_id, thread_id);
+        }
     }
 
     if (context.is_group_leader(worker_id, thread_id)) {

@@ -10,6 +10,7 @@
 #include "../loadbalance/CoarseLoadBalancer.hpp"
 #include "../au/AuTest.hpp"
 #include "../Checkpoint.hpp"
+#include "../Optimizer.hpp"
 
 // forward declaration to avoid cyclic header inclusion
 class SharedBatchResources;
