@@ -486,7 +486,22 @@ void TunedBatch::perform_plausibility_check(const Options &opts, SharedBatchReso
     if (context.is_group_leader(worker_id, thread_id)) {
         this->plausible_tree_count = 0;
         this->p_values.clear();
-        auto first = au_test.get_p_values().begin() + reference_persite_loglh.size();
+
+        auto first = au_test.get_p_values().begin();
+        auto reference_p_count = 0;
+
+        // count how many reference trees are plausible
+        for (const auto last = au_test.get_p_values().begin() + reference_persite_loglh.size(); first != last; ++first) {
+            if (*first > SIGNIFICANCE_LEVEL) {
+                reference_p_count += 1;
+            }
+        }
+        LOG_DEBUG_TS << "AU Test found " << reference_p_count << " plausible trees in the reference set." << std::endl;
+        if (reference_p_count == 0) {
+            LOG_WARN << "Warning: treeset search found strictly better tree than ML search. Plausible treeset no longer plausible." << std::endl;
+        }
+
+        // count how many inferred trees are plausible
         for (const auto last = au_test.get_p_values().end(); first != last; ++first) {
             this->p_values.push_back(*first);
             if (*first > SIGNIFICANCE_LEVEL) {
