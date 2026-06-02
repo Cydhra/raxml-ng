@@ -211,15 +211,14 @@ void TunedBatch::optimize_topology(const Options &opts, const TaskGroup &context
 
         context.enter_barrier(); // required to propagate auto-configuration
         auto begin = std::chrono::steady_clock::now();
+
+        // do not reset local copy in between SPR rounds to keep the cutoff values
+        // TODO instead of manually fixing problems with the spr cutoff, we should get rid of shared parameters, and
+        //  mirror what the optimizer is doing
         auto local_copy = spr_params;
 
         // run optimization kernel
         for (const auto tree_id: tree_ids) {
-            // reset subtree-cutoff in-between trees
-            // TODO instead of manually fixing problems with the spr cutoff, we should get rid of shared parameters
-            //  entirely, and let the auto-configure function work on local spr parameter instances instead.
-            spr_params.subtree_cutoff = opts.spr_cutoff;
-
             for (unsigned int spr_round = rounds_performed; spr_round < total_rounds; ++spr_round) {
                 InferencePhase phase = spr_params.thorough
                                            ? SlowSprRound{spr_round}
