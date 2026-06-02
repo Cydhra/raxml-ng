@@ -204,9 +204,15 @@ void TunedBatch::optimize_topology(const Options &opts, const TaskGroup &context
 
         context.enter_barrier(); // required to propagate auto-configuration
         auto begin = std::chrono::steady_clock::now();
+        auto local_copy = spr_params;
 
         // run optimization kernel
         for (const auto tree_id: tree_ids) {
+            // reset subtree-cutoff in-between trees
+            // TODO instead of manually fixing problems with the spr cutoff, we should get rid of shared parameters
+            //  entirely, and let the auto-configure function work on local spr parameter instances instead.
+            spr_params.subtree_cutoff = opts.spr_cutoff;
+
             for (unsigned int spr_round = rounds_performed; spr_round < total_rounds; ++spr_round) {
                 InferencePhase phase = spr_params.thorough
                                            ? SlowSprRound{spr_round}
@@ -224,7 +230,7 @@ void TunedBatch::optimize_topology(const Options &opts, const TaskGroup &context
                 // But if we don't do it, the spr_rounds desynchronize reliably if two threads work on the same tree.
                 // I have no idea why, but creating a copy of the parameter here fixes it and is cheaper
                 // than ritual sacrifice of a goat each syzygy.
-                auto local_copy = spr_params;
+
                 batch_trees[tree_id][thread_id].value().spr_round(local_copy);
                 batch_trees[tree_id][thread_id].value().optimize_branches(1.0, 1);
 
