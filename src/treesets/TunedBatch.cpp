@@ -212,13 +212,19 @@ void TunedBatch::optimize_topology(const Options &opts, const TaskGroup &context
         context.enter_barrier(); // required to propagate auto-configuration
         auto begin = std::chrono::steady_clock::now();
 
-        // do not reset local copy in between SPR rounds to keep the cutoff values
+        // Fix 1: we must not share spr_params across threads because the struct contains shared out-parameters
+        //        that interfere between threads
+        // Fix 2: we must not create local copies between SPR rounds, since that would destroy the out-parameters
+        //        like cut-off values and thus make SPR rounds less efficient.
         // TODO instead of manually fixing problems with the spr cutoff, we should get rid of shared parameters, and
         //  mirror what the optimizer is doing
-        auto local_copy = spr_params;
+        auto local_spr_params = spr_params;
 
         // run optimization kernel
         for (const auto tree_id: tree_ids) {
+            const auto loglh = batch_trees[tree_id][thread_id].value().loglh();
+            local_spr_params.reset_cutoff_info(loglh, true);
+
             for (unsigned int spr_round = rounds_performed; spr_round < total_rounds; ++spr_round) {
                 InferencePhase phase = spr_params.thorough
                                            ? SlowSprRound{spr_round}
@@ -230,14 +236,7 @@ void TunedBatch::optimize_topology(const Options &opts, const TaskGroup &context
                     begin = std::chrono::steady_clock::now();
                 }
 
-                // important: we create a copy of the parameters here and give spr_round a copy, not the shared reference.
-                // This doesn't fix any issues or has any effect on the code as written (that I know of) because the
-                // first thing the spr round does is copying the values into a per-thread local struct.
-                // But if we don't do it, the spr_rounds desynchronize reliably if two threads work on the same tree.
-                // I have no idea why, but creating a copy of the parameter here fixes it and is cheaper
-                // than ritual sacrifice of a goat each syzygy.
-
-                batch_trees[tree_id][thread_id].value().spr_round(local_copy);
+                batch_trees[tree_id][thread_id].value().spr_round(local_spr_params);
                 batch_trees[tree_id][thread_id].value().optimize_branches(1.0, 1);
 
                 if (context.is_group_leader(worker_id, thread_id)) {
