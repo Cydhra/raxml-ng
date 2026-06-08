@@ -45,6 +45,7 @@ void TreesetOptimizer::initialize_bandits() {
 
     this->successors.emplace_back(make_tuple(3, "Commitment", this->commitment_mab));
     this->successors.emplace_back(make_tuple(4, "Heavy", this->heavy_mab));
+    this->successors.emplace_back(make_tuple(4, "Fallback", this->fallback_fast_mab));
 
     // second-level MAB
     this->hierarchical_mab.emplace_back("Starting Trees", parsimony);
