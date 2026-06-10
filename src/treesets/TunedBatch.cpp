@@ -546,6 +546,9 @@ bool TunedBatch::is_compatible(const MetaParameters &new_parameters) const {
     // if the current parameters do the bare minimum, we can always continue with new parameters
     if (this->meta_parameters->accept_starting_trees) {
         return true;
+    // however if we already did something, the other set need not do the bare minimum.
+    } else if (new_parameters.accept_starting_trees) {
+        return false;
     }
 
     // do not reuse batch if it was created with a different model
