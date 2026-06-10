@@ -462,7 +462,7 @@ void TunedBatch::perform_plausibility_check(const Options &opts, SharedBatchReso
                                             const bool initialized,
                                             const TaskGroup &context, const unsigned int worker_id,
                                             const unsigned int thread_id) {
-    auto &au_test = resources.get_au_test(context);
+    auto &au_test = resources.get_screening_test(context);
 
     if (context.is_group_leader(worker_id, thread_id)) {
         if (!initialized) {

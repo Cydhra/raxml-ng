@@ -5,6 +5,12 @@
 #include "TreesetProfiling.hpp"
 #include "../au/AuTest.hpp"
 #include "../Optimizer.hpp"
+
+/**
+ * Shallow replication counts for a faster AU test.
+ */
+const uintVector SHALLOW_REPS = {500, 500, 500, 500, 500, 500, 500, 500, 500, 500};
+
 /**
  * We share AUTest instances between batches, one per TaskGroup of the threadpool, to save on resource and reuse
  * the computed likelihood values for the reference trees.
@@ -19,8 +25,6 @@ public:
                          const Tree &tree,
                          const std::vector<std::vector<doubleVector> > &reference_logh_matrix,
                          const unsigned int batch_size,
-                         const doubleVector &scales,
-                         const uintVector &num_replicates,
                          long seed) {
         // prepare a dummy matrix with empty vectors to correctly initialize the AU-Test. These dummy vectors
         // will be replaced by the TunedBatch instance before the AU test is called.
@@ -30,7 +34,8 @@ public:
         }
 
         for (unsigned int group = 0; group < num_task_groups; ++group) {
-            au_tests.emplace_back(msa, reference_logh_matrix, batch_loglh_dummy, scales, num_replicates, seed);
+            screening_au_tests.emplace_back(msa, reference_logh_matrix, batch_loglh_dummy, AU_DEFAULT_SCALES,
+                                            SHALLOW_REPS, seed);
             initialized.emplace_back(false);
         }
 
@@ -93,8 +98,8 @@ public:
      * @return An AuTest instance that is reserved for the caller TaskGroup. Call is_initialized() to find out whether
      * the reference tree bootstrap values have been generated already.
      */
-    AuTest &get_au_test(const TaskGroup &context) {
-        return au_tests[context.group_id()];
+    AuTest &get_screening_test(const TaskGroup &context) {
+        return screening_au_tests[context.group_id()];
     }
 
     /**
@@ -123,9 +128,10 @@ protected:
     TreesetProfiling profiling;
 
     /**
-     * Shared AU test instances, one for each thread group.
+     * Shared AU test instances, one for each thread group. These are initialized with drastically reduced replication
+     * counts to be able to be used for pre-screening.
      */
-    std::vector<AuTest> au_tests;
+    std::vector<AuTest> screening_au_tests;
 
     /**
      * Whether the corresponding Au Test has been used before, initializing the bootstrap values of the reference trees.
