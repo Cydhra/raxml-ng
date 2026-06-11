@@ -2,6 +2,8 @@
 #include "TunedBatch.hpp"
 #include "../Optimizer.hpp"
 
+constexpr unsigned int MIN_PAUSE_BETWEEN_MODIFICATIONS = 6;
+
 void TreesetOptimizer::initialize_bandits() {
     this->parsimony->emplace_back("Parsimony", MetaParameters(1, false, 0, 0, true, false));
 
@@ -71,7 +73,7 @@ void TreesetOptimizer::run_batch(Bandit<std::shared_ptr<MultiArmedBandit<MetaPar
         mab.get_parameters()->get()->take_measurement(bandit, batch, true);
         this->hierarchical_mab.take_measurement(mab, batch, true);
 
-        this->check_mab_modification(this->hierarchical_mab.get_best_bandit());
+        this->check_mab_modification();
 
         // inform the batch queue that the batch has been inferred
         this->batch_queue.finish_batch(batch);
@@ -114,21 +116,21 @@ void TreesetOptimizer::run() {
     shared_batch_resources.get_profiling().print_report();
 }
 
-void TreesetOptimizer::check_mab_modification(
-    const Bandit<shared_ptr<MultiArmedBandit<MetaParameters> > > &current_arm) {
+void TreesetOptimizer::check_mab_modification() {
     // TODO implement a proper heuristic here. For now, we check if the current arm exceeds 75% success per batch,
     //  and if not, we add arms according to a pre-defined mapping.
 
-    // check if we have more than a trivial amount of data, if the success rate is low, and we had at least 4 batches per bandit
-    if (current_arm.num_samples() >= 4 && current_arm.get_expected_tree_rate() < 0.75 && hierarchical_mab.num_bandits() * 4 <= batch_queue.num_batches()) {
+    // check if we have more than a trivial amount of data, if the success rate is low, and we had at least 4 batches since the last modification
+    if (last_mab_modification + MIN_PAUSE_BETWEEN_MODIFICATIONS < hierarchical_mab.get_iterations_completed() && hierarchical_mab.get_best_bandit().num_samples() >= 4 && hierarchical_mab.get_best_bandit().get_expected_tree_rate() < 0.75) {
         const auto current_level = hierarchical_mab.num_bandits();
 
         // add all bandits of the current level
         for (auto it = this->successors.begin(); it != this->successors.end(); it += 1) {
             if (std::get<0>(*it) <= current_level) {
                 if (!hierarchical_mab.has_bandit(std::get<1>(*it))) {
-                    LOG_INFO << "Adding bandit " << std::get<1>(*it) << " to algorithm." << std::endl;
+                    LOG_WORKER_TS(LogLevel::info) << std::endl << "Adding bandit " << std::get<1>(*it) << " to algorithm." << std::endl;
                     hierarchical_mab.emplace_back(std::get<1>(*it), std::get<2>(*it));
+                    last_mab_modification = hierarchical_mab.get_iterations_completed();
                 }
             }
         }

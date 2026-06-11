@@ -134,9 +134,8 @@ protected:
      * the algorithm.
      * This enables us to skip exploring arms that have no potential gain over currently explored arms.
      *
-     * @param current_arm the arm of the MAB that was last modified
      */
-    void check_mab_modification(const Bandit<shared_ptr<MultiArmedBandit<MetaParameters> > > &current_arm);
+    void check_mab_modification();
 
 public:
     /**
@@ -204,6 +203,13 @@ public:
      * @return A new vector instance containing all plausible tree topologies.
      */
     std::vector<Tree> get_plausible_trees() const;
+
+    /**
+     * The hierarchical bandit counts how many iterations of the bandit algorithm have been completed. Modifications
+     * of the bandit shouldn't happen too often, so we ensure there is a minimum amount of iterations between adding
+     * new bandits, such that the new bandit can be tested before adding new ones.
+     */
+    unsigned int last_mab_modification = 0;
 };
 
 

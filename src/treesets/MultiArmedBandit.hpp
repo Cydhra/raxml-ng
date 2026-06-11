@@ -184,6 +184,13 @@ public:
         return bandits[this->best_known_bandit];
     }
 
+    /**
+     * @return how many iterations have been completed (i.e., bandit was selected and has submitted the measurements).
+     */
+    unsigned int get_iterations_completed() const {
+        return iterations_completed;
+    }
+
 protected:
     /**
      * Registered bandits in this MAB.
