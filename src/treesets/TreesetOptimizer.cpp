@@ -93,6 +93,7 @@ BatchTask TreesetOptimizer::next_work_unit() {
 
     BatchTask runner = [this, &mab, &current_bandit, &current_batch](TaskGroup &context, const unsigned int worker_id,
                                                                      const unsigned int thread_id) {
+        printf("thread %ld:%ld entered task %s (%s:%d) into bandit: %s->%s\n", ParallelContext::group_id(), ParallelContext::local_thread_id(), __func__, __FILE__, __LINE__, mab.get_name().c_str(), current_bandit.get_name().c_str());
         this->run_batch(mab, current_bandit, current_batch, context, worker_id, thread_id);
     };
 
