@@ -29,9 +29,9 @@ void ThreadPool::thread_main() {
         if (context.is_group_leader(worker_id, local_thread_id)) {
             const auto task = this->task_generator();
             context.assign_task(std::move(task));
-            context.enter_barrier();
+            context.enter_barrier(__LINE__, __FILE__, __func__);
         } else {
-            context.enter_barrier();
+            context.enter_barrier(__LINE__, __FILE__, __func__);
         }
 
         // solve task
@@ -41,6 +41,6 @@ void ThreadPool::thread_main() {
         // wait at a barrier to make sure the task isn't shutting down the threadpool while some workers are already
         // in the next loop iteration.
         // TODO this still breaks if another thread cancels the pool while some workers are still in this barrier and others already left
-        context.enter_barrier();
+        context.enter_barrier(__LINE__, __FILE__, __func__);
     }
 }

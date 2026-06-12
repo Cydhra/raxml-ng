@@ -91,8 +91,10 @@ public:
     /**
      * Enter the task barrier and wait until all threads have entered.
      */
-    void enter_barrier() const {
+    void enter_barrier(int ln, const char*file, const char*func) const {
+        printf("thread %ld:%ld entered barrier at %s (%s:%d)\n", ParallelContext::group_id(), ParallelContext::local_thread_id(), func, file, ln);
         this->task_barrier.enter();
+        printf("thread %ld:%ld left barrier at %s (%s:%d)\n", ParallelContext::group_id(), ParallelContext::local_thread_id(), func, file, ln);
     }
 
     /**

@@ -111,7 +111,7 @@ void TunedBatch::generate_starting_trees(RaxmlInstance &instance, const Options 
     }
 
     // barrier so we dont start building tree-info objects without finished trees (since the thread assignment changes)
-    context.enter_barrier();
+    context.enter_barrier(__LINE__, __FILE__, __func__);
 
     // create context for tree inference and assign the initial model
     for (const auto id: this->coarse_assignments.at(worker_id)) {
@@ -158,7 +158,8 @@ void TunedBatch::optimize_nni(const Options &opts, SharedBatchResources &resourc
         }
 
         // propagate spr_params
-        context.enter_barrier();
+        context.enter_barrier(__LINE__, __FILE__, __func__);
+        LOG_WORKER_TS(LogLevel::debug) << "exit barrier!" << std::endl;
 
         for (const auto tree_id: tree_ids) {
             if (context.is_group_leader(worker_id, thread_id)) {
@@ -209,7 +210,7 @@ void TunedBatch::optimize_topology(const Options &opts, const TaskGroup &context
                     << round_name << " spr rounds, radius: " << spr_params.radius_max << ")" << std::endl;
         }
 
-        context.enter_barrier(); // required to propagate auto-configuration
+        context.enter_barrier(__LINE__, __FILE__, __func__); // required to propagate auto-configuration
         auto begin = std::chrono::steady_clock::now();
 
         // Fix 1: we must not share spr_params across threads because the struct contains shared out-parameters
@@ -440,7 +441,7 @@ void TunedBatch::perform_au_test(AuTest &au_test, const bool initialized, const 
     }
 
     // replace with group barrier
-    context.enter_barrier();
+    context.enter_barrier(__LINE__, __FILE__, __func__);
 
     // next, change the parallelization scheme to avoid splitting trees between workers. If we have more workers than
     // trees, this sucks, but currently AU doesn't support per-partition parallelization because that would require
@@ -455,7 +456,7 @@ void TunedBatch::perform_au_test(AuTest &au_test, const bool initialized, const 
                                          : *tree_ids.begin();
 
     au_test.run_bootstrap(tree_ids.size(), slice_start);
-    context.enter_barrier();
+    context.enter_barrier(__LINE__, __FILE__, __func__);
 
     if (context.is_group_leader(worker_id, thread_id)) {
         // guard the calculation of AU test p-values with a guard so we don't use partially updated p-values to obtain
