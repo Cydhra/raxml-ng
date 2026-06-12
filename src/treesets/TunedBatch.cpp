@@ -141,6 +141,7 @@ void TunedBatch::generate_starting_trees(RaxmlInstance &instance, const Options 
 
 void TunedBatch::optimize_nni(const Options &opts, SharedBatchResources &resources, const TaskGroup &context,
                               unsigned int worker_id, unsigned int thread_id) {
+    printf("thread %ld:%ld entered task at %s (%s:%d)\n", ParallelContext::group_id(), ParallelContext::local_thread_id(), __func__, __FILE__, __LINE__);
     const auto &tree_ids = this->coarse_assignments.at(worker_id);
 
     auto begin = std::chrono::steady_clock::now();

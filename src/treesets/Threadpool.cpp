@@ -34,9 +34,15 @@ void ThreadPool::thread_main() {
             context.enter_barrier(__LINE__, __FILE__, __func__);
         }
 
+        printf("thread %ld:%ld moved safely across barrier %s (%s:%d)\n", ParallelContext::group_id(), ParallelContext::local_thread_id(), __func__, __FILE__, __LINE__);
+
         // solve task
         const auto &task = context.get_task();
+
+        printf("thread %ld:%ld retrieved task %s (%s:%d)\n", ParallelContext::group_id(), ParallelContext::local_thread_id(), __func__, __FILE__, __LINE__);
         task(context, group_worker_id, local_thread_id);
+
+        printf("thread %ld:%ld exited task at %s (%s:%d)\n", ParallelContext::group_id(), ParallelContext::local_thread_id(), __func__, __FILE__, __LINE__);
 
         // wait at a barrier to make sure the task isn't shutting down the threadpool while some workers are already
         // in the next loop iteration.
