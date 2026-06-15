@@ -342,6 +342,7 @@ void TunedBatch::optimize_parameters(SharedBatchResources &resources, const Task
 
 void TunedBatch::optimize(RaxmlInstance &instance, const Options &opts, SharedBatchResources &resources,
                           const TaskGroup &context, const unsigned int worker_id, const unsigned int thread_id) {
+    printf("thread %ld:%ld ENTER OPTIMIZE %s (%s:%d)\n", ParallelContext::group_id(), ParallelContext::local_thread_id(), __func__, __FILE__, __LINE__);
     if (!meta_parameters_set) {
         throw RaxmlException("TunedBatch has not been configured with meta heuristics");
     }

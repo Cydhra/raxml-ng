@@ -85,7 +85,11 @@ public:
      * Get a reference to the task currently assigned to the task group.
      */
     BatchTask &get_task() const {
-        return *current_task;
+        printf("thread %ld:%ld PRE MEMORY ACCESS %s (%s:%d)\n", ParallelContext::group_id(), ParallelContext::local_thread_id(), __func__, __FILE__, __LINE__);
+        printf("thread %ld:%ld PRE DEREF at addr: (%p) %s (%s:%d)\n", ParallelContext::group_id(), ParallelContext::local_thread_id(), current_task.get(), __func__, __FILE__, __LINE__);
+        auto &ret = *current_task;
+        printf("thread %ld:%ld POST DEREF: (%p) %s (%s:%d)\n", ParallelContext::group_id(), ParallelContext::local_thread_id(), &ret, __func__, __FILE__, __LINE__);
+        return ret;
     }
 
     /**
