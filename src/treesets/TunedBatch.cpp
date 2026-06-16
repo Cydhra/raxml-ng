@@ -350,15 +350,23 @@ void TunedBatch::optimize(RaxmlInstance &instance, const Options &opts, SharedBa
     }
 
     if (context.is_group_leader(worker_id, thread_id)) {
+        printf("thread %ld:%ld ENTER PROFILING %s (%s:%d)\n", ParallelContext::group_id(), ParallelContext::local_thread_id(), __func__, __FILE__, __LINE__);
+        std::cout.flush();
         resources.get_profiling().start_measurement(*this, CompleteInference{});
     }
 
     if (!this->start_trees_generated()) {
+        printf("thread %ld:%ld ENTER START TREES %s (%s:%d)\n", ParallelContext::group_id(), ParallelContext::local_thread_id(), __func__, __FILE__, __LINE__);
+        std::cout.flush();
         this->generate_starting_trees(instance, opts, context, worker_id, thread_id);
     }
 
     if (!meta_parameters->accept_starting_trees) {
+        printf("thread %ld:%ld ENTER NOT ACCEPT START TREES %s (%s:%d)\n", ParallelContext::group_id(), ParallelContext::local_thread_id(), __func__, __FILE__, __LINE__);
+        std::cout.flush();
         if (meta_parameters->fallback_fast_raxml) {
+            printf("thread %ld:%ld ENTER FALLBACK %s (%s:%d)\n", ParallelContext::group_id(), ParallelContext::local_thread_id(), __func__, __FILE__, __LINE__);
+            std::cout.flush();
             auto &optimizer = resources.get_fast_optimizer();
             const auto stop_criterion = resources.get_fast_stop_criterion();
 
@@ -379,8 +387,12 @@ void TunedBatch::optimize(RaxmlInstance &instance, const Options &opts, SharedBa
                 optimizer.optimize_topology(tree_info, cm);
             }
         } else {
+            printf("thread %ld:%ld ENTER NORMAL BANDIT %s (%s:%d)\n", ParallelContext::group_id(), ParallelContext::local_thread_id(), __func__, __FILE__, __LINE__);
+            std::cout.flush();
             // do initial model and branch length optimization
             if (!this->initial_model_optimized) {
+                printf("thread %ld:%ld ENTER INITIAL OPT %s (%s:%d)\n", ParallelContext::group_id(), ParallelContext::local_thread_id(), __func__, __FILE__, __LINE__);
+                std::cout.flush();
                 this->optimize_parameters(resources, context, worker_id, thread_id, 3.0);
 
                 if (context.is_group_leader(worker_id, thread_id)) {
