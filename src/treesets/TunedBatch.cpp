@@ -602,9 +602,10 @@ bool TunedBatch::is_compatible(const MetaParameters &new_parameters) const {
 }
 
 void TunedBatch::backup_models(ModelMap &target) const {
-    for (size_t part_id = 0; part_id < this->msa->part_count(); ++part_id) {
-        // all threads have the same model, so backup from the first thread is sufficient
-        assign(target[part_id], this->batch_trees[0][part_id].value(), part_id);
+    for (size_t thread_id = 0; thread_id < this->batch_trees[0].size(); ++thread_id) {
+        for (size_t part_id : this->batch_trees[0][thread_id].value().parts_master()) {
+            assign(target[part_id], this->batch_trees[0][thread_id].value(), part_id);
+        }
     }
 }
 
