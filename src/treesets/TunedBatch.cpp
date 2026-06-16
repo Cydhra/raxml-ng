@@ -395,6 +395,9 @@ void TunedBatch::optimize(RaxmlInstance &instance, const Options &opts, SharedBa
                 std::cout.flush();
                 this->optimize_parameters(resources, context, worker_id, thread_id, 3.0);
 
+                // barrier required so initial_model_optimized isn't set before all threads optimized model
+                context.enter_barrier(__LINE__, __FILE__, __func__);
+
                 if (context.is_group_leader(worker_id, thread_id)) {
                     this->initial_model_optimized = true;
                 }
