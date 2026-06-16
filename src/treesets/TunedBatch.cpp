@@ -142,6 +142,7 @@ void TunedBatch::generate_starting_trees(RaxmlInstance &instance, const Options 
 void TunedBatch::optimize_nni(const Options &opts, SharedBatchResources &resources, const TaskGroup &context,
                               unsigned int worker_id, unsigned int thread_id) {
     printf("thread %ld:%ld entered task at %s (%s:%d)\n", ParallelContext::group_id(), ParallelContext::local_thread_id(), __func__, __FILE__, __LINE__);
+    std::cout.flush();
     const auto &tree_ids = this->coarse_assignments.at(worker_id);
 
     auto begin = std::chrono::steady_clock::now();
@@ -160,7 +161,6 @@ void TunedBatch::optimize_nni(const Options &opts, SharedBatchResources &resourc
 
         // propagate spr_params
         context.enter_barrier(__LINE__, __FILE__, __func__);
-        LOG_WORKER_TS(LogLevel::debug) << "exit barrier!" << std::endl;
 
         for (const auto tree_id: tree_ids) {
             if (context.is_group_leader(worker_id, thread_id)) {
@@ -343,6 +343,8 @@ void TunedBatch::optimize_parameters(SharedBatchResources &resources, const Task
 void TunedBatch::optimize(RaxmlInstance &instance, const Options &opts, SharedBatchResources &resources,
                           const TaskGroup &context, const unsigned int worker_id, const unsigned int thread_id) {
     printf("thread %ld:%ld ENTER OPTIMIZE %s (%s:%d)\n", ParallelContext::group_id(), ParallelContext::local_thread_id(), __func__, __FILE__, __LINE__);
+    std::cout.flush();
+
     if (!meta_parameters_set) {
         throw RaxmlException("TunedBatch has not been configured with meta heuristics");
     }
