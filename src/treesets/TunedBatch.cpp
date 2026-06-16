@@ -378,6 +378,9 @@ void TunedBatch::optimize(RaxmlInstance &instance, const Options &opts, SharedBa
             if (!this->initial_model_optimized) {
                 this->optimize_parameters(resources, context, worker_id, thread_id, 3.0);
 
+                // barrier required so initial_model_optimized isn't set before all threads optimized model
+                context.enter_barrier();
+
                 if (context.is_group_leader(worker_id, thread_id)) {
                     this->initial_model_optimized = true;
                 }
