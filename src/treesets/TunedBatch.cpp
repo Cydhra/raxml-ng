@@ -383,7 +383,7 @@ void TunedBatch::optimize(RaxmlInstance &instance, const Options &opts, SharedBa
             context.enter_barrier();
             if (context.is_group_leader(worker_id, thread_id)) {
                 const auto end = std::chrono::steady_clock::now();
-                this->au_wall_time = static_cast<unsigned int>(std::chrono::duration_cast<std::chrono::milliseconds>(
+                this->wall_time += static_cast<unsigned int>(std::chrono::duration_cast<std::chrono::milliseconds>(
                         end - begin)
                     .count());
                 resources.get_profiling().finish_measurement(*this, RaxmlFastOptimization{});
