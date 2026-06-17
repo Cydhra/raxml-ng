@@ -356,6 +356,12 @@ void TunedBatch::optimize(RaxmlInstance &instance, const Options &opts, SharedBa
         if (meta_parameters->fallback_fast_raxml) {
             auto &optimizer = resources.get_fast_optimizer();
             const auto stop_criterion = resources.get_fast_stop_criterion();
+            auto begin = std::chrono::steady_clock::now();
+
+            if (context.is_group_leader(worker_id, thread_id)) {
+                LOG_INFO_TS << this->name << ": Calling RAxML --fast..." << std::endl;
+                resources.get_profiling().start_measurement(*this, RaxmlFastOptimization{});
+            }
 
             const auto &tree_ids = coarse_assignments.at(worker_id);
             for (const auto tree_id: tree_ids) {
@@ -373,6 +379,16 @@ void TunedBatch::optimize(RaxmlInstance &instance, const Options &opts, SharedBa
                 // optimize using standard raxml
                 optimizer.optimize_topology(tree_info, cm);
             }
+
+            context.enter_barrier();
+            if (context.is_group_leader(worker_id, thread_id)) {
+                const auto end = std::chrono::steady_clock::now();
+                this->au_wall_time = static_cast<unsigned int>(std::chrono::duration_cast<std::chrono::milliseconds>(
+                        end - begin)
+                    .count());
+                resources.get_profiling().finish_measurement(*this, RaxmlFastOptimization{});
+            }
+
         } else {
             // do initial model and branch length optimization
             if (!this->initial_model_optimized) {

@@ -39,7 +39,11 @@ struct CompleteInference {
 struct NNIOptimization {
 };
 
-typedef std::variant<FastSprRound, SlowSprRound, GreedySprRound, NNIOptimization, ModelOptimization, BranchOptimization, CompleteInference> InferencePhase;
+struct RaxmlFastOptimization {
+
+};
+
+typedef std::variant<FastSprRound, SlowSprRound, GreedySprRound, NNIOptimization, ModelOptimization, BranchOptimization, CompleteInference, RaxmlFastOptimization> InferencePhase;
 
 class Profiler {
 public:
