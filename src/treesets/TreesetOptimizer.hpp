@@ -58,51 +58,9 @@ protected:
      */
     const unsigned int target_tree_count;
 
-    MultiArmedBandit<std::shared_ptr<MultiArmedBandit<MetaParameters> > > hierarchical_mab;
+    std::atomic_uint bandit_cursor = 0;
 
-    std::shared_ptr<MultiArmedBandit<MetaParameters> > parsimony = std::make_shared<MultiArmedBandit<
-        MetaParameters> >();
-
-    std::shared_ptr<MultiArmedBandit<MetaParameters> > nni_mab = std::make_shared<MultiArmedBandit<
-        MetaParameters> >();
-
-    /**
-     * A multi-armed bandit instance that contains aggressive heuristics
-     */
-    std::shared_ptr<MultiArmedBandit<MetaParameters> > light_mab = std::make_shared<MultiArmedBandit<
-        MetaParameters> >();
-
-    /**
-    * A multi-armed bandit instance that contains slower heuristics
-    */
-    std::shared_ptr<MultiArmedBandit<MetaParameters> > heavy_mab = std::make_shared<MultiArmedBandit<
-        MetaParameters> >();
-
-    /**
-     * A multi-armed bandit instance that contains light heuristics with fast commitment: we do model optimization to 0.1 EPS before anything
-     * to commit to the local minimum.
-     */
-    std::shared_ptr<MultiArmedBandit<MetaParameters> > commitment_mab = std::make_shared<MultiArmedBandit<
-        MetaParameters> >();
-
-    /**
-     * A multi-armed bandit instance that contains light and mixed heuristics with tree constrains
-     */
-    std::shared_ptr<MultiArmedBandit<MetaParameters> > constrained_mab = std::make_shared<MultiArmedBandit<
-        MetaParameters> >();
-
-    /**
-     * Fallback to fast raxml
-     */
-    std::shared_ptr<MultiArmedBandit<MetaParameters> > fallback_fast_mab = std::make_shared<MultiArmedBandit<
-        MetaParameters> >();
-
-    /**
-     * A list of bandit arms that are successors to previous arms in case they are not yet optimal.
-     * They are each given a rank, and are added if the best performing bandit does not have high success rate.
-     * Each time, all bandits with a rank as high or lower than the number of currently active bandits are added.
-     */
-    std::vector<std::tuple<unsigned int, std::string, std::shared_ptr<MultiArmedBandit<MetaParameters> > > > successors;
+    std::deque<MultiArmedBandit<MetaParameters> > benchmark_mabs;
 
     /**
      * Initialize the bandit algorithms we use during the inference. These depend on the parameters derivded from initial
@@ -115,7 +73,7 @@ protected:
      * This method runs one batch and then handles the updates to the MABs.
      * It is bound into a BatchTask by next_work_unit.
      */
-    void run_batch(Bandit<std::shared_ptr<MultiArmedBandit<MetaParameters> > > &mab, Bandit<MetaParameters> &bandit,
+    void run_batch(Bandit<MetaParameters> &bandit,
                    TunedBatch &batch, TaskGroup &context, unsigned int worker_id, unsigned int thread_id);
 
     /**
@@ -127,15 +85,6 @@ protected:
      * @return the main method of the next tuned batch to call by all threads of the work group that called this method.
      */
     BatchTask next_work_unit();
-
-    /**
-     * Check whether we should insert new arms into the MAB depending on the performance of the current bandit arm.
-     * This implements a heuristic that enables exploration for new arms if they have potential to be useful within
-     * the algorithm.
-     * This enables us to skip exploring arms that have no potential gain over currently explored arms.
-     *
-     */
-    void check_mab_modification();
 
 public:
     /**
@@ -162,14 +111,11 @@ public:
                      const unsigned long long starting_seed) : pool(ThreadPool(
                                                                    [this] {
                                                                        return this->next_work_unit();
-                                                                   }, opts.treeset_threads, opts.treeset_workers,
-                                                                   opts.treeset_groups)),
+                                                                   }, 16, 8,
+                                                                   1)),
                                                                shared_batch_resources(
-                                                                   opts.treeset_groups,
-                                                                   opts.treeset_workers,
-                                                                   opts.treeset_threads,
-                                                                   opts, msa, tree,
-                                                                   persite_loglh,
+                                                                   1, 8, 16,
+                                                                   opts, msa, tree, persite_loglh,
                                                                    DEFAULT_BATCH_SIZE,
                                                                    starting_seed),
                                                                instance(instance),

@@ -17,6 +17,9 @@ constexpr unsigned int INITIAL_VARIANCE_WEIGHT = 6;
 template<class Heuristic>
 class MultiArmedBandit {
 public:
+
+    explicit MultiArmedBandit() {}
+
     /**
      * Add a single-arm bandit to this MAB instance.
      * It will be returned by the round-robin style selection as long it isn't assumed to be worse.

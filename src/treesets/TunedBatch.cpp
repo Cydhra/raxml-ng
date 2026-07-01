@@ -352,7 +352,8 @@ void TunedBatch::optimize(RaxmlInstance &instance, const Options &opts, SharedBa
 
                 // initialize stop criterion
                 stop_criterion->initialize_persite_lnl_vectors(&tree_info);
-                stop_criterion->set_thread_offset(&tree_info, part_assignments.at(thread_id), ParallelContext::local_proc_id());
+                stop_criterion->set_thread_offset(&tree_info, part_assignments.at(thread_id),
+                                                  ParallelContext::local_proc_id());
                 optimizer.set_stopping_criterion(stop_criterion);
 
                 // optimize using standard raxml
@@ -367,7 +368,6 @@ void TunedBatch::optimize(RaxmlInstance &instance, const Options &opts, SharedBa
                     .count());
                 resources.get_profiling().finish_measurement(*this, RaxmlFastOptimization{});
             }
-
         } else {
             // do initial model and branch length optimization
             if (!this->initial_model_optimized) {
@@ -502,14 +502,17 @@ void TunedBatch::perform_plausibility_check(const Options &opts, SharedBatchReso
         auto reference_p_count = 0;
 
         // count how many reference trees are plausible
-        for (const auto last = au_test.get_p_values().begin() + reference_persite_loglh.size(); first != last; ++first) {
+        for (const auto last = au_test.get_p_values().begin() + reference_persite_loglh.size(); first != last; ++
+             first) {
             if (*first > SIGNIFICANCE_LEVEL) {
                 reference_p_count += 1;
             }
         }
         LOG_DEBUG_TS << "AU Test found " << reference_p_count << " plausible trees in the reference set." << std::endl;
         if (reference_p_count == 0) {
-            LOG_WARN << "Warning: treeset search found strictly better tree than ML search. Plausible treeset no longer plausible." << std::endl;
+            LOG_WARN <<
+                    "Warning: treeset search found strictly better tree than ML search. Plausible treeset no longer plausible."
+                    << std::endl;
         }
 
         // count how many inferred trees are plausible
