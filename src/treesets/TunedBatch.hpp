@@ -415,11 +415,10 @@ protected:
     doubleVector p_values;
 
     /**
-     * Update spr_params instance according to the meta_parameters
+     * Update an spr_round_params instance according to the meta_parameters.
      *
      * @param opts parsed command line options with defaults and user-mandated search parameters
-     * @param spr_params
-     * @param spr_params
+     * @param spr_params a new instance of spr_round_params of the local thread
      */
     void auto_configure(const Options &opts, spr_round_params &spr_params) const {
         // update options according to MetaParameters:
