@@ -58,38 +58,31 @@ unsigned int TunedBatch::get_batch_size() const {
 
 void TunedBatch::apply_tree_constraint(Tree &constraint, const Options &opts, const unsigned int tree_id,
                                        const unsigned int thread_id) {
-    // make sure the trees from the current worker are not being accessed by delayed threads.
-    ParallelContext::barrier();
-
-    if (thread_id == 0) {
-        // sort the tip ids so the constrained ids come first:
-        NameIdMap new_label_id_map;
-        IDVector new_tip_msa_map;
-        new_tip_msa_map.resize(msa->taxon_count());
-        auto cons_name_map = constraint.tip_ids();
-        size_t seq_id = 0;
-        size_t cons_tip_id = 0;
-        size_t free_tip_id = constraint.num_tips();
-        for (const auto &tip_name: msa->taxon_names()) {
-            auto tip_id = cons_name_map.count(tip_name) ? cons_tip_id++ : free_tip_id++;
-            new_label_id_map[tip_name] = tip_id;
-            new_tip_msa_map[tip_id] = seq_id++;
-        }
-        assert(cons_tip_id == constraint.num_tips());
-        assert(free_tip_id == new_tip_msa_map.size());
-        assert(new_label_id_map.size() == msa->taxon_count());
-
-        auto topology = batch_trees[tree_id][0]->tree();
-        topology.reset_tip_ids(new_label_id_map);
-        constraint.reset_tip_ids(new_label_id_map);
-
-        for (unsigned int i = 0; i < this->batch_trees[tree_id].size(); ++i) {
-            this->batch_trees[tree_id][i].
-                    emplace(opts, topology, *msa, new_tip_msa_map, part_assignments.at(i));
-            this->batch_trees[tree_id][i]->set_topology_constraint(constraint);
-            assert(constraint.compatible(this->batch_trees[tree_id][i]->tree()));
-        }
+    // sort the tip ids so the constrained ids come first:
+    NameIdMap new_label_id_map;
+    IDVector new_tip_msa_map;
+    new_tip_msa_map.resize(msa->taxon_count());
+    auto cons_name_map = constraint.tip_ids();
+    size_t seq_id = 0;
+    size_t cons_tip_id = 0;
+    size_t free_tip_id = constraint.num_tips();
+    for (const auto &tip_name: msa->taxon_names()) {
+        auto tip_id = cons_name_map.count(tip_name) ? cons_tip_id++ : free_tip_id++;
+        new_label_id_map[tip_name] = tip_id;
+        new_tip_msa_map[tip_id] = seq_id++;
     }
+    assert(cons_tip_id == constraint.num_tips());
+    assert(free_tip_id == new_tip_msa_map.size());
+    assert(new_label_id_map.size() == msa->taxon_count());
+
+    auto topology = batch_trees[tree_id][thread_id]->tree();
+    topology.reset_tip_ids(new_label_id_map);
+    constraint.reset_tip_ids(new_label_id_map);
+
+    this->batch_trees[tree_id][thread_id].
+            emplace(opts, topology, *msa, new_tip_msa_map, part_assignments.at(thread_id));
+    this->batch_trees[tree_id][thread_id]->set_topology_constraint(constraint);
+    assert(constraint.compatible(this->batch_trees[tree_id][thread_id]->tree()));
 
     // make sure the trees aren't used until all constraints are applied
     ParallelContext::barrier();
@@ -200,7 +193,6 @@ void TunedBatch::optimize_topology(const Options &opts, const TaskGroup &context
 
         if (context.is_group_leader(worker_id, thread_id)) {
             auto round_name = fast ? "FAST" : "SLOW";
-
             LOG_INFO_TS << this->name << ": Optimizing topology (" << num_rounds << " of " << total_rounds << " total "
                     << round_name << " spr rounds, radius: " << spr_params.radius_max << ")" << std::endl;
         }
@@ -396,7 +388,8 @@ void TunedBatch::optimize(RaxmlInstance &instance, const Options &opts, SharedBa
             if (meta_parameters->constrain) {
                 const auto my_trees = coarse_assignments.at(worker_id);
                 for (const auto tree_id: my_trees) {
-                    if (auto constraint = get_reverse_backbone(this->batch_trees[tree_id][0].value()); constraint.has_value()) {
+                    if (auto constraint = get_reverse_backbone(this->batch_trees[tree_id][thread_id].value());
+                        constraint.has_value()) {
                         this->apply_tree_constraint(*constraint, opts, tree_id, thread_id);
                     }
                 }
@@ -551,13 +544,14 @@ bool TunedBatch::is_compatible(const MetaParameters &new_parameters) const {
     // if the current parameters do the bare minimum, we can always continue with new parameters
     if (this->meta_parameters->accept_starting_trees) {
         return true;
-    // however if we already did something, the other set need not do the bare minimum.
+        // however if we already did something, the other set need not do the bare minimum.
     } else if (new_parameters.accept_starting_trees) {
         return false;
     }
 
     // do not reuse batch if it was created with a different model
-    if ((this->num_fast_spr_performed > 0 || this->num_slow_spr_performed > 0) && this->meta_parameters->model_override != new_parameters.model_override) {
+    if ((this->num_fast_spr_performed > 0 || this->num_slow_spr_performed > 0) && this->meta_parameters->model_override
+        != new_parameters.model_override) {
         return false;
     }
 
@@ -608,7 +602,7 @@ bool TunedBatch::is_compatible(const MetaParameters &new_parameters) const {
 
 void TunedBatch::backup_models(ModelMap &target) const {
     for (size_t thread_id = 0; thread_id < this->batch_trees[0].size(); ++thread_id) {
-        for (size_t part_id : this->batch_trees[0][thread_id].value().parts_master()) {
+        for (size_t part_id: this->batch_trees[0][thread_id].value().parts_master()) {
             assign(target[part_id], this->batch_trees[0][thread_id].value(), part_id);
         }
     }
