@@ -187,15 +187,10 @@ void TunedBatch::optimize_topology(const Options &opts, const TaskGroup &context
                                    const unsigned int worker_id, const unsigned int thread_id) {
     const auto &tree_ids = this->coarse_assignments.at(worker_id);
 
-    // copy current status into local variables. This is simpler than putting those states into atomic counters and add
-    // barriers to their access
-    auto current_spr_fast = this->num_fast_spr_performed;
-    auto current_spr_slow = this->num_slow_spr_performed;
-
-    while (this->meta_parameters->num_fast_spr > current_spr_fast || this->meta_parameters->num_slow_spr >
-           current_spr_slow) {
-        const auto fast = this->meta_parameters->num_fast_spr > current_spr_fast;
-        const auto rounds_performed = fast ? current_spr_fast : current_spr_slow;
+    while (this->meta_parameters->num_fast_spr > this->num_fast_spr_performed || this->meta_parameters->num_slow_spr >
+           this->num_slow_spr_performed) {
+        const auto fast = this->meta_parameters->num_fast_spr > this->num_fast_spr_performed;
+        const auto rounds_performed = fast ? this->num_fast_spr_performed : this->num_slow_spr_performed;
         auto total_rounds = fast ? meta_parameters->num_fast_spr : meta_parameters->num_slow_spr;
         auto num_rounds = total_rounds - rounds_performed;
 
@@ -210,12 +205,12 @@ void TunedBatch::optimize_topology(const Options &opts, const TaskGroup &context
                     << round_name << " spr rounds, radius: " << spr_params.radius_max << ")" << std::endl;
         }
 
-        // context.enter_barrier(); // required to propagate auto-configuration
-
         auto begin = std::chrono::steady_clock::now();
 
         // run optimization kernel
         for (const auto tree_id: tree_ids) {
+            // reset cutoff between tree searches to avoid under-optimizing a tree with cutoffs from previous trees.
+            // this also prevents the cutoff info to have invalid data due to uninitialized instantiation
             const auto loglh = batch_trees[tree_id][thread_id].value().loglh();
             spr_params.reset_cutoff_info(loglh, true);
 
@@ -250,20 +245,18 @@ void TunedBatch::optimize_topology(const Options &opts, const TaskGroup &context
                     << ") for tree search #" << (tree_id + 1) << std::endl;
         }
 
-        if (fast) {
-            current_spr_fast = this->meta_parameters->num_fast_spr;
-        } else {
-            current_spr_slow = this->meta_parameters->num_slow_spr;
-        }
-
         // update the TunedBatch status
         if (context.is_group_leader(worker_id, thread_id)) {
             if (fast) {
-                this->num_fast_spr_performed = current_spr_fast;
+                this->num_fast_spr_performed = this->meta_parameters->num_fast_spr;
             } else {
-                this->num_slow_spr_performed = current_spr_slow;
+                this->num_slow_spr_performed = this->meta_parameters->num_slow_spr;
             }
         }
+
+        // make sure the spr_performed-variables are updated for all threads before they call auto_configure to avoid
+        // desynchronization of whether we perform slow or fast spr rounds, or re-evaluate the loop condition
+        context.enter_barrier();
     }
 }
 
