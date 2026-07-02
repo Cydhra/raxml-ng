@@ -16,7 +16,7 @@ constexpr unsigned int DEFAULT_BATCH_SIZE = 16;
 /**
  * SPR radius used when pythia is disabled. Fast SPR will multiply this radius with 2.
  */
-constexpr unsigned int DEFAULT_ADAPTIVE_RADIUS = 10;
+constexpr int DEFAULT_ADAPTIVE_RADIUS = 10;
 
 class TreesetOptimizer {
 protected:

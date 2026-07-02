@@ -16,6 +16,8 @@ void TreesetOptimizer::initialize_bandits() {
                                      ? Optimizer::adaptive_radius(pythia_score)
                                      : DEFAULT_ADAPTIVE_RADIUS;
 
+    const auto lower_radius = std::max(static_cast<int>(adaptive_radius) - 5, 5);
+
     // constrained
     create_mab(this->benchmark_mabs, "Constrained,Fast,NNI,2spr",
                MetaParameters(20, false, 2, 0, false, false, adaptive_radius, true, true));
@@ -55,6 +57,16 @@ void TreesetOptimizer::initialize_bandits() {
                MetaParameters(20, false, 4, 0, false, false, adaptive_radius));
     create_mab(this->benchmark_mabs, "Fast,NoModel,2spr",
                MetaParameters(20, true, 2, 0, false, false, adaptive_radius));
+
+    // lower radius
+    create_mab(this->benchmark_mabs, "Greedy,DoModel,2spr,low",
+               MetaParameters(1, false, 2, 0, false, false, lower_radius));
+    create_mab(this->benchmark_mabs, "Greedy,DoModel,4spr,low",
+               MetaParameters(1, false, 4, 0, false, false, lower_radius));
+    create_mab(this->benchmark_mabs, "Fast,DoModel,2spr,low",
+               MetaParameters(20, false, 2, 0, false, false, lower_radius));
+    create_mab(this->benchmark_mabs, "Fast,DoModel,4spr,low",
+               MetaParameters(20, false, 4, 0, false, false, lower_radius));
 
     // heavy heuristics
     create_mab(this->benchmark_mabs, "Slow,2spr", MetaParameters(20, false, 0, 2, false, false, adaptive_radius));
@@ -151,7 +163,7 @@ BatchTask TreesetOptimizer::next_work_unit() {
     current_batch.update_meta_parameters(current_bandit.get_parameters());
 
     BatchTask runner = [this, &current_bandit, &current_batch](TaskGroup &context, const unsigned int worker_id,
-                                                                                             const unsigned int thread_id) {
+                                                               const unsigned int thread_id) {
         this->run_batch(current_bandit, current_batch, context, worker_id, thread_id);
     };
 
