@@ -108,11 +108,13 @@ protected:
      */
     IDVector &tip_msa_idmap;
 
+public:
     /**
      * Pointer to the partitioned msa instance of the current RAxML-ng run
      */
     std::shared_ptr<PartitionedMSA> msa;
 
+protected:
     /**
      * Reference to the user-configured fine-grained load balancer used by the main RAxML instance.
      */

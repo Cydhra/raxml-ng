@@ -27,16 +27,21 @@ void TreesetOptimizer::initialize_bandits() {
                MetaParameters(20, false, 2, 0, false, false, adaptive_radius, false, true));
 
     // model downgrade
-    create_mab(this->benchmark_mabs, "Fast,2spr,JC",
-               MetaParameters(20, false, 2, 0, false, false, adaptive_radius, false, false, "JC"));
-    create_mab(this->benchmark_mabs, "Greedy,2spr,JC",
-               MetaParameters(1, false, 2, 0, false, false, adaptive_radius, false, false, "JC"));
-    create_mab(this->benchmark_mabs, "Fast,2spr,GTR",
+    if (batch_queue.msa->models().at(0).state_names().size() == 4) {
+        create_mab(this->benchmark_mabs, "Fast,2spr,Downgrade",
                MetaParameters(20, false, 2, 0, false, false, adaptive_radius, false, false, "GTR"));
-    create_mab(this->benchmark_mabs, "Greedy,2spr,GTR",
-               MetaParameters(1, false, 2, 0, false, false, adaptive_radius, false, false, "GTR"));
-    create_mab(this->benchmark_mabs, "Constrained,Fast,JC,2spr",
-               MetaParameters(20, false, 2, 0, false, false, adaptive_radius, false, true, "JC"));
+        create_mab(this->benchmark_mabs, "Greedy,2spr,Downgrade",
+                   MetaParameters(1, false, 2, 0, false, false, adaptive_radius, false, false, "GTR"));
+        create_mab(this->benchmark_mabs, "Constrained,Fast,2spr,Downgrade",
+                       MetaParameters(20, false, 2, 0, false, false, adaptive_radius, false, true, "GTR"));
+    } else {
+        create_mab(this->benchmark_mabs, "Fast,2spr,Downgrade",
+               MetaParameters(20, false, 2, 0, false, false, adaptive_radius, false, false, "LG"));
+        create_mab(this->benchmark_mabs, "Greedy,2spr,Downgrade",
+                   MetaParameters(1, false, 2, 0, false, false, adaptive_radius, false, false, "LG"));
+        create_mab(this->benchmark_mabs, "Constrained,Fast,2spr,Downgrade",
+                       MetaParameters(20, false, 2, 0, false, false, adaptive_radius, false, true, "LG"));
+    }
 
     // init default bandits
     create_mab(this->benchmark_mabs, "NNI,DoModel",
