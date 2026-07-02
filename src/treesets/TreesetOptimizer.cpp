@@ -81,6 +81,11 @@ void TreesetOptimizer::initialize_bandits() {
     create_mab(this->benchmark_mabs, "Constrained,Mixed,4+2spr,NNI",
                MetaParameters(20, false, 4, 2, false, false, adaptive_radius, true, true));
 
+    // heavy and low radius
+    create_mab(this->benchmark_mabs, "Slow,2spr,low", MetaParameters(20, false, 0, 2, false, false, lower_radius));
+    create_mab(this->benchmark_mabs, "Mixed,2+2spr,low", MetaParameters(20, false, 2, 2, false, false, lower_radius));
+    create_mab(this->benchmark_mabs, "Mixed,4+2spr,low", MetaParameters(20, false, 4, 2, false, false, lower_radius));
+
     // early commitment
     create_mab(this->benchmark_mabs, "Commit,Greedy,DoModel,2spr",
                MetaParameters(1, false, 2, 0, false, true, adaptive_radius));
