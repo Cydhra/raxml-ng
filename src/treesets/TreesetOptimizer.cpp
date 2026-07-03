@@ -10,7 +10,7 @@ void create_mab(std::deque<MultiArmedBandit<MetaParameters> > &target_list, cons
 }
 
 void TreesetOptimizer::initialize_bandits() {
-    create_mab(this->benchmark_mabs, "Parsimony", MetaParameters(1, false, 0, 0, true, false));
+    // create_mab(this->benchmark_mabs, "Parsimony", MetaParameters(1, false, 0, 0, true, false));
 
     const auto adaptive_radius = pythia_score >= 0.0
                                      ? Optimizer::adaptive_radius(pythia_score)
@@ -19,21 +19,21 @@ void TreesetOptimizer::initialize_bandits() {
     const auto lower_radius = std::max(static_cast<int>(adaptive_radius) - 5, 5);
 
     // constrained
-    create_mab(this->benchmark_mabs, "Constrained,Fast,NNI,2spr",
-               MetaParameters(20, false, 2, 0, false, false, adaptive_radius, true, true));
-    create_mab(this->benchmark_mabs, "Constrained,Fast,NNI,4spr",
-               MetaParameters(20, false, 4, 0, false, false, adaptive_radius, true, true));
-    create_mab(this->benchmark_mabs, "Constrained,Fast,2spr",
-               MetaParameters(20, false, 2, 0, false, false, adaptive_radius, false, true));
+    // create_mab(this->benchmark_mabs, "Constrained,Fast,NNI,2spr",
+    //            MetaParameters(20, false, 2, 0, false, false, adaptive_radius, true, true));
+    // create_mab(this->benchmark_mabs, "Constrained,Fast,NNI,4spr",
+    //            MetaParameters(20, false, 4, 0, false, false, adaptive_radius, true, true));
+    // create_mab(this->benchmark_mabs, "Constrained,Fast,2spr",
+    //            MetaParameters(20, false, 2, 0, false, false, adaptive_radius, false, true));
 
     // model downgrade
     if (batch_queue.msa->models().at(0).state_names().size() == 4) {
-        create_mab(this->benchmark_mabs, "Fast,2spr,Downgrade",
-               MetaParameters(20, false, 2, 0, false, false, adaptive_radius, false, false, "GTR"));
+        // create_mab(this->benchmark_mabs, "Fast,2spr,Downgrade",
+               // MetaParameters(20, false, 2, 0, false, false, adaptive_radius, false, false, "GTR"));
         create_mab(this->benchmark_mabs, "Greedy,2spr,Downgrade",
                    MetaParameters(1, false, 2, 0, false, false, adaptive_radius, false, false, "GTR"));
-        create_mab(this->benchmark_mabs, "Constrained,Fast,2spr,Downgrade",
-                       MetaParameters(20, false, 2, 0, false, false, adaptive_radius, false, true, "GTR"));
+        // create_mab(this->benchmark_mabs, "Constrained,Fast,2spr,Downgrade",
+                       // MetaParameters(20, false, 2, 0, false, false, adaptive_radius, false, true, "GTR"));
     } else {
         create_mab(this->benchmark_mabs, "Fast,2spr,Downgrade",
                MetaParameters(20, false, 2, 0, false, false, adaptive_radius, false, false, "LG"));
@@ -44,56 +44,56 @@ void TreesetOptimizer::initialize_bandits() {
     }
 
     // init default bandits
-    create_mab(this->benchmark_mabs, "NNI,DoModel",
-               MetaParameters(20, false, 0, 0, false, false, adaptive_radius, true));
-    create_mab(this->benchmark_mabs, "NNI,NoModel",
-               MetaParameters(20, true, 0, 0, false, false, adaptive_radius, true));
-
-    create_mab(this->benchmark_mabs, "Greedy,DoModel,2spr",
-               MetaParameters(1, false, 2, 0, false, false, adaptive_radius));
-    create_mab(this->benchmark_mabs, "Greedy,DoModel,4spr",
-               MetaParameters(1, false, 4, 0, false, false, adaptive_radius));
-    create_mab(this->benchmark_mabs, "Greedy,NoModel,2spr",
-               MetaParameters(1, true, 2, 0, false, false, adaptive_radius));
-
-    create_mab(this->benchmark_mabs, "Fast,DoModel,2spr",
-               MetaParameters(20, false, 2, 0, false, false, adaptive_radius));
-    create_mab(this->benchmark_mabs, "Fast,DoModel,4spr",
-               MetaParameters(20, false, 4, 0, false, false, adaptive_radius));
-    create_mab(this->benchmark_mabs, "Fast,NoModel,2spr",
-               MetaParameters(20, true, 2, 0, false, false, adaptive_radius));
-
-    // lower radius
-    create_mab(this->benchmark_mabs, "Greedy,DoModel,2spr,low",
-               MetaParameters(1, false, 2, 0, false, false, lower_radius));
-    create_mab(this->benchmark_mabs, "Greedy,DoModel,4spr,low",
-               MetaParameters(1, false, 4, 0, false, false, lower_radius));
-    create_mab(this->benchmark_mabs, "Fast,DoModel,2spr,low",
-               MetaParameters(20, false, 2, 0, false, false, lower_radius));
-    create_mab(this->benchmark_mabs, "Fast,DoModel,4spr,low",
-               MetaParameters(20, false, 4, 0, false, false, lower_radius));
-
-    // heavy heuristics
-    create_mab(this->benchmark_mabs, "Slow,2spr", MetaParameters(20, false, 0, 2, false, false, adaptive_radius));
-    create_mab(this->benchmark_mabs, "Mixed,2+2spr", MetaParameters(20, false, 2, 2, false, false, adaptive_radius));
-    create_mab(this->benchmark_mabs, "Mixed,4+2spr", MetaParameters(20, false, 4, 2, false, false, adaptive_radius));
-    create_mab(this->benchmark_mabs, "Mixed,4+4spr", MetaParameters(20, false, 4, 4, false, false, adaptive_radius));
-    create_mab(this->benchmark_mabs, "Constrained,Mixed,4+2spr,NNI",
-               MetaParameters(20, false, 4, 2, false, false, adaptive_radius, true, true));
-
-    // heavy and low radius
-    create_mab(this->benchmark_mabs, "Slow,2spr,low", MetaParameters(20, false, 0, 2, false, false, lower_radius));
-    create_mab(this->benchmark_mabs, "Mixed,2+2spr,low", MetaParameters(20, false, 2, 2, false, false, lower_radius));
-    create_mab(this->benchmark_mabs, "Mixed,4+2spr,low", MetaParameters(20, false, 4, 2, false, false, lower_radius));
-
-    // early commitment
-    create_mab(this->benchmark_mabs, "Commit,Greedy,DoModel,2spr",
-               MetaParameters(1, false, 2, 0, false, true, adaptive_radius));
-    create_mab(this->benchmark_mabs, "Commit,Fast,DoModel,4spr",
-               MetaParameters(20, false, 4, 0, false, true, adaptive_radius));
+    // create_mab(this->benchmark_mabs, "NNI,DoModel",
+    //            MetaParameters(20, false, 0, 0, false, false, adaptive_radius, true));
+    // create_mab(this->benchmark_mabs, "NNI,NoModel",
+    //            MetaParameters(20, true, 0, 0, false, false, adaptive_radius, true));
+    //
+    // create_mab(this->benchmark_mabs, "Greedy,DoModel,2spr",
+    //            MetaParameters(1, false, 2, 0, false, false, adaptive_radius));
+    // create_mab(this->benchmark_mabs, "Greedy,DoModel,4spr",
+    //            MetaParameters(1, false, 4, 0, false, false, adaptive_radius));
+    // create_mab(this->benchmark_mabs, "Greedy,NoModel,2spr",
+    //            MetaParameters(1, true, 2, 0, false, false, adaptive_radius));
+    //
+    // create_mab(this->benchmark_mabs, "Fast,DoModel,2spr",
+    //            MetaParameters(20, false, 2, 0, false, false, adaptive_radius));
+    // create_mab(this->benchmark_mabs, "Fast,DoModel,4spr",
+    //            MetaParameters(20, false, 4, 0, false, false, adaptive_radius));
+    // create_mab(this->benchmark_mabs, "Fast,NoModel,2spr",
+    //            MetaParameters(20, true, 2, 0, false, false, adaptive_radius));
+    //
+    // // lower radius
+    // create_mab(this->benchmark_mabs, "Greedy,DoModel,2spr,low",
+    //            MetaParameters(1, false, 2, 0, false, false, lower_radius));
+    // create_mab(this->benchmark_mabs, "Greedy,DoModel,4spr,low",
+    //            MetaParameters(1, false, 4, 0, false, false, lower_radius));
+    // create_mab(this->benchmark_mabs, "Fast,DoModel,2spr,low",
+    //            MetaParameters(20, false, 2, 0, false, false, lower_radius));
+    // create_mab(this->benchmark_mabs, "Fast,DoModel,4spr,low",
+    //            MetaParameters(20, false, 4, 0, false, false, lower_radius));
+    //
+    // // heavy heuristics
+    // create_mab(this->benchmark_mabs, "Slow,2spr", MetaParameters(20, false, 0, 2, false, false, adaptive_radius));
+    // create_mab(this->benchmark_mabs, "Mixed,2+2spr", MetaParameters(20, false, 2, 2, false, false, adaptive_radius));
+    // create_mab(this->benchmark_mabs, "Mixed,4+2spr", MetaParameters(20, false, 4, 2, false, false, adaptive_radius));
+    // create_mab(this->benchmark_mabs, "Mixed,4+4spr", MetaParameters(20, false, 4, 4, false, false, adaptive_radius));
+    // create_mab(this->benchmark_mabs, "Constrained,Mixed,4+2spr,NNI",
+    //            MetaParameters(20, false, 4, 2, false, false, adaptive_radius, true, true));
+    //
+    // // heavy and low radius
+    // create_mab(this->benchmark_mabs, "Slow,2spr,low", MetaParameters(20, false, 0, 2, false, false, lower_radius));
+    // create_mab(this->benchmark_mabs, "Mixed,2+2spr,low", MetaParameters(20, false, 2, 2, false, false, lower_radius));
+    // create_mab(this->benchmark_mabs, "Mixed,4+2spr,low", MetaParameters(20, false, 4, 2, false, false, lower_radius));
+    //
+    // // early commitment
+    // create_mab(this->benchmark_mabs, "Commit,Greedy,DoModel,2spr",
+    //            MetaParameters(1, false, 2, 0, false, true, adaptive_radius));
+    // create_mab(this->benchmark_mabs, "Commit,Fast,DoModel,4spr",
+    //            MetaParameters(20, false, 4, 0, false, true, adaptive_radius));
 }
 
-constexpr unsigned int SAMPLES_PER_BANDIT = 10;
+constexpr unsigned int SAMPLES_PER_BANDIT = 130;
 
 std::string get_report_filename(std::string output_prefix, std::string bandit_name) {
     auto file_name = string();
@@ -150,21 +150,21 @@ BatchTask TreesetOptimizer::next_work_unit() {
     auto file_name = get_report_filename(opts.outfile_prefix, current_mab->get_bandit(0).get_name());
 
     // check if we already have a report file for this bandit, so we can skip redoing it
-    while (std::filesystem::exists(file_name)) {
-        LOG_INFO << "Skipping bandit [" << current_mab->get_bandit(0).get_name() <<
-                "] because we already benchmarked it" << std::endl;
-        bandit_cursor += 1;
-
-        if (bandit_cursor == this->benchmark_mabs.size()) {
-            shutdown(pool, opts.outfile_prefix);
-            return [](TaskGroup &, const unsigned int, const unsigned int) {
-                // do nothing
-            };
-        }
-
-        current_mab = &this->benchmark_mabs[bandit_cursor];
-        file_name = get_report_filename(opts.outfile_prefix, current_mab->get_bandit(0).get_name());
-    }
+    // while (std::filesystem::exists(file_name)) {
+    //     LOG_INFO << "Skipping bandit [" << current_mab->get_bandit(0).get_name() <<
+    //             "] because we already benchmarked it" << std::endl;
+    //     bandit_cursor += 1;
+    //
+    //     if (bandit_cursor == this->benchmark_mabs.size()) {
+    //         shutdown(pool, opts.outfile_prefix);
+    //         return [](TaskGroup &, const unsigned int, const unsigned int) {
+    //             // do nothing
+    //         };
+    //     }
+    //
+    //     current_mab = &this->benchmark_mabs[bandit_cursor];
+    //     file_name = get_report_filename(opts.outfile_prefix, current_mab->get_bandit(0).get_name());
+    // }
 
 
     auto &current_bandit = current_mab->select_next_bandit();
