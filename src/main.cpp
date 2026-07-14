@@ -3606,7 +3606,7 @@ void init_parallel_buffers(const RaxmlInstance& instance)
   ParallelContext::resize_buffers(reduce_buffer_size, worker_buf_size);
 }
 
-void thread_infer_ml(RaxmlInstance& instance, CheckpointManager& cm)
+void thread_infer_ml(RaxmlInstance& instance, CheckpointManager& cm, bool optimize_topol = true)
 {
   auto& worker = instance.get_worker();
   Checkpoint& checkp = cm.checkpoint();
@@ -3711,12 +3711,16 @@ void thread_infer_ml(RaxmlInstance& instance, CheckpointManager& cm)
     }
     else
     {
-      optimizer.optimize_topology(*treeinfo, cm);
+      if (optimize_topol) {
+        optimizer.optimize_topology(*treeinfo, cm);
 
-      LOG_PROGR << endl;
-      LOG_WORKER_TS(log_level) << "ML tree search #" << start_tree_num <<
-                          ", logLikelihood: " << FMT_LH(checkp.loglh()) << endl;
-      LOG_PROGR << endl;
+        LOG_PROGR << endl;
+        LOG_WORKER_TS(log_level) << "ML tree search #" << start_tree_num <<
+            ", logLikelihood: " << FMT_LH(checkp.loglh()) << endl;
+        LOG_PROGR << endl;
+      } else {
+        optimizer.optimize_model(*treeinfo, 0.1);
+      }
     }
 
     if (!instance.persite_loglh.empty())
@@ -4027,7 +4031,7 @@ void thread_infer_model(RaxmlInstance& instance, CheckpointManager& cm)
   ParallelContext::global_barrier();
 }
 
-void thread_main(RaxmlInstance& instance, CheckpointManager& cm)
+void thread_main(RaxmlInstance& instance, CheckpointManager& cm, bool optimize_topol = true)
 {
   /* wait until master thread prepares all global data */
 //  printf("WORKER: %u, LOCAL_THREAD: %u\n", ParallelContext::group_id(), ParallelContext::local_proc_id());
@@ -4042,7 +4046,7 @@ void thread_main(RaxmlInstance& instance, CheckpointManager& cm)
       opts.command == Command::au_test || opts.command == Command::treeset) &&
       !instance.start_trees.empty())
   {
-    thread_infer_ml(instance, cm);
+    thread_infer_ml(instance, cm, optimize_topol);
     ParallelContext::global_barrier();
   }
 
@@ -4171,13 +4175,32 @@ void master_main(RaxmlInstance& instance, CheckpointManager& cm)
   if (opts.command == Command::modeltest)
     return;
 
+  bool trees_present = false;
+  NewickStream input(opts.output_fname("reftrees"), std::ios::in);
+  if (input.good()) {
+    trees_present = true;
+
+    unsigned int i = 0;
+    instance.start_trees.clear();
+    while (input.peek() != EOF) {
+      Tree tree;
+      input >> tree;
+      i++;
+
+      prepare_tree(instance, tree);
+      instance.start_trees.emplace_back(tree);
+    }
+  }
+  input.close();
+
   auto threads_per_worker = opts.num_threads * opts.num_ranks / opts.num_workers;
   LOG_INFO << "Parallelization scheme: " << opts.num_workers << " worker(s) x "
            << threads_per_worker << " thread(s)" << endl << endl;
 
   ParallelContext::init_pthreads(opts, std::bind(thread_main,
                                                 std::ref(instance),
-                                                std::ref(cm)));
+                                                std::ref(cm),
+                                                !trees_present));
   
   /* init workers */
   assert(opts.num_workers > 0);
@@ -4235,11 +4258,23 @@ void master_main(RaxmlInstance& instance, CheckpointManager& cm)
   init_stop_criterion(instance);
 
   // Main routines
-  thread_main(instance, cm);
+  thread_main(instance, cm, !trees_present);
 
   // treeset computation reuses the above treesearch code for the first batch and then switches over to aggressive
   // heuristics
   if (opts.command == Command::treeset) {
+    if (!trees_present) {
+      CheckpointFile checkp = cm.checkp_file();
+      NewickStream nw(opts.output_fname("reftrees"), std::ios::out);
+      for (auto& topol: checkp.ml_trees)
+      {
+        Tree ml_tree = checkp.tree();
+        ml_tree.topology(topol.second.second);
+        postprocess_tree(instance, ml_tree);
+        nw << ml_tree;
+      }
+    }
+
     /* initialize treeset optimizer here, after the persite lnl are already calculated */
     init_treeset_optimizer(instance, cm);
 
