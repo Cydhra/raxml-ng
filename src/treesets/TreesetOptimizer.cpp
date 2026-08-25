@@ -16,46 +16,44 @@ void TreesetOptimizer::initialize_bandits() {
     this->nni_mab->emplace_back("NNI,NoModel", MetaParameters(20, true, 0, 0, false, false, adaptive_radius, true));
 
     this->light_mab->emplace_back("Greedy,DoModel,2spr", MetaParameters(1, false, 2, 0, false, false, adaptive_radius));
-    this->light_mab->emplace_back("Greedy,DoModel,4spr", MetaParameters(1, false, 4, 0, false, false, adaptive_radius));
     this->light_mab->emplace_back("Greedy,NoModel,2spr", MetaParameters(1, true, 2, 0, false, false, adaptive_radius));
 
     this->light_mab->emplace_back("Fast,DoModel,2spr", MetaParameters(20, false, 2, 0, false, false, adaptive_radius));
-    this->light_mab->emplace_back("Fast,DoModel,4spr", MetaParameters(20, false, 4, 0, false, false, adaptive_radius));
     this->light_mab->emplace_back("Fast,NoModel,2spr", MetaParameters(20, true, 2, 0, false, false, adaptive_radius));
 
-    // heavy heuristics
-    this->heavy_mab->emplace_back("Slow,2spr", MetaParameters(20, false, 0, 2, false, false, adaptive_radius));
-    this->heavy_mab->emplace_back("Mixed,2+2spr", MetaParameters(20, false, 2, 2, false, false, adaptive_radius));
-    this->heavy_mab->emplace_back("Mixed,4+2spr", MetaParameters(20, false, 4, 2, false, false, adaptive_radius));
+    // low radius heuristics
+    this->low_mab->emplace_back("Greedy,2spr,low",
+                                MetaParameters(1, false, 2, 0, false, false,
+                                               max(adaptive_radius - 5, static_cast<unsigned int>(5))));
+    this->low_mab->emplace_back("Fast,2spr,low",
+                                MetaParameters(20, false, 2, 0, false, false,
+                                               max(adaptive_radius - 5, static_cast<unsigned int>(5))));
+    this->low_mab->emplace_back("Fast,2spr,v-low",
+                                MetaParameters(20, false, 2, 0, false, false,
+                                               max(adaptive_radius - 10, static_cast<unsigned int>(5))));
+    this->low_mab->emplace_back("Slow,2spr,low",
+                                MetaParameters(20, false, 0, 2, false, false,
+                                               max(adaptive_radius - 5, static_cast<unsigned int>(5))));
 
-    // early commitment
-    this->commitment_mab->emplace_back("Commit,Greedy,DoModel,2spr",
-                                       MetaParameters(1, false, 2, 0, false, true, adaptive_radius));
-    this->commitment_mab->emplace_back("Commit,Greedy,DoModel,4spr",
-                                       MetaParameters(1, false, 4, 0, false, true, adaptive_radius));
-    this->commitment_mab->emplace_back("Commit,Fast,DoModel,2spr",
-                                       MetaParameters(20, false, 2, 0, false, true, adaptive_radius));
-    this->commitment_mab->emplace_back("Commit,Fast,DoModel,4spr",
-                                       MetaParameters(20, false, 4, 0, false, true, adaptive_radius));
-
-    this->constrained_mab->emplace_back("Fast,DoModel,2spr,NNI,Constrained", MetaParameters(20, false, 2, 0, false, false, adaptive_radius, true, true));
-    this->constrained_mab->emplace_back("Fast,DoModel,1+1spr,NNI,Constrained", MetaParameters(20, false, 1, 1, false, false, adaptive_radius, true, true));
-    this->constrained_mab->emplace_back("Greedy,NoModel,2spr,NNI,Constrained", MetaParameters(1, true, 2, 0, false, false, adaptive_radius, true, true));
-    this->constrained_mab->emplace_back("Greedy,DoModel,2spr,NNI,Constrained", MetaParameters(1, false, 2, 0, false, false, adaptive_radius, true, true));
-    this->constrained_mab->emplace_back("Greedy,DoModel,1+1spr,NNI,Constrained", MetaParameters(1, false, 1, 1, false, false, adaptive_radius, true, true));
+    this->constrained_mab->emplace_back("Fast,DoModel,2spr,NNI,Constrained",
+                                        MetaParameters(20, false, 2, 0, false, false, adaptive_radius, true, true));
+    this->constrained_mab->emplace_back("Fast,NoModel,2spr,NNI,Constrained",
+                                        MetaParameters(20, true, 2, 0, false, false, adaptive_radius, true, true));
+    this->constrained_mab->emplace_back("Greedy,NoModel,2spr,NNI,Constrained",
+                                        MetaParameters(1, true, 2, 0, false, false, adaptive_radius, true, true));
+    this->constrained_mab->emplace_back("Greedy,DoModel,2spr,NNI,Constrained",
+                                        MetaParameters(1, false, 2, 0, false, false, adaptive_radius, true, true));
 
     // fallbacks
-    this->fallback_fast_mab->emplace_back("Fast-Raxml", MetaParameters(20, true, 0, 0, false, false, 20, false, false, std::nullopt, true));
+    this->fallback_fast_mab->emplace_back("Fast-Raxml",
+                                          MetaParameters(20, true, 0, 0, false, false, 20, false, false, std::nullopt,
+                                                         true));
 
     // set up successors
     this->successors.emplace_back(make_tuple(1, "NNI", this->nni_mab));
-    this->successors.emplace_back(make_tuple(1, "Light", this->light_mab));
-
-    this->successors.emplace_back(make_tuple(3, "Commitment", this->commitment_mab));
-
-    this->successors.emplace_back(make_tuple(4, "Constrained", this->constrained_mab));
-
-    this->successors.emplace_back(make_tuple(5, "Heavy", this->heavy_mab));
+    this->successors.emplace_back(make_tuple(2, "Light", this->light_mab));
+    this->successors.emplace_back(make_tuple(3, "Constrained", this->constrained_mab));
+    this->successors.emplace_back(make_tuple(4, "LowRadius", this->low_mab));
     this->successors.emplace_back(make_tuple(5, "Fallback", this->fallback_fast_mab));
 
     // second-level MAB
@@ -78,7 +76,8 @@ void TreesetOptimizer::run_batch(Bandit<std::shared_ptr<MultiArmedBandit<MetaPar
         // inform the batch queue that the batch has been inferred
         this->batch_queue.finish_batch(batch);
 
-        if (this->batch_queue.num_plausible_trees() > this->target_tree_count || this->batch_queue.view_batches().size() >= 250) {
+        if (this->batch_queue.num_plausible_trees() > this->target_tree_count || this->batch_queue.view_batches().size()
+            >= 250) {
             pool.shutdown();
         }
     }
@@ -121,14 +120,17 @@ void TreesetOptimizer::check_mab_modification() {
     //  and if not, we add arms according to a pre-defined mapping.
 
     // check if we have more than a trivial amount of data, if the success rate is low, and we had at least 4 batches since the last modification
-    if (last_mab_modification + MIN_PAUSE_BETWEEN_MODIFICATIONS < hierarchical_mab.get_iterations_completed() && hierarchical_mab.get_best_bandit().num_samples() >= 4 && hierarchical_mab.get_best_bandit().get_expected_tree_rate() < 0.75) {
+    if (last_mab_modification + MIN_PAUSE_BETWEEN_MODIFICATIONS < hierarchical_mab.get_iterations_completed() &&
+        hierarchical_mab.get_best_bandit().num_samples() >= 4 && hierarchical_mab.get_best_bandit().
+        get_expected_tree_rate() < 0.75) {
         const auto current_level = hierarchical_mab.num_bandits();
 
         // add all bandits of the current level
         for (auto it = this->successors.begin(); it != this->successors.end(); it += 1) {
             if (std::get<0>(*it) <= current_level) {
                 if (!hierarchical_mab.has_bandit(std::get<1>(*it))) {
-                    LOG_WORKER_TS(LogLevel::info) << std::endl << "Adding bandit " << std::get<1>(*it) << " to algorithm." << std::endl;
+                    LOG_WORKER_TS(LogLevel::info) << std::endl << "Adding bandit " << std::get<1>(*it) <<
+                            " to algorithm." << std::endl;
                     hierarchical_mab.emplace_back(std::get<1>(*it), std::get<2>(*it));
                     last_mab_modification = hierarchical_mab.get_iterations_completed();
                 }
