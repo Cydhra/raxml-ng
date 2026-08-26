@@ -109,7 +109,7 @@ protected:
      * It is bound into a BatchTask by next_work_unit.
      */
     void run_batch(Bandit<std::shared_ptr<MultiArmedBandit<MetaParameters> > > &mab, Bandit<MetaParameters> &bandit,
-                   TunedBatch &batch, TaskGroup &context, unsigned int worker_id, unsigned int thread_id);
+                   TunedBatch &batch, const TaskGroup &context, unsigned int worker_id, unsigned int thread_id);
 
     /**
      * Select a unit of work of the current state of the optimizer algorithm.
