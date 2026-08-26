@@ -21,11 +21,11 @@ public:
                          const unsigned int workers_per_group,
                          const unsigned int total_threads,
                          const Options &opts,
-                         const std::shared_ptr<PartitionedMSA> &msa,
-                         const Tree tree,
+                         std::shared_ptr<PartitionedMSA> msa,
+                         const Tree &tree,
                          const std::vector<std::vector<doubleVector> > &reference_logh_matrix,
                          const unsigned int batch_size,
-                         long seed) : num_task_groups(num_task_groups), workers_per_group(workers_per_group), msa(msa), reference_tree(make_shared<Tree>(tree)) {
+                         long seed) {
         // prepare a dummy matrix with empty vectors to correctly initialize the AU-Test. These dummy vectors
         // will be replaced by the TunedBatch instance before the AU test is called.
         std::vector<std::vector<doubleVector> > batch_loglh_dummy(batch_size);
@@ -47,6 +47,9 @@ public:
         fast_options->num_searches = 16; // TODO sync with batch size
 
         // initialize an optimizer and checkpoint manager for raxml-fast.
+        fast_optimizer = make_shared<Optimizer>(*fast_options);
+        fast_checkpoint_manager = make_shared<CheckpointManager>(*fast_options);
+
         fast_stop = make_shared<KHStoppingTest>(msa,
                                                 workers_per_group * num_task_groups,
                                                 total_threads,
@@ -54,9 +57,10 @@ public:
                                                 opts.random_seed,
                                                 opts.lh_epsilon);
 
-        // reserve space for optimizers and CMs
-        fast_optimizers.resize(num_task_groups);
-        fast_checkpoint_managers.resize(num_task_groups);
+        // unfortunately this method wants a tree. Please do not ask why it wants that, it doesn't deserve the tree.
+        // But we have to comply, so we give it one of the reference trees since
+        // any tree that conforms to the MSA will do.
+        fast_checkpoint_manager->init_checkpoints(tree, msa->models(), num_task_groups * workers_per_group);
     }
 
     /**
@@ -69,13 +73,8 @@ public:
     /**
      * @return An Optimizer instance pre-configured to run `RAxML-ng --fast` inference
      */
-    Optimizer &get_fast_optimizer(const TaskGroup &context, const unsigned int worker_id, const unsigned int thread_id, const Options &opts) {
-        if (context.is_group_leader(worker_id, thread_id)) {
-            fast_optimizers.at(context.group_id()).emplace(opts);
-        }
-
-        context.enter_barrier();
-        return *fast_optimizers[context.group_id()];
+    Optimizer &get_fast_optimizer() const {
+        return *fast_optimizer;
     }
 
     /**
@@ -88,18 +87,8 @@ public:
     /**
      * @return an instance of the CheckpointManager that is configured to work for raxml fast inference
      */
-    CheckpointManager &get_fast_cm(const TaskGroup &context, const unsigned int worker_id, const unsigned int thread_id, const Options &opts) {
-        if (context.is_group_leader(worker_id, thread_id)) {
-            fast_checkpoint_managers.at(context.group_id()).emplace(opts);
-
-            // we have to initialize each checkpoint manager for all tasks here, unfortunately,
-            // even though they are task-group-specific, because CM was not designed with task-groups in mind.
-            // It therefore has to have entries for all threads such that it can hold the checkpoints for the last threads
-            fast_checkpoint_managers.at(context.group_id()).value().init_checkpoints(*reference_tree, msa->models(), num_task_groups * workers_per_group);
-        }
-
-        context.enter_barrier();
-        return *fast_checkpoint_managers[context.group_id()];
+    CheckpointManager &get_fast_cm() const {
+        return *fast_checkpoint_manager;
     }
 
     /**
@@ -164,36 +153,16 @@ protected:
     std::shared_ptr<KHStoppingTest> fast_stop;
 
     /**
-     * Batch-local instances of the standard RAxML optimizer. This is instanced for the raxml-fast fallback bandit.
+     * Batch-local instance of the standard RAxML optimizer. This is instanced for the raxml-fast fallback bandit.
      * The options passed to this optimizer are forced to perform the --fast heuristic.
      */
-    std::vector<std::optional<Optimizer>> fast_optimizers;
+    std::shared_ptr<Optimizer> fast_optimizer;
 
     /**
-     * Batch-local instances of the standard RAxML checkpoint manager configured for raxml-fast.
+     * Batch-local instance of the standard RAxML checkpoint manager configured for raxml-fast.
      * This is instanced for the raxml-fast fallback bandit.
      */
-    std::vector<std::optional<CheckpointManager>> fast_checkpoint_managers;
-
-    /**
-     * Number of task groups. We need it to initialize checkpoint-managers with appropriate size.
-     */
-    unsigned int num_task_groups;
-
-    /**
-     * Number of workers per task-group. We need it to initialize checkpoint-managers with appropriate size.
-     */
-    unsigned int workers_per_group;
-
-    /**
-     * Store a reference to the partioned msa to initialize checkpoint managers.
-     */
-    std::shared_ptr<PartitionedMSA> msa;
-
-    /**
-     * Store a copy(!) of RaxmlInstance::random_tree, for initializing checkpoint managers.
-     */
-    std::shared_ptr<Tree> reference_tree;
+    shared_ptr<CheckpointManager> fast_checkpoint_manager;
 };
 
 #endif //RAXML_SHAREDBATCHRESOURCES_HPP_

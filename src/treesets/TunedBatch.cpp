@@ -333,11 +333,9 @@ void TunedBatch::optimize(RaxmlInstance &instance, const Options &opts, SharedBa
 
     if (!meta_parameters->accept_starting_trees) {
         if (meta_parameters->fallback_fast_raxml) {
-            auto &optimizer = resources.get_fast_optimizer(context, worker_id, thread_id, opts);
-            auto &cm = resources.get_fast_cm(context, worker_id, thread_id, opts);
-
+            auto &optimizer = resources.get_fast_optimizer();
             const auto stop_criterion = resources.get_fast_stop_criterion();
-            const auto begin = std::chrono::steady_clock::now();
+            auto begin = std::chrono::steady_clock::now();
 
             if (context.is_group_leader(worker_id, thread_id)) {
                 LOG_INFO_TS << this->name << ": Calling RAxML --fast..." << std::endl;
@@ -349,15 +347,16 @@ void TunedBatch::optimize(RaxmlInstance &instance, const Options &opts, SharedBa
                 auto &tree_info = this->batch_trees[tree_id][thread_id].value();
 
                 // reset search state
+                auto &cm = resources.get_fast_cm();
                 cm.reset_search_state();
 
                 // initialize stop criterion
                 stop_criterion->initialize_persite_lnl_vectors(&tree_info);
-                stop_criterion->set_thread_offset(&tree_info, part_assignments.at(thread_id), static_cast<int>(ParallelContext::local_proc_id()));
+                stop_criterion->set_thread_offset(&tree_info, part_assignments.at(thread_id), ParallelContext::local_proc_id());
                 optimizer.set_stopping_criterion(stop_criterion);
 
                 // optimize using standard raxml
-                optimizer.optimize_topology_adaptive(tree_info, cm);
+                optimizer.optimize_topology(tree_info, cm);
             }
 
             context.enter_barrier();

@@ -57,13 +57,13 @@ void TreesetOptimizer::initialize_bandits() {
     this->successors.emplace_back(make_tuple(5, "Fallback", this->fallback_fast_mab));
 
     // second-level MAB
-    this->hierarchical_mab.emplace_back("Dynamic", fallback_fast_mab);
+    this->hierarchical_mab.emplace_back("Starting Trees", parsimony);
 }
 
 void TreesetOptimizer::run_batch(Bandit<std::shared_ptr<MultiArmedBandit<MetaParameters> > > &mab,
                                  Bandit<MetaParameters> &bandit,
-                                 TunedBatch &batch, const TaskGroup &context, unsigned int worker_id,
-                                 const unsigned int thread_id) {
+                                 TunedBatch &batch, TaskGroup &context, unsigned int worker_id,
+                                 unsigned int thread_id) {
     batch.optimize(instance, opts, shared_batch_resources, context, worker_id, thread_id);
 
     if (context.is_group_leader(worker_id, thread_id)) {
