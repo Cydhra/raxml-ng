@@ -63,7 +63,7 @@ void TunedBatch::optimize_nni(const Options &opts, SharedBatchResources &resourc
 
     if (meta_parameters->nni_round) {
         for (const auto tree_id: tree_ids) {
-            nni_round_.do_optimize(batch_trees[tree_id][thread_id].value(), opts, context, resources, worker_id, thread_id);
+            nni_round_.do_optimize(batch_trees[tree_id][thread_id], opts, context, resources, worker_id, thread_id);
         }
     }
 }
@@ -73,7 +73,7 @@ void TunedBatch::optimize_topology(const Options &opts, const TaskGroup &context
     const auto &tree_ids = this->coarse_assignments.at(worker_id);
 
     for (const auto tree_id: tree_ids) {
-        fixed_spr_.do_optimize(batch_trees[tree_id][thread_id].value(), opts, context, resources, worker_id, thread_id);
+        fixed_spr_.do_optimize(batch_trees[tree_id][thread_id], opts, context, resources, worker_id, thread_id);
     }
 }
 
@@ -83,7 +83,7 @@ void TunedBatch::optimize_parameters(const Options &opts, SharedBatchResources &
     const auto &tree_ids = this->coarse_assignments.at(worker_id);
 
     for (const auto tree_id : tree_ids) {
-        model_opt_.do_optimize(batch_trees[tree_id][thread_id].value(), opts, context, resources, worker_id, thread_id);
+        model_opt_.do_optimize(batch_trees[tree_id][thread_id], opts, context, resources, worker_id, thread_id);
     }
 }
 
@@ -164,7 +164,7 @@ void TunedBatch::optimize(RaxmlInstance &instance, const Options &opts, SharedBa
 
                 const auto my_trees = coarse_assignments.at(worker_id);
                 for (const auto tree_id: my_trees) {
-                    constrain_.do_optimize(this->batch_trees[tree_id][thread_id].value(), opts, context, resources, worker_id, thread_id);
+                    constrain_.do_optimize(this->batch_trees[tree_id][thread_id], opts, context, resources, worker_id, thread_id);
                 }
             }
 

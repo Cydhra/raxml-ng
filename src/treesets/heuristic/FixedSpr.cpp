@@ -1,7 +1,7 @@
 #include "FixedSpr.hpp"
 #include "../SharedBatchResources.hpp"
 
-void FixedSpr::do_optimize(TreeInfo &tree, const Options &opts, const TaskGroup &context, SharedBatchResources &,
+void FixedSpr::do_optimize(std::optional<TreeInfo> &tree, const Options &opts, const TaskGroup &context, SharedBatchResources &,
                            const unsigned int worker_id, const unsigned int thread_id) {
     while (this->meta_parameters->num_fast_spr > this->num_fast_spr_performed || this->meta_parameters->num_slow_spr >
            this->num_slow_spr_performed) {
@@ -13,7 +13,7 @@ void FixedSpr::do_optimize(TreeInfo &tree, const Options &opts, const TaskGroup 
         // make sure the spr-params are set correctly for fast/slow rounds
         spr_round_params spr_params;
         this->meta_parameters->auto_configure(opts, spr_params, num_fast_spr_performed);
-        const auto loglh = tree.loglh();
+        const auto loglh = tree->loglh();
         spr_params.reset_cutoff_info(loglh, true);
 
         if (context.is_group_leader(worker_id, thread_id)) {
@@ -33,8 +33,8 @@ void FixedSpr::do_optimize(TreeInfo &tree, const Options &opts, const TaskGroup 
                 begin = std::chrono::steady_clock::now();
             }
 
-            tree.spr_round(spr_params);
-            tree.optimize_branches(1.0, 1);
+            tree->spr_round(spr_params);
+            tree->optimize_branches(1.0, 1);
 
             if (context.is_group_leader(worker_id, thread_id)) {
                 const auto end = std::chrono::steady_clock::now();

@@ -32,7 +32,7 @@ public:
 
     ImprovingHeuristic & operator=(ImprovingHeuristic &&other) noexcept = default;
 
-    void optimize(TreeInfo &tree, const Options &opts,
+    void optimize(std::optional<TreeInfo> &tree, const Options &opts,
                   const TaskGroup &context, SharedBatchResources &resources,
                   const unsigned int worker_id, const unsigned int thread_id) {
         if (inner) {
@@ -42,7 +42,7 @@ public:
         do_optimize(tree, opts, context, resources, worker_id, thread_id);
     }
 
-    virtual void do_optimize(TreeInfo &tree, const Options &opts, const TaskGroup &context, SharedBatchResources &resources,
+    virtual void do_optimize(std::optional<TreeInfo> &tree, const Options &opts, const TaskGroup &context, SharedBatchResources &resources,
                              unsigned int worker_id, unsigned int thread_id) = 0;
 
 protected:

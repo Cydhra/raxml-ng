@@ -39,8 +39,8 @@ std::optional<Tree> get_reverse_backbone(TreeInfo &tree) {
     return constraint;
 }
 
-void Constrain::do_optimize(TreeInfo &tree, const Options &opts, const TaskGroup &, SharedBatchResources &, unsigned int, unsigned int thread_id) {
-    auto constraint = get_reverse_backbone(tree);
+void Constrain::do_optimize(std::optional<TreeInfo> &tree, const Options &opts, const TaskGroup &, SharedBatchResources &, unsigned int, unsigned int thread_id) {
+    auto constraint = get_reverse_backbone(tree.value());
 
     if (!constraint) {
         return;
@@ -63,13 +63,13 @@ void Constrain::do_optimize(TreeInfo &tree, const Options &opts, const TaskGroup
     assert(free_tip_id == new_tip_msa_map.size());
     assert(new_label_id_map.size() == msa->taxon_count());
 
-    auto topology = tree.tree();
+    auto topology = tree->tree();
     topology.reset_tip_ids(new_label_id_map);
     constraint->reset_tip_ids(new_label_id_map);
 
-    tree = std::move(TreeInfo(opts, topology, *msa, new_tip_msa_map, partition_assignments.at(thread_id)));
-    tree.set_topology_constraint(*constraint);
-    assert(constraint->compatible(tree.tree()));
+    tree.emplace(TreeInfo(opts, topology, *msa, new_tip_msa_map, partition_assignments.at(thread_id)));
+    tree->set_topology_constraint(*constraint);
+    assert(constraint->compatible(tree->tree()));
 
     // make sure the trees aren't used until all constraints are applied
     ParallelContext::barrier();
