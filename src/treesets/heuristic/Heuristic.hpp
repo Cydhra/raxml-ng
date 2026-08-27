@@ -3,6 +3,7 @@
 
 #include <optional>
 #include <memory>
+#include <utility>
 #include <vector>
 #include <string>
 #include "../MetaParameters.hpp"
@@ -20,8 +21,8 @@ class ImprovingHeuristic {
 public:
     virtual ~ImprovingHeuristic() = default;
 
-    ImprovingHeuristic(const std::string &batch_name, std::unique_ptr<ImprovingHeuristic> inner)
-        : batch_name(batch_name),
+    ImprovingHeuristic(std::string batch_name, std::unique_ptr<ImprovingHeuristic> inner)
+        : batch_name(std::move(batch_name)),
           inner(std::move(inner)) {
     }
 
@@ -49,7 +50,7 @@ public:
 protected:
     unsigned int wall_time = 0;
 
-    std::string batch_name = "placeholder";
+    std::string batch_name;
 
 private:
     std::unique_ptr<ImprovingHeuristic> inner = {};

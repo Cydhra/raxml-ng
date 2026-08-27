@@ -152,68 +152,13 @@ void TunedBatch::optimize_topology(const Options &opts, const TaskGroup &context
     }
 }
 
-void TunedBatch::optimize_parameters(SharedBatchResources &resources, const TaskGroup &context,
+void TunedBatch::optimize_parameters(const Options &opts, SharedBatchResources &resources, const TaskGroup &context,
                                      const unsigned int worker_id, const unsigned int thread_id, double epsilon,
                                      const bool model, const bool branches, const bool force) {
     const auto &tree_ids = this->coarse_assignments.at(worker_id);
 
-    const auto opt_model = model && (!this->meta_parameters->skip_model || force);
-    const auto opt_branches = branches;
-
-    if (!force && meta_parameters->early_commit) {
-        // force hyper-optimization if this batch is early-committing
-        epsilon = 0.1;
-    }
-
-    const auto begin = std::chrono::steady_clock::now();
-
-    if (opt_model && opt_branches) {
-        if (context.is_group_leader(worker_id, thread_id)) {
-            LOG_INFO_TS << this->name << ": Optimizing all params (eps: " << epsilon << ")" << std::endl;
-
-            resources.get_profiling().start_measurement(*this, BranchOptimization{epsilon});
-            if (!force) resources.get_profiling().start_measurement(*this, ModelOptimization{epsilon});
-        }
-
-        // run all parameters optimization
-        for (const auto tree_id: tree_ids) {
-            batch_trees[tree_id][thread_id].value().optimize_params(CORAX_OPT_PARAM_ALL, epsilon);
-        }
-    } else if (opt_model) {
-        if (context.is_group_leader(worker_id, thread_id)) {
-            LOG_INFO_TS << this->name << ": Optimizing model (eps: " << epsilon << ")" << std::endl;
-
-            if (!force) resources.get_profiling().start_measurement(*this, ModelOptimization{epsilon});
-        }
-
-        // run model optimization
-        for (const auto tree_id: tree_ids) {
-            batch_trees[tree_id][thread_id].value().optimize_model(epsilon);
-        }
-    } else if (branches) {
-        if (context.is_group_leader(worker_id, thread_id)) {
-            LOG_INFO_TS << this->name << ": Optimizing branches (eps: " << epsilon << ")" << std::endl;
-
-            resources.get_profiling().start_measurement(*this, BranchOptimization{epsilon});
-        }
-
-        // run model optimization
-        for (const auto tree_id: tree_ids) {
-            batch_trees[tree_id][thread_id].value().optimize_params(CORAX_OPT_PARAM_BRANCHES_ITERATIVE, epsilon);
-        }
-    }
-
-    if (context.is_group_leader(worker_id, thread_id)) {
-        if (!force) {
-            const auto end = std::chrono::steady_clock::now();
-            this->wall_time += static_cast<unsigned int>(std::chrono::duration_cast<
-                std::chrono::milliseconds>(end - begin).count());
-        }
-
-        if (opt_branches) resources.get_profiling().finish_measurement(*this, BranchOptimization{epsilon});
-        if (opt_model && !force) resources.get_profiling().finish_measurement(*this, ModelOptimization{epsilon});
-
-        LOG_INFO_TS << this->name << ": Model Opt complete (eps: " << epsilon << ")" << std::endl;
+    for (const auto tree_id : tree_ids) {
+        model_opt_.do_optimize(batch_trees[tree_id][thread_id].value(), opts, context, resources, worker_id, thread_id);
     }
 }
 
@@ -271,7 +216,7 @@ void TunedBatch::optimize(RaxmlInstance &instance, const Options &opts, SharedBa
         } else {
             // do initial model and branch length optimization
             if (!this->initial_model_optimized) {
-                this->optimize_parameters(resources, context, worker_id, thread_id, 3.0);
+                this->optimize_parameters(opts, resources, context, worker_id, thread_id, 3.0);
 
                 // barrier required so initial_model_optimized isn't set before all threads optimized model
                 context.enter_barrier();
@@ -389,7 +334,7 @@ void TunedBatch::perform_plausibility_check(const Options &opts, SharedBatchReso
     }
 
     const auto begin = std::chrono::steady_clock::now();
-    this->optimize_parameters(resources, context, worker_id, thread_id, 0.1, true, true, true);
+    this->optimize_parameters(opts, resources, context, worker_id, thread_id, 0.1, true, true, true);
 
     this->perform_au_test(au_test, initialized, context, worker_id, thread_id);
 
