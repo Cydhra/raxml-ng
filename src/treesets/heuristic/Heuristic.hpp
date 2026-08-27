@@ -1,10 +1,8 @@
 #ifndef RAXML_HEURISTIC_HPP_
 #define RAXML_HEURISTIC_HPP_
 
-#include <optional>
 #include <memory>
 #include <utility>
-#include <vector>
 #include <string>
 #include "../MetaParameters.hpp"
 #include "../Threadpool.hpp"
@@ -37,11 +35,11 @@ public:
     void optimize(TreeInfo &tree, const Options &opts,
                   const TaskGroup &context, SharedBatchResources &resources,
                   const unsigned int worker_id, const unsigned int thread_id) {
-        do_optimize(tree, opts, context, resources, worker_id, thread_id);
-
         if (inner) {
             inner->optimize(tree, opts, context, resources, worker_id, thread_id);
         }
+
+        do_optimize(tree, opts, context, resources, worker_id, thread_id);
     }
 
     virtual void do_optimize(TreeInfo &tree, const Options &opts, const TaskGroup &context, SharedBatchResources &resources,
