@@ -10,6 +10,7 @@
 #include "heuristic/FixedSpr.hpp"
 #include "heuristic/NniRound.hpp"
 #include "heuristic/ModelOpt.hpp"
+#include "heuristic/Constrain.hpp"
 #include "../loadbalance/LoadBalancer.hpp"
 #include "../loadbalance/CoarseLoadBalancer.hpp"
 #include "../au/AuTest.hpp"
@@ -54,7 +55,8 @@ public:
           batch_persite_logh(std::vector<std::vector<doubleVector> >(batch_size)),
           fixed_spr_(name, nullptr, meta_parameters),
           nni_round_(name, nullptr, meta_parameters),
-          model_opt_(name, nullptr, meta_parameters, true, true, false, 0.1) { // TODO: do not use constant values here
+          model_opt_(name, nullptr, meta_parameters, true, true, false, 0.1), // TODO: do not use constant values here
+          constrain_(name, nullptr, msa) {
         for (auto &tree_slh: batch_persite_logh) {
             for (const auto &pinfo: msa->part_list())
                 tree_slh.emplace_back(pinfo.msa().length());
@@ -122,7 +124,7 @@ public:
           plausible_tree_count(other.plausible_tree_count),
           wall_time(other.wall_time),
           tree_topologies(std::move(other.tree_topologies)), fixed_spr_(std::move(other.fixed_spr_)),
-          nni_round_(std::move(other.nni_round_)), model_opt_(std::move(model_opt_)) {
+          nni_round_(std::move(other.nni_round_)), model_opt_(std::move(model_opt_)), constrain_(std::move(constrain_)) {
         *meta_parameters = *other.meta_parameters;
     }
 
@@ -153,6 +155,7 @@ public:
         fixed_spr_ = std::move(other.fixed_spr_);
         nni_round_ = std::move(other.nni_round_);
         model_opt_ = std::move(other.model_opt_);
+        constrain_ = std::move(other.constrain_);
         return *this;
     }
 
@@ -418,14 +421,14 @@ protected:
 
     ModelOpt model_opt_;
 
+    Constrain constrain_;
+
     /**
      * @return Whether all starting trees have been generated for this batch.
      */
     bool start_trees_generated() const {
         return this->num_trees_generated == get_batch_size();
     }
-
-    void apply_tree_constraint(Tree &constraint, const Options &opts, unsigned int tree_id, unsigned int thread_id);
 
     /**
      * Generate parsimony starting trees for this batch, and initialize the tree inference.
@@ -446,7 +449,8 @@ protected:
      * @param branches if true, optimize branch lengths
      * @param force if true, model optimization is forced, even if batch tuning parameters turn it off
      */
-    void optimize_parameters(const Options &opts, SharedBatchResources &resources, const TaskGroup &context, unsigned int worker_id,
+    void optimize_parameters(const Options &opts, SharedBatchResources &resources, const TaskGroup &context,
+                             unsigned int worker_id,
                              unsigned int thread_id,
                              double epsilon, bool model = true, bool branches = true, bool force = false);
 
