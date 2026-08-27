@@ -6,6 +6,8 @@
 #include <utility>
 #include "MetaParameters.hpp"
 #include "Threadpool.hpp"
+#include "heuristic/Heuristic.hpp"
+#include "heuristic/FixedSpr.hpp"
 #include "../loadbalance/LoadBalancer.hpp"
 #include "../loadbalance/CoarseLoadBalancer.hpp"
 #include "../au/AuTest.hpp"
@@ -44,9 +46,11 @@ public:
           reference_persite_loglh(reference_persite_loglh),
           msa(msa),
           starting_seed(starting_seed),
+          meta_parameters(make_shared<MetaParameters>()),
           batch_start_trees(new TreeList(batch_size)),
           tip_msa_idmap(tip_msa_idmap),
-          batch_persite_logh(std::vector<std::vector<doubleVector> >(batch_size)) {
+          batch_persite_logh(std::vector<std::vector<doubleVector> >(batch_size)),
+          fixed_spr_(name, nullptr, meta_parameters) {
         for (auto &tree_slh: batch_persite_logh) {
             for (const auto &pinfo: msa->part_list())
                 tree_slh.emplace_back(pinfo.msa().length());
@@ -85,7 +89,7 @@ public:
         std::iota(au_tree_ids.begin(), au_tree_ids.end(), 0);
         this->au_assignment = load_balancer.get_all_assignments(au_tree_ids, num_threads);
 
-        // load-balance work where one tree can be manaaged by one thread only
+        // load-balance work where one tree can be managed by one thread only
         CoarseAssignment exclusive_tree_access(batch_size);
         std::iota(exclusive_tree_access.begin(), exclusive_tree_access.end(), 0);
         this->exclusive_assignment = load_balancer.get_all_assignments(exclusive_tree_access, num_threads);
@@ -101,10 +105,7 @@ public:
           reference_persite_loglh(other.reference_persite_loglh),
           msa(std::move(other.msa)),
           starting_seed(other.starting_seed),
-          meta_parameters(std::move(other.meta_parameters)),
           batch_start_trees(std::move(other.batch_start_trees)),
-          num_fast_spr_performed(other.num_fast_spr_performed),
-          num_slow_spr_performed(other.num_slow_spr_performed),
           au_assignment(std::move(other.au_assignment)),
           exclusive_assignment(std::move(other.exclusive_assignment)),
           coarse_assignments(std::move(other.coarse_assignments)),
@@ -116,7 +117,8 @@ public:
           initial_model_optimized(other.initial_model_optimized),
           plausible_tree_count(other.plausible_tree_count),
           wall_time(other.wall_time),
-          tree_topologies(std::move(other.tree_topologies)) {
+          tree_topologies(std::move(other.tree_topologies)), fixed_spr_(std::move(other.fixed_spr_)) {
+        *meta_parameters = *other.meta_parameters;
     }
 
     // explicitly implement move-assign to avoid implicit deletion
@@ -126,12 +128,10 @@ public:
             return *this;
         reuse_attempts = other.reuse_attempts;
         name = std::move(other.name);
-        meta_parameters = std::move(other.meta_parameters);
+        *meta_parameters = *other.meta_parameters;
         starting_seed = other.starting_seed;
         batch_start_trees = std::move(other.batch_start_trees);
         msa = std::move(other.msa);
-        num_fast_spr_performed = other.num_fast_spr_performed;
-        num_slow_spr_performed = other.num_slow_spr_performed;
         reference_persite_loglh = other.reference_persite_loglh;
         au_assignment = std::move(other.au_assignment);
         exclusive_assignment = std::move(other.exclusive_assignment);
@@ -145,6 +145,7 @@ public:
         initial_model_optimized = other.initial_model_optimized;
         plausible_tree_count = other.plausible_tree_count;
         wall_time = other.wall_time;
+        fixed_spr_ = std::move(other.fixed_spr_);
         return *this;
     }
 
@@ -175,7 +176,8 @@ public:
      *
      * @return The number of plausible trees.
      */
-    void perform_plausibility_check(const Options &opts, SharedBatchResources &resources, bool initialized, const TaskGroup &context,
+    void perform_plausibility_check(const Options &opts, SharedBatchResources &resources, bool initialized,
+                                    const TaskGroup &context,
                                     unsigned int worker_id,
                                     unsigned int thread_id);
 
@@ -289,24 +291,12 @@ protected:
      * The meta-heuristic parameters for inferring trees. These are not the model parameters, but settings of the
      * inference heuristics which are being optimized for plausible tree throughput during tree set inference.
      */
-    shared_ptr<MetaParameters> meta_parameters;
+    const shared_ptr<MetaParameters> meta_parameters;
 
     /**
      * Starting trees for this inference batch
      */
     shared_ptr<TreeList> batch_start_trees;
-
-    /**
-     * Number of fast SPR rounds that have already been performed on the tree. This is increased by the `infer_batch`
-     * method.
-     */
-    unsigned int num_fast_spr_performed{0};
-
-    /**
-     * Number of slow SPR rounds that have already been performed on the tree. This is increased by the `infer_batch`
-     * method.
-     */
-    unsigned int num_slow_spr_performed{0};
 
     /**
      * Assignment of trees to threads for the AU test. The AU test cannot split between partitions, and so no tree
@@ -414,30 +404,8 @@ protected:
      */
     doubleVector p_values;
 
-    /**
-     * Update an spr_round_params instance according to the meta_parameters.
-     *
-     * @param opts parsed command line options with defaults and user-mandated search parameters
-     * @param spr_params a new instance of spr_round_params of the local thread
-     */
-    void auto_configure(const Options &opts, spr_round_params &spr_params) const {
-        // update options according to MetaParameters:
-        spr_params.ntopol_keep = this->meta_parameters->keep_top_k_topol;
-        spr_params.subtree_cutoff = opts.spr_cutoff;
-        spr_params.radius_min = 1;
-
-        // if all fast spr rounds have been performed, set thorough to true, so further spr rounds are slow
-        spr_params.thorough = this->num_fast_spr_performed >= this->meta_parameters->num_fast_spr;
-        spr_params.lh_epsilon_brlen_full = opts.lh_epsilon;
-        spr_params.lh_epsilon_brlen_triplet = opts.lh_epsilon_brlen_triplet;
-
-        // taken from the fast heuristic
-        spr_params.radius_max = (spr_params.thorough ? 1 : 2) * meta_parameters->max_adaptive_radius;
-
-        // we don't need those
-        spr_params.increasing_moves = nullptr;
-        spr_params.total_moves = nullptr;
-    }
+    // TODO temporary
+    FixedSpr fixed_spr_;
 
     /**
      * @return Whether all starting trees have been generated for this batch.

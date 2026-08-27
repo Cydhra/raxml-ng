@@ -144,7 +144,7 @@ void TunedBatch::optimize_nni(const Options &opts, SharedBatchResources &resourc
         }
 
         spr_round_params spr_params;
-        this->auto_configure(opts, spr_params);
+        this->meta_parameters->auto_configure(opts, spr_params, 2);
         spr_params.radius_max = 1;
         spr_params.thorough = false;
         spr_params.ntopol_keep = 1;
@@ -180,75 +180,8 @@ void TunedBatch::optimize_topology(const Options &opts, const TaskGroup &context
                                    const unsigned int worker_id, const unsigned int thread_id) {
     const auto &tree_ids = this->coarse_assignments.at(worker_id);
 
-    while (this->meta_parameters->num_fast_spr > this->num_fast_spr_performed || this->meta_parameters->num_slow_spr >
-           this->num_slow_spr_performed) {
-        const auto fast = this->meta_parameters->num_fast_spr > this->num_fast_spr_performed;
-        const auto rounds_performed = fast ? this->num_fast_spr_performed : this->num_slow_spr_performed;
-        auto total_rounds = fast ? meta_parameters->num_fast_spr : meta_parameters->num_slow_spr;
-        auto num_rounds = total_rounds - rounds_performed;
-
-        // make sure the spr-params are set correctly for fast/slow rounds
-        spr_round_params spr_params;
-        this->auto_configure(opts, spr_params);
-
-        if (context.is_group_leader(worker_id, thread_id)) {
-            auto round_name = fast ? "FAST" : "SLOW";
-            LOG_INFO_TS << this->name << ": Optimizing topology (" << num_rounds << " of " << total_rounds << " total "
-                    << round_name << " spr rounds, radius: " << spr_params.radius_max << ")" << std::endl;
-        }
-
-        auto begin = std::chrono::steady_clock::now();
-
-        // run optimization kernel
-        for (const auto tree_id: tree_ids) {
-            // reset cutoff between tree searches to avoid under-optimizing a tree with cutoffs from previous trees.
-            // this also prevents the cutoff info to have invalid data due to uninitialized instantiation
-            const auto loglh = batch_trees[tree_id][thread_id].value().loglh();
-            spr_params.reset_cutoff_info(loglh, true);
-
-            for (unsigned int spr_round = rounds_performed; spr_round < total_rounds; ++spr_round) {
-                InferencePhase phase = spr_params.thorough
-                                           ? SlowSprRound{spr_round}
-                                           : (meta_parameters->keep_top_k_topol == 1
-                                                  ? static_cast<InferencePhase>(GreedySprRound{spr_round})
-                                                  : static_cast<InferencePhase>(FastSprRound{spr_round}));
-                if (context.is_group_leader(worker_id, thread_id)) {
-                    resources.get_profiling().start_measurement(*this, phase);
-                    begin = std::chrono::steady_clock::now();
-                }
-
-                batch_trees[tree_id][thread_id].value().spr_round(spr_params);
-                batch_trees[tree_id][thread_id].value().optimize_branches(1.0, 1);
-
-                if (context.is_group_leader(worker_id, thread_id)) {
-                    const auto end = std::chrono::steady_clock::now();
-
-                    const unsigned int elapsed = static_cast<unsigned int>(std::chrono::duration_cast<
-                        std::chrono::milliseconds>(end - begin).count());
-                    this->wall_time += elapsed;
-
-                    resources.get_profiling().finish_measurement(*this, phase);
-                }
-            }
-
-            LOG_WORKER_TS(LogLevel::debug) << "performed " << (total_rounds - rounds_performed)
-                    << (spr_params.ntopol_keep < 20 ? " GREEDY" : " FAST") << " spr rounds (radius: " << spr_params.
-                    radius_min
-                    << ") for tree search #" << (tree_id + 1) << std::endl;
-        }
-
-        // update the TunedBatch status
-        if (context.is_group_leader(worker_id, thread_id)) {
-            if (fast) {
-                this->num_fast_spr_performed = this->meta_parameters->num_fast_spr;
-            } else {
-                this->num_slow_spr_performed = this->meta_parameters->num_slow_spr;
-            }
-        }
-
-        // make sure the spr_performed-variables are updated for all threads before they call auto_configure to avoid
-        // desynchronization of whether we perform slow or fast spr rounds, or re-evaluate the loop condition
-        context.enter_barrier();
+    for (const auto tree_id: tree_ids) {
+        fixed_spr_.do_optimize(batch_trees[tree_id][thread_id].value(), opts, context, resources, worker_id, thread_id);
     }
 }
 
@@ -531,7 +464,8 @@ void TunedBatch::perform_plausibility_check(const Options &opts, SharedBatchReso
 }
 
 void TunedBatch::update_meta_parameters(const shared_ptr<MetaParameters> &new_parameters) {
-    this->meta_parameters = new_parameters;
+    // TODO the shared pointer is pre-shared with the strategies. But this means we must not re-assign it.
+    *this->meta_parameters = *new_parameters;
     this->meta_parameters_set = true;
 }
 
@@ -549,55 +483,58 @@ bool TunedBatch::is_compatible(const MetaParameters &new_parameters) const {
         return false;
     }
 
+    // TODO: this method needs to be part of heuristics
+    return false;
+
     // do not reuse batch if it was created with a different model
-    if ((this->num_fast_spr_performed > 0 || this->num_slow_spr_performed > 0) && this->meta_parameters->model_override
-        != new_parameters.model_override) {
-        return false;
-    }
+    // if ((this->num_fast_spr_performed > 0 || this->num_slow_spr_performed > 0) && this->meta_parameters->model_override
+    //     != new_parameters.model_override) {
+    //     return false;
+    // }
 
     // if settings of the SPR rounds do not match, and we already completed some SPR rounds,
     // the new parameters cannot replace the current ones
-    if (this->num_fast_spr_performed > 0) {
-        if (this->meta_parameters->keep_top_k_topol != new_parameters.keep_top_k_topol) {
-            return false;
-        }
-        if (this->meta_parameters->max_adaptive_radius != new_parameters.max_adaptive_radius) {
-            return false;
-        }
-
-        if (this->meta_parameters->num_fast_spr > new_parameters.num_fast_spr) {
-            return false;
-        }
-    }
-
-    if (this->num_slow_spr_performed > 0) {
-        if (this->meta_parameters->keep_top_k_topol != new_parameters.keep_top_k_topol) {
-            return false;
-        }
-        if (this->meta_parameters->max_adaptive_radius != new_parameters.max_adaptive_radius) {
-            return false;
-        }
-
-        // if we already completed some slow rounds, but the other parameter wants to do more fast rounds,
-        // we reject, because order matters
-        if (this->meta_parameters->num_fast_spr != new_parameters.num_fast_spr) {
-            return false;
-        }
-
-        if (this->meta_parameters->num_slow_spr > new_parameters.num_slow_spr) {
-            return false;
-        }
-    }
+    // if (this->num_fast_spr_performed > 0) {
+    //     if (this->meta_parameters->keep_top_k_topol != new_parameters.keep_top_k_topol) {
+    //         return false;
+    //     }
+    //     if (this->meta_parameters->max_adaptive_radius != new_parameters.max_adaptive_radius) {
+    //         return false;
+    //     }
+    //
+    //     if (this->meta_parameters->num_fast_spr > new_parameters.num_fast_spr) {
+    //         return false;
+    //     }
+    // }
+    //
+    // if (this->num_slow_spr_performed > 0) {
+    //     if (this->meta_parameters->keep_top_k_topol != new_parameters.keep_top_k_topol) {
+    //         return false;
+    //     }
+    //     if (this->meta_parameters->max_adaptive_radius != new_parameters.max_adaptive_radius) {
+    //         return false;
+    //     }
+    //
+    //     // if we already completed some slow rounds, but the other parameter wants to do more fast rounds,
+    //     // we reject, because order matters
+    //     if (this->meta_parameters->num_fast_spr != new_parameters.num_fast_spr) {
+    //         return false;
+    //     }
+    //
+    //     if (this->meta_parameters->num_slow_spr > new_parameters.num_slow_spr) {
+    //         return false;
+    //     }
+    // }
 
     // if the way the model is obtained doesn't match, the new parameters cannot replace the current ones
-    if (this->initial_model_optimized && this->meta_parameters->early_commit != new_parameters.early_commit) {
-        return false;
-    }
-    if (this->initial_model_optimized && this->meta_parameters->skip_model != new_parameters.skip_model) {
-        return false;
-    }
-
-    return true;
+    // if (this->initial_model_optimized && this->meta_parameters->early_commit != new_parameters.early_commit) {
+    //     return false;
+    // }
+    // if (this->initial_model_optimized && this->meta_parameters->skip_model != new_parameters.skip_model) {
+    //     return false;
+    // }
+    //
+    // return true;
 }
 
 void TunedBatch::backup_models(ModelMap &target) const {
