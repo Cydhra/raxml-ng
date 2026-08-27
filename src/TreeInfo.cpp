@@ -34,22 +34,54 @@ TreeInfo::TreeInfo(const Options &opts, const Tree &tree, const PartitionedMSA &
   init(opts, tree, parted_msa, tip_msa_idmap, part_assign, std::vector<uintVector>(), partition_id, model);
 }
 
-TreeInfo::TreeInfo(TreeInfo &&other) noexcept : _pll_treeinfo(std::move(other._pll_treeinfo)),
+TreeInfo::TreeInfo(TreeInfo &&other) noexcept : _pll_treeinfo(other._pll_treeinfo),
                                                 _parts_master(std::move(other._parts_master)),
-                                                _brlen_opt_method(std::move(other._brlen_opt_method)),
-                                                _brlen_min(std::move(other._brlen_min)),
+                                                _brlen_opt_method(other._brlen_opt_method),
+                                                _brlen_min(other._brlen_min),
                                                 _brlen_max(std::move(other._brlen_max)),
-                                                _check_lh_impr(std::move(other._check_lh_impr)),
+                                                _check_lh_impr(other._check_lh_impr),
                                                 _use_old_constraint(std::move(other._use_old_constraint)),
-                                                _use_spr_fastclv(std::move(other._use_spr_fastclv)),
-                                                _lh_epsilon(std::move(other._lh_epsilon)),
-                                                _param_epsilon(std::move(other._param_epsilon)),
+                                                _use_spr_fastclv(other._use_spr_fastclv),
+                                                _lh_epsilon(other._lh_epsilon),
+                                                _param_epsilon(other._param_epsilon),
                                                 _partition_contributions(std::move(other._partition_contributions)),
-                                                _freerate_opt(std::move(other._freerate_opt)),
+                                                _freerate_opt(other._freerate_opt),
                                                 _param_opt_order(std::move(other._param_opt_order))
 {
   // take ownership of the corax allocation
   other._pll_treeinfo = nullptr;
+}
+
+TreeInfo & TreeInfo::operator=(TreeInfo &&other) noexcept {
+  if (this == &other)
+    return *this;
+
+  if (_pll_treeinfo) {
+    for (unsigned int i = 0; i < _pll_treeinfo->partition_count; ++i) {
+      if (_pll_treeinfo->partitions[i])
+        corax_partition_destroy(_pll_treeinfo->partitions[i]);
+    }
+
+    corax_utree_graph_destroy(_pll_treeinfo->root, NULL);
+    corax_treeinfo_destroy(_pll_treeinfo);
+  }
+
+  _pll_treeinfo = other._pll_treeinfo;
+  other._pll_treeinfo = nullptr;
+
+  _parts_master = std::move(other._parts_master);
+  _brlen_opt_method = other._brlen_opt_method;
+  _brlen_min = other._brlen_min;
+  _brlen_max = other._brlen_max;
+  _check_lh_impr = other._check_lh_impr;
+  _use_old_constraint = other._use_old_constraint;
+  _use_spr_fastclv = other._use_spr_fastclv;
+  _lh_epsilon = other._lh_epsilon;
+  _param_epsilon = other._param_epsilon;
+  _partition_contributions = std::move(other._partition_contributions);
+  _freerate_opt = other._freerate_opt;
+  _param_opt_order = std::move(other._param_opt_order);
+  return *this;
 }
 
 // modeltest edition
