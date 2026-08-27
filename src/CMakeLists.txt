@@ -12,7 +12,8 @@ file(GLOB RAXML_SOURCES ${PROJECT_SOURCE_DIR}/src/common.h
                         ${PROJECT_SOURCE_DIR}/src/adaptive/*.cpp
                         ${PROJECT_SOURCE_DIR}/src/modeltest/*.cpp
                         ${PROJECT_SOURCE_DIR}/src/au/*.cpp
-                        ${PROJECT_SOURCE_DIR}/src/treesets/*.cpp)
+                        ${PROJECT_SOURCE_DIR}/src/treesets/*.cpp
+                        ${PROJECT_SOURCE_DIR}/src/treesets/heuristic/*.cpp)
 
 if(USE_TERRAPHAST)
   file (GLOB TERRACE_SOURCES ${PROJECT_SOURCE_DIR}/src/terraces/*.cpp)
