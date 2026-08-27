@@ -8,6 +8,7 @@
 #include "Threadpool.hpp"
 #include "heuristic/Heuristic.hpp"
 #include "heuristic/FixedSpr.hpp"
+#include "heuristic/NniRound.hpp"
 #include "../loadbalance/LoadBalancer.hpp"
 #include "../loadbalance/CoarseLoadBalancer.hpp"
 #include "../au/AuTest.hpp"
@@ -50,7 +51,8 @@ public:
           batch_start_trees(new TreeList(batch_size)),
           tip_msa_idmap(tip_msa_idmap),
           batch_persite_logh(std::vector<std::vector<doubleVector> >(batch_size)),
-          fixed_spr_(name, nullptr, meta_parameters) {
+          fixed_spr_(name, nullptr, meta_parameters),
+          nni_round_(name, nullptr, meta_parameters) {
         for (auto &tree_slh: batch_persite_logh) {
             for (const auto &pinfo: msa->part_list())
                 tree_slh.emplace_back(pinfo.msa().length());
@@ -117,7 +119,7 @@ public:
           initial_model_optimized(other.initial_model_optimized),
           plausible_tree_count(other.plausible_tree_count),
           wall_time(other.wall_time),
-          tree_topologies(std::move(other.tree_topologies)), fixed_spr_(std::move(other.fixed_spr_)) {
+          tree_topologies(std::move(other.tree_topologies)), fixed_spr_(std::move(other.fixed_spr_)), nni_round_(std::move(other.nni_round_)) {
         *meta_parameters = *other.meta_parameters;
     }
 
@@ -146,6 +148,7 @@ public:
         plausible_tree_count = other.plausible_tree_count;
         wall_time = other.wall_time;
         fixed_spr_ = std::move(other.fixed_spr_);
+        nni_round_ = std::move(other.nni_round_);
         return *this;
     }
 
@@ -406,6 +409,8 @@ protected:
 
     // TODO temporary
     FixedSpr fixed_spr_;
+
+    NniRound nni_round_;
 
     /**
      * @return Whether all starting trees have been generated for this batch.
