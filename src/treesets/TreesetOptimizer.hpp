@@ -9,7 +9,6 @@
 #include "../Checkpoint.hpp"
 #include "Threadpool.hpp"
 #include "SharedBatchResources.hpp"
-#include "TreesetProfiling.hpp"
 
 constexpr unsigned int DEFAULT_BATCH_SIZE = 16;
 

@@ -4,7 +4,6 @@
 #include "Bandit.hpp"
 #include "SharedBatchResources.hpp"
 #include "Threadpool.hpp"
-#include "TreesetProfiling.hpp"
 
 using namespace std::placeholders;
 
@@ -92,10 +91,6 @@ void TunedBatch::optimize(RaxmlInstance &instance, const Options &opts, SharedBa
         throw RaxmlException("TunedBatch has not been configured with meta heuristics");
     }
 
-    if (context.is_group_leader(worker_id, thread_id)) {
-        resources.get_profiling().start_measurement(*this, CompleteInference{});
-    }
-
     if (!this->start_trees_generated()) {
         this->generate_starting_trees(instance, opts, context, worker_id, thread_id);
     }
@@ -158,8 +153,6 @@ void TunedBatch::optimize(RaxmlInstance &instance, const Options &opts, SharedBa
         for (auto &batch_tree: this->batch_trees) {
             this->tree_topologies.push_back(batch_tree.at(0).value().tree());
         }
-
-        resources.get_profiling().finish_measurement(*this, CompleteInference{});
     }
 }
 

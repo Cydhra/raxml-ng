@@ -111,8 +111,6 @@ void TreesetOptimizer::run() {
     LOG_INFO_TS << "Inferred " << this->batch_queue.num_plausible_trees() << " plausible trees in " << this->batch_queue
             .num_batches() <<
             " batches." << std::endl;
-
-    shared_batch_resources.get_profiling().print_report();
 }
 
 void TreesetOptimizer::check_mab_modification() {

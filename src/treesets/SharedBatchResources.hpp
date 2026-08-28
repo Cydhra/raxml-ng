@@ -2,7 +2,6 @@
 #define RAXML_SHAREDBATCHRESOURCES_HPP_
 
 #include "Threadpool.hpp"
-#include "TreesetProfiling.hpp"
 #include "../au/AuTest.hpp"
 #include "../Optimizer.hpp"
 
@@ -64,13 +63,6 @@ public:
     }
 
     /**
-     * Get the profiling instance. The instance is thread-safe, so there is only one global profiler.
-     */
-    TreesetProfiling &get_profiling() {
-        return profiling;
-    }
-
-    /**
      * @return An Optimizer instance pre-configured to run `RAxML-ng --fast` inference
      */
     Optimizer &get_fast_optimizer() const {
@@ -122,11 +114,6 @@ public:
     }
 
 protected:
-    /**
-     * Handles fine-grained profiling of batch optimization
-     */
-    TreesetProfiling profiling;
-
     /**
      * Shared AU test instances, one for each thread group. These are initialized with drastically reduced replication
      * counts to be able to be used for pre-screening.
