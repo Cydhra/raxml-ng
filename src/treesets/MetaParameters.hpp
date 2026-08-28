@@ -128,31 +128,6 @@ struct MetaParameters {
                                                               : static_cast<std::size_t>(0));
         return seed;
     }
-
-    /**
-     * Update an spr_round_params instance according to the meta_parameters.
-     *
-     * @param opts parsed command line options with defaults and user-mandated search parameters
-     * @param spr_params a new instance of spr_round_params of the local thread
-     */
-    void auto_configure(const Options &opts, spr_round_params &spr_params, unsigned int num_fast_spr_performed) const {
-        // update options according to MetaParameters:
-        spr_params.ntopol_keep = this->keep_top_k_topol;
-        spr_params.subtree_cutoff = opts.spr_cutoff;
-        spr_params.radius_min = 1;
-
-        // if all fast spr rounds have been performed, set thorough to true, so further spr rounds are slow
-        spr_params.thorough = num_fast_spr_performed >= this->num_fast_spr;
-        spr_params.lh_epsilon_brlen_full = opts.lh_epsilon;
-        spr_params.lh_epsilon_brlen_triplet = opts.lh_epsilon_brlen_triplet;
-
-        // taken from the fast heuristic
-        spr_params.radius_max = (spr_params.thorough ? 1 : 2) * this->max_adaptive_radius;
-
-        // we don't need those
-        spr_params.increasing_moves = nullptr;
-        spr_params.total_moves = nullptr;
-    }
 };
 
 template<>

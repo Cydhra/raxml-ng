@@ -1,52 +1,29 @@
 #include "FixedSpr.hpp"
 #include "../SharedBatchResources.hpp"
 
-void FixedSpr::do_optimize(std::optional<TreeInfo> &tree, unsigned int, const Options &opts, const TaskGroup &context, SharedBatchResources &,
-                           const unsigned int worker_id, const unsigned int thread_id) {
-    while (this->meta_parameters->num_fast_spr > this->num_fast_spr_performed || this->meta_parameters->num_slow_spr >
-           this->num_slow_spr_performed) {
-        const auto fast = this->meta_parameters->num_fast_spr > this->num_fast_spr_performed;
-        const auto rounds_performed = fast ? this->num_fast_spr_performed : this->num_slow_spr_performed;
-        auto total_rounds = fast ? meta_parameters->num_fast_spr : meta_parameters->num_slow_spr;
-        auto num_rounds = total_rounds - rounds_performed;
+void FixedSpr::do_optimize(std::optional<TreeInfo> &tree, const unsigned int tree_id, const Options &opts,
+                           const TaskGroup &context,
+                           SharedBatchResources &, const unsigned int worker_id, const unsigned int thread_id) {
+    const auto round_name = thorough ? "SLOW" : (keep_top_k_topol < 20 ? " GREEDY" : " FAST");
 
-        // make sure the spr-params are set correctly for fast/slow rounds
-        spr_round_params spr_params;
-        this->meta_parameters->auto_configure(opts, spr_params, num_fast_spr_performed);
-        const auto loglh = tree->loglh();
-        spr_params.reset_cutoff_info(loglh, true);
+    // make sure the spr-params are set correctly for fast/slow rounds
+    auto spr_params = this->auto_configure(opts);
+    const auto loglh = tree->loglh();
+    spr_params.reset_cutoff_info(loglh, true);
 
-        if (context.is_group_leader(worker_id, thread_id)) {
-            auto round_name = fast ? "FAST" : "SLOW";
-            LOG_INFO_TS << this->batch_name << ": Optimizing topology (" << num_rounds << " of " << total_rounds <<
-                    " total "
-                    << round_name << " spr rounds, radius: " << spr_params.radius_max << ")" << std::endl;
-        }
-
-        // run optimization kernel
-        // reset cutoff between tree searches to avoid under-optimizing a tree with cutoffs from previous trees.
-        // this also prevents the cutoff info to have invalid data due to uninitialized instantiation
-        for (unsigned int spr_round = rounds_performed; spr_round < total_rounds; ++spr_round) {
-            tree->spr_round(spr_params);
-            tree->optimize_branches(1.0, 1);
-        }
-
-        LOG_WORKER_TS(LogLevel::debug) << "performed " << (total_rounds - rounds_performed)
-                << (spr_params.ntopol_keep < 20 ? " GREEDY" : " FAST") << " spr rounds (radius: " << spr_params.
-                radius_min
-                << ") for tree search #?" << std::endl;
-
-        // update the TunedBatch status
-        if (context.is_group_leader(worker_id, thread_id)) {
-            if (fast) {
-                this->num_fast_spr_performed = this->meta_parameters->num_fast_spr;
-            } else {
-                this->num_slow_spr_performed = this->meta_parameters->num_slow_spr;
-            }
-        }
-
-        // make sure the spr_performed-variables are updated for all threads before they call auto_configure to avoid
-        // desynchronization of whether we perform slow or fast spr rounds, or re-evaluate the loop condition
-        context.enter_barrier();
+    if (context.is_group_leader(worker_id, thread_id) && tree_id == 0) {
+        LOG_INFO_TS << this->batch_name << ": Optimizing topology (" << this->num_spr << " " << round_name <<
+                " spr rounds, radius: " << spr_params.radius_max << ")" << std::endl;
     }
+
+    // run optimization kernel
+    // reset cutoff between tree searches to avoid under-optimizing a tree with cutoffs from previous trees.
+    // this also prevents the cutoff info to have invalid data due to uninitialized instantiation
+    for (unsigned int spr_round = 0; spr_round < this->num_spr; ++spr_round) {
+        tree->spr_round(spr_params);
+        tree->optimize_branches(1.0, 1);
+    }
+
+    LOG_WORKER_TS(LogLevel::debug) << "performed " << num_spr << " " << round_name << " spr rounds (radius: " <<
+            spr_params.radius_min << ") for tree search #" << tree_id << std::endl;
 }
