@@ -50,7 +50,7 @@ void Constrain::do_optimize(std::optional<TreeInfo> &tree, const unsigned int, c
     NameIdMap new_label_id_map;
     IDVector new_tip_msa_map;
     new_tip_msa_map.resize(msa->taxon_count());
-    auto cons_name_map = constraint->tip_ids();
+    const auto cons_name_map = constraint->tip_ids();
     size_t seq_id = 0;
     size_t cons_tip_id = 0;
     size_t free_tip_id = constraint->num_tips();

@@ -23,26 +23,12 @@ void FixedSpr::do_optimize(std::optional<TreeInfo> &tree, unsigned int, const Op
                     << round_name << " spr rounds, radius: " << spr_params.radius_max << ")" << std::endl;
         }
 
-        auto begin = std::chrono::steady_clock::now();
-
         // run optimization kernel
         // reset cutoff between tree searches to avoid under-optimizing a tree with cutoffs from previous trees.
         // this also prevents the cutoff info to have invalid data due to uninitialized instantiation
         for (unsigned int spr_round = rounds_performed; spr_round < total_rounds; ++spr_round) {
-            if (context.is_group_leader(worker_id, thread_id)) {
-                begin = std::chrono::steady_clock::now();
-            }
-
             tree->spr_round(spr_params);
             tree->optimize_branches(1.0, 1);
-
-            if (context.is_group_leader(worker_id, thread_id)) {
-                const auto end = std::chrono::steady_clock::now();
-
-                const unsigned int elapsed = static_cast<unsigned int>(std::chrono::duration_cast<
-                    std::chrono::milliseconds>(end - begin).count());
-                this->cumulative_wall_time += elapsed;
-            }
         }
 
         LOG_WORKER_TS(LogLevel::debug) << "performed " << (total_rounds - rounds_performed)

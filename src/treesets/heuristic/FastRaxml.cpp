@@ -4,7 +4,6 @@
 void FastRaxml::do_optimize(std::optional<TreeInfo> &tree, unsigned int, const Options&, const TaskGroup &context, SharedBatchResources &resources, const unsigned int worker_id, const unsigned int thread_id) {
     auto &optimizer = resources.get_fast_optimizer();
     const auto stop_criterion = resources.get_fast_stop_criterion();
-    const auto begin = std::chrono::steady_clock::now();
 
     if (context.is_group_leader(worker_id, thread_id)) {
         LOG_INFO_TS << this->batch_name << ": Calling RAxML --fast..." << std::endl;
@@ -23,12 +22,4 @@ void FastRaxml::do_optimize(std::optional<TreeInfo> &tree, unsigned int, const O
 
     // optimize using standard raxml
     optimizer.optimize_topology(tree_info, cm);
-
-    context.enter_barrier(); // Todo this barrier is awkward, but fast raxml is expected to be slower in some threads
-    if (context.is_group_leader(worker_id, thread_id)) {
-        const auto end = std::chrono::steady_clock::now();
-        this->cumulative_wall_time += static_cast<unsigned int>(std::chrono::duration_cast<std::chrono::milliseconds>(
-                end - begin)
-            .count());
-    }
 }

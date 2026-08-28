@@ -1,8 +1,8 @@
 #include "NniRound.hpp"
 #include "../SharedBatchResources.hpp"
 
-void NniRound::do_optimize(std::optional<TreeInfo> &tree, unsigned int, const Options &opts, const TaskGroup &context, SharedBatchResources &, const unsigned int worker_id, const unsigned int thread_id) {
-    if (context.is_group_leader(worker_id, thread_id)) {
+void NniRound::do_optimize(std::optional<TreeInfo> &tree, unsigned int tree_id, const Options &opts, const TaskGroup &context, SharedBatchResources &, const unsigned int worker_id, const unsigned int thread_id) {
+    if (context.is_group_leader(worker_id, thread_id) && tree_id == 0) {
         LOG_INFO_TS << this->batch_name << ": Performing NNI round." << std::endl;
     }
 
@@ -13,8 +13,6 @@ void NniRound::do_optimize(std::optional<TreeInfo> &tree, unsigned int, const Op
     spr_params.thorough = false;
     spr_params.ntopol_keep = 1;
 
-    const auto begin = std::chrono::steady_clock::now();
-
     // reset cutoff info for each tree. This has to be done, even if it is just one tree, to avoid
     // uninitialized cutoff problems
     const auto loglh = tree->loglh();
@@ -22,12 +20,4 @@ void NniRound::do_optimize(std::optional<TreeInfo> &tree, unsigned int, const Op
 
     tree->spr_round(spr_params);
     tree->optimize_branches(1.0, 1);
-
-    if (context.is_group_leader(worker_id, thread_id)) {
-        const auto end = std::chrono::steady_clock::now();
-
-        const auto elapsed = static_cast<unsigned int>(std::chrono::duration_cast<
-            std::chrono::milliseconds>(end - begin).count());
-        this->cumulative_wall_time += elapsed;
-    }
 }

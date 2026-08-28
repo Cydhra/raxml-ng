@@ -2,7 +2,6 @@
 #define RAXML_HEURISTIC_HPP_
 
 #include <memory>
-#include <utility>
 #include <string>
 #include "../MetaParameters.hpp"
 #include "../Threadpool.hpp"
@@ -54,7 +53,13 @@ public:
             inner->optimize(tree, tree_id, opts, context, resources, worker_id, thread_id);
         }
 
+        const auto begin = std::chrono::steady_clock::now();
         do_optimize(tree, tree_id, opts, context, resources, worker_id, thread_id);
+        const auto end = std::chrono::steady_clock::now();
+        const unsigned int elapsed = static_cast<unsigned int>(std::chrono::duration_cast<
+            std::chrono::milliseconds>(end - begin).count());
+
+        cumulative_wall_time->fetch_add(elapsed);
     }
 
     /**
@@ -78,17 +83,17 @@ public:
 
 protected:
     /**
-     * Wall-time spent on the current heuristic. This is cumulative across all trees, even if they were processed in
-     * parallel.
-     */
-    unsigned int cumulative_wall_time = 0;
-
-    /**
      * Batch name of the batch that owns this strategy, used for log output.
      */
     std::string batch_name;
 
 private:
+    /**
+     * Wall-time spent on the current heuristic. This is cumulative across all trees, even if they were processed in
+     * parallel.
+     */
+    std::unique_ptr<atomic_uint> cumulative_wall_time = make_unique<atomic_uint>(0);
+
     /**
      * Previous stage of the decorator chain. If this pointer is not null, the strategy contained in this pointer is
      * called before the current stage is executed.
