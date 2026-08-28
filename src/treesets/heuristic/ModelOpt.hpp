@@ -5,14 +5,11 @@
 
 class ModelOpt : public InferenceHeuristic {
 public:
-    ModelOpt(const std::string &batch_name, std::unique_ptr<InferenceHeuristic> inner,
-             const std::shared_ptr<MetaParameters> &meta_parameters, const bool model, const bool branches,
-             const bool force, const double epsilon)
+    ModelOpt(const std::string &batch_name, std::unique_ptr<InferenceHeuristic> inner, const bool model,
+             const bool branches, const double epsilon)
         : InferenceHeuristic(batch_name, std::move(inner)),
-          meta_parameters(meta_parameters),
           model(model),
           branches(branches),
-          force(force),
           epsilon(epsilon) {
     }
 
@@ -20,18 +17,14 @@ public:
 
     ModelOpt &operator=(ModelOpt &&other) noexcept = default;
 
-    void do_optimize(std::optional<TreeInfo> &tree, unsigned int tree_id, const Options &opts, const TaskGroup &context, SharedBatchResources &resources,
+    void do_optimize(std::optional<TreeInfo> &tree, unsigned int tree_id, const Options &opts, const TaskGroup &context,
+                     SharedBatchResources &resources,
                      unsigned int worker_id, unsigned int thread_id) override;
-
-    // TODO remove
-    std::shared_ptr<MetaParameters> meta_parameters;
 
 protected:
     bool model;
 
     bool branches;
-
-    bool force;
 
     double epsilon;
 };

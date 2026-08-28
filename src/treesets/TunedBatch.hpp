@@ -57,7 +57,7 @@ public:
           batch_persite_logh(std::vector<std::vector<doubleVector> >(batch_size)),
           fixed_spr_(name, nullptr, 2, 20, false, 10),
           nni_round_(name, nullptr),
-          model_opt_(name, nullptr, meta_parameters, true, true, false, 0.1), // TODO: do not use constant values here
+          model_opt_(name, nullptr, true, true, 0.1), // TODO: do not use constant values here
           constrain_(name, nullptr, msa), fast_raxml_(FastRaxml(name, nullptr, part_assignments /* this is broken and needs to be replaced */)) {
         for (auto &tree_slh: batch_persite_logh) {
             for (const auto &pinfo: msa->part_list())
