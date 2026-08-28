@@ -23,7 +23,7 @@ void TunedBatch::generate_starting_trees(RaxmlInstance &instance, const Options 
     std::iota(seeds.begin(), seeds.end(), this->starting_seed);
 
     // generate trees from seeds
-    for (const auto id: this->exclusive_assignment.at(context.get_group_thread_id(worker_id, thread_id))) {
+    for (const auto id: this->exclusive_assignment->at(context.get_group_thread_id(worker_id, thread_id))) {
         (*this->batch_start_trees)[id] = generate_tree(instance, StartingTree::parsimony, seeds[id], false);
         this->num_trees_generated.fetch_add(1);
     }
@@ -36,11 +36,11 @@ void TunedBatch::generate_starting_trees(RaxmlInstance &instance, const Options 
         if (meta_parameters->model_override.has_value()) {
             const auto model = Model(*meta_parameters->model_override);
             this->batch_trees[id][thread_id].emplace(opts, this->batch_start_trees->at(id), *this->msa,
-                                                     this->tip_msa_idmap, this->part_assignments[thread_id], &model);
+                                                     *this->tip_msa_idmap, this->part_assignments->at(thread_id), &model);
         } else {
             this->batch_trees[id][thread_id].emplace(opts, this->batch_start_trees->at(id), *this->msa,
-                                                     this->tip_msa_idmap, this->part_assignments[thread_id]);
-            assign_models(batch_trees[id][thread_id].value(), this->initial_model);
+                                                     *this->tip_msa_idmap, this->part_assignments->at(thread_id));
+            assign_models(batch_trees[id][thread_id].value(), *this->initial_model);
         }
     }
 
@@ -122,7 +122,7 @@ void TunedBatch::optimize(RaxmlInstance &instance, const Options &opts, SharedBa
 
                 // initialize stop criterion
                 stop_criterion->initialize_persite_lnl_vectors(&tree_info);
-                stop_criterion->set_thread_offset(&tree_info, part_assignments.at(thread_id), ParallelContext::local_proc_id());
+                stop_criterion->set_thread_offset(&tree_info, part_assignments->at(thread_id), ParallelContext::local_proc_id());
                 optimizer.set_stopping_criterion(stop_criterion);
 
                 // optimize using standard raxml
@@ -158,7 +158,7 @@ void TunedBatch::optimize(RaxmlInstance &instance, const Options &opts, SharedBa
             if (meta_parameters->constrain) {
                 // TODO remove explicit assignment here and move it to strategy construction
                 if (context.is_group_leader(worker_id, thread_id)) {
-                    constrain_.partition_assignments = part_assignments;
+                    constrain_.partition_assignments = *part_assignments;
                 }
                 context.enter_barrier();
 
@@ -203,7 +203,7 @@ void TunedBatch::perform_au_test(AuTest &au_test, const bool initialized, const 
         auto &tree_likelihood_vec = batch_persite_logh[tree_id];
         std::vector<double *> thread_partition_view(msa.get()->part_count(), nullptr);
 
-        for (const auto &pa: part_assignments.at(thread_id)) {
+        for (const auto &pa: part_assignments->at(thread_id)) {
             thread_partition_view[pa.part_id] = tree_likelihood_vec[pa.part_id].data() + pa.start;
         }
 
@@ -220,7 +220,7 @@ void TunedBatch::perform_au_test(AuTest &au_test, const bool initialized, const 
     // we therefore use as many workers as possible with one thread each now.
     const std::vector<size_t> &tree_ids =
             initialized
-                ? exclusive_assignment.at(context.get_group_thread_id(worker_id, thread_id))
+                ? exclusive_assignment->at(context.get_group_thread_id(worker_id, thread_id))
                 : au_assignment.at(context.get_group_thread_id(worker_id, thread_id));
     const unsigned int slice_start = initialized
                                          ? *tree_ids.begin() + reference_persite_loglh.size()
@@ -256,8 +256,8 @@ void TunedBatch::perform_plausibility_check(const Options &opts, SharedBatchReso
     // reset model to original for AU test
     if (meta_parameters->model_override) {
         for (auto &tree_id: coarse_assignments.at(worker_id)) {
-            batch_trees[tree_id][thread_id].emplace(opts, batch_trees[tree_id][thread_id]->tree(), *msa, tip_msa_idmap,
-                                                    part_assignments.at(thread_id));
+            batch_trees[tree_id][thread_id].emplace(opts, batch_trees[tree_id][thread_id]->tree(), *msa, *tip_msa_idmap,
+                                                    part_assignments->at(thread_id));
         }
     }
 
@@ -386,7 +386,7 @@ void TunedBatch::backup_models(ModelMap &target) const {
 }
 
 void TunedBatch::assign_batch_models(const ModelMap &other) {
-    initial_model = other;
+    initial_model = make_shared<ModelMap>(other);
 }
 
 void TunedBatch::finalize() {

@@ -51,7 +51,7 @@ public:
           starting_seed(starting_seed),
           meta_parameters(make_shared<MetaParameters>()),
           batch_start_trees(new TreeList(batch_size)),
-          tip_msa_idmap(tip_msa_idmap),
+          tip_msa_idmap(make_shared<IDVector>(tip_msa_idmap)),
           batch_persite_logh(std::vector<std::vector<doubleVector> >(batch_size)),
           fixed_spr_(name, nullptr, meta_parameters),
           nni_round_(name, nullptr, meta_parameters),
@@ -85,7 +85,7 @@ public:
             part_sizes.assign_sites(i, 0, pinfo->length(), pinfo->model().clv_entry_size());
         }
 
-        this->part_assignments = thread_load_balancer.get_all_assignments(part_sizes, threads_per_worker);
+        this->part_assignments = make_shared<PartitionAssignmentList>(thread_load_balancer.get_all_assignments(part_sizes, threads_per_worker));
 
         // load-balance work for AU test, where we have reference trees and trees assigned to one thread need to be
         // contiguous. This is only needed for the first instance of the AU test, afterward we can reuse the bootstrap
@@ -98,7 +98,7 @@ public:
         // load-balance work where one tree can be managed by one thread only
         CoarseAssignment exclusive_tree_access(batch_size);
         std::iota(exclusive_tree_access.begin(), exclusive_tree_access.end(), 0);
-        this->exclusive_assignment = load_balancer.get_all_assignments(exclusive_tree_access, num_threads);
+        this->exclusive_assignment = make_shared<CoarseAssignmentList>(load_balancer.get_all_assignments(exclusive_tree_access, num_threads));
     }
 
     // delete copy constructor because of corax partition
@@ -319,7 +319,7 @@ protected:
      * Assignment of trees to threads where only one thread can work on a tree. This is relevant for starting trees,
      * but can replace the au_assignment once the AU test stops recalculating the reference bootstraps.
      */
-    CoarseAssignmentList exclusive_assignment;
+    std::shared_ptr<CoarseAssignmentList> exclusive_assignment;
 
     /**
      * Assignment of trees to workers for tree inference. The AU test diverges from this assignment because the AU
@@ -330,12 +330,12 @@ protected:
     /**
      * Fine-grained assignment of partitions to threads within workers (thread groups).
      */
-    PartitionAssignmentList part_assignments;
+    std::shared_ptr<PartitionAssignmentList> part_assignments;
 
     /**
      * Vector mapping sequence IDs to the MSA.
      */
-    IDVector &tip_msa_idmap;
+    shared_ptr<IDVector> tip_msa_idmap;
 
     /**
      * Treeinfo objects for the trees inferred in this batch. These objects are updated by the inference algorithm.
@@ -354,7 +354,7 @@ protected:
      * Initial model parameters that get loaded into the tree info objects upon creation.
      * This is initialized after creating the TunedBatch with a call to assign_batch_models.
      */
-    ModelMap initial_model;
+    shared_ptr<ModelMap> initial_model;
 
     /**
      * Flag indicating whether the batch has been configured with meta-parameters.
