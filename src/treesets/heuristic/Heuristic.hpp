@@ -63,6 +63,20 @@ public:
     }
 
     /**
+     * Calculate the cumulative wall-time spent on all inferred trees across the entire heuristic.
+     * Cumulative time is the time spent on each tree as if they were inferred sequentially.
+     *
+     * @return the total cumulative wall-time across the entire heuristic
+     */
+    [[nodiscard]] unsigned int get_total_wall_time() const {
+        unsigned int total = 0;
+        if (inner) {
+            total += inner->get_total_wall_time();
+        }
+        return *cumulative_wall_time + total;
+    }
+
+    /**
      * Implementation of the concrete inference strategy. Inference will modify the `tree` argument, which is passed
      * to each implementation in the decorator chain. Subclasses of `ImprovingHeuristic` have to implement this
      * method.
