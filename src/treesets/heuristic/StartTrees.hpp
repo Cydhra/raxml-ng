@@ -6,10 +6,17 @@
 
 class StartTrees : ImprovingHeuristic {
 public:
-    StartTrees(const std::string &batch_name, std::unique_ptr<ImprovingHeuristic> inner,
-              const std::string &model_override)
-        : ImprovingHeuristic(batch_name, std::move(inner)),
-          model_override(model_override) {
+    StartTrees(std::string batch_name, std::unique_ptr<ImprovingHeuristic> inner,
+        shared_ptr<TreeList> batch_start_trees, std::shared_ptr<PartitionAssignmentList> part_assignments,
+        std::shared_ptr<ModelMap> initial_model, std::optional<std::string> model_override,
+        std::shared_ptr<PartitionedMSA> msa, std::shared_ptr<IDVector> tip_msa_idmap)
+        : ImprovingHeuristic(std::move(batch_name), std::move(inner)),
+          batch_start_trees(std::move(batch_start_trees)),
+          part_assignments(std::move(part_assignments)),
+          initial_model(std::move(initial_model)),
+          model_override(std::move(model_override)),
+          msa(std::move(msa)),
+          tip_msa_idmap(std::move(tip_msa_idmap)) {
     }
 
     StartTrees(StartTrees &&other) noexcept = default;
