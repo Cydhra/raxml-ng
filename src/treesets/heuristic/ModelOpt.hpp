@@ -20,7 +20,7 @@ public:
 
     ModelOpt &operator=(ModelOpt &&other) noexcept = default;
 
-    void do_optimize(std::optional<TreeInfo> &tree, const Options &opts, const TaskGroup &context, SharedBatchResources &resources,
+    void do_optimize(std::optional<TreeInfo> &tree, unsigned int tree_id, const Options &opts, const TaskGroup &context, SharedBatchResources &resources,
                      unsigned int worker_id, unsigned int thread_id) override;
 
     // TODO remove

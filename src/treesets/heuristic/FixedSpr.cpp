@@ -1,7 +1,7 @@
 #include "FixedSpr.hpp"
 #include "../SharedBatchResources.hpp"
 
-void FixedSpr::do_optimize(std::optional<TreeInfo> &tree, const Options &opts, const TaskGroup &context, SharedBatchResources &,
+void FixedSpr::do_optimize(std::optional<TreeInfo> &tree, unsigned int, const Options &opts, const TaskGroup &context, SharedBatchResources &,
                            const unsigned int worker_id, const unsigned int thread_id) {
     while (this->meta_parameters->num_fast_spr > this->num_fast_spr_performed || this->meta_parameters->num_slow_spr >
            this->num_slow_spr_performed) {

@@ -1,7 +1,7 @@
 #include "NniRound.hpp"
 #include "../SharedBatchResources.hpp"
 
-void NniRound::do_optimize(std::optional<TreeInfo> &tree, const Options &opts, const TaskGroup &context, SharedBatchResources &, const unsigned int worker_id, const unsigned int thread_id) {
+void NniRound::do_optimize(std::optional<TreeInfo> &tree, unsigned int, const Options &opts, const TaskGroup &context, SharedBatchResources &, const unsigned int worker_id, const unsigned int thread_id) {
     if (context.is_group_leader(worker_id, thread_id)) {
         LOG_INFO_TS << this->batch_name << ": Performing NNI round." << std::endl;
     }

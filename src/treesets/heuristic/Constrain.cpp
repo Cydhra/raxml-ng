@@ -1,6 +1,6 @@
 #include "Constrain.hpp"
 
-std::optional<Tree> get_reverse_backbone(TreeInfo &tree) {
+static std::optional<Tree> get_reverse_backbone(const TreeInfo &tree) {
     // obtain the topology with negative branch lengths to invert the order of branch lengths.
     Tree constraint = tree.tree();
 
@@ -39,7 +39,7 @@ std::optional<Tree> get_reverse_backbone(TreeInfo &tree) {
     return constraint;
 }
 
-void Constrain::do_optimize(std::optional<TreeInfo> &tree, const Options &opts, const TaskGroup &, SharedBatchResources &, unsigned int, unsigned int thread_id) {
+void Constrain::do_optimize(std::optional<TreeInfo> &tree, const unsigned int, const Options &opts, const TaskGroup &, SharedBatchResources &, unsigned int, unsigned int thread_id) {
     auto constraint = get_reverse_backbone(tree.value());
 
     if (!constraint) {
@@ -55,7 +55,7 @@ void Constrain::do_optimize(std::optional<TreeInfo> &tree, const Options &opts, 
     size_t cons_tip_id = 0;
     size_t free_tip_id = constraint->num_tips();
     for (const auto &tip_name: msa->taxon_names()) {
-        auto tip_id = cons_name_map.count(tip_name) ? cons_tip_id++ : free_tip_id++;
+        const auto tip_id = cons_name_map.count(tip_name) ? cons_tip_id++ : free_tip_id++;
         new_label_id_map[tip_name] = tip_id;
         new_tip_msa_map[tip_id] = seq_id++;
     }
