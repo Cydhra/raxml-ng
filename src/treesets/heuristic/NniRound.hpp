@@ -3,7 +3,7 @@
 
 #include "Heuristic.hpp"
 
-class NniRound : InferenceHeuristic {
+class NniRound : public InferenceHeuristic {
 
 public:
     NniRound(const std::string &batch_name, std::unique_ptr<InferenceHeuristic> inner,

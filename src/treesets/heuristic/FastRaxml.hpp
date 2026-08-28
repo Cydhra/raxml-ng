@@ -3,7 +3,7 @@
 
 #include "Heuristic.hpp"
 
-class FastRaxml : InferenceHeuristic {
+class FastRaxml : public InferenceHeuristic {
 
 public:
     FastRaxml(std::string batch_name, std::unique_ptr<InferenceHeuristic> inner,

@@ -3,7 +3,7 @@
 
 #include "Heuristic.hpp"
 
-class FixedSpr : InferenceHeuristic {
+class FixedSpr : public InferenceHeuristic {
 public:
     FixedSpr(const std::string &batch_name, std::unique_ptr<InferenceHeuristic> inner,
              const std::shared_ptr<MetaParameters> &meta_parameters)

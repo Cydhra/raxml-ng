@@ -3,7 +3,7 @@
 
 #include "Heuristic.hpp"
 
-class ModelOpt : InferenceHeuristic {
+class ModelOpt : public InferenceHeuristic {
 public:
     ModelOpt(const std::string &batch_name, std::unique_ptr<InferenceHeuristic> inner,
              const std::shared_ptr<MetaParameters> &meta_parameters, const bool model, const bool branches,

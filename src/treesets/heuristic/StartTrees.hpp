@@ -4,7 +4,7 @@
 #include "Heuristic.hpp"
 #include "../../loadbalance/CoarseLoadBalancer.hpp"
 
-class StartTrees : InferenceHeuristic {
+class StartTrees : public InferenceHeuristic {
 public:
     StartTrees(std::string batch_name, std::unique_ptr<InferenceHeuristic> inner,
         shared_ptr<TreeList> batch_start_trees, std::shared_ptr<PartitionAssignmentList> part_assignments,

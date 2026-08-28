@@ -3,7 +3,7 @@
 
 #include "Heuristic.hpp"
 
-class Constrain : InferenceHeuristic {
+class Constrain : public InferenceHeuristic {
 
 public:
     Constrain(const std::string &batch_name, std::unique_ptr<InferenceHeuristic> inner, const std::shared_ptr<PartitionedMSA> &msa)
