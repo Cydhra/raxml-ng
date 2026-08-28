@@ -4,13 +4,6 @@
 #include "Heuristic.hpp"
 #include "../../loadbalance/CoarseLoadBalancer.hpp"
 
-// forward declaration
-struct RaxmlInstance;
-
-// forward declaration of generate_tree in main.cpp to make it accessible. If the function in main.cpp
-// changes signature, just update this declaration as well.
-Tree generate_tree(const RaxmlInstance &instance, StartingTree type, int random_seed, bool bootstrap);
-
 class StartTrees : ImprovingHeuristic {
 public:
     StartTrees(const std::string &batch_name, std::unique_ptr<ImprovingHeuristic> inner,
