@@ -11,6 +11,8 @@
 #include "heuristic/NniRound.hpp"
 #include "heuristic/ModelOpt.hpp"
 #include "heuristic/Constrain.hpp"
+#include "heuristic/StartTrees.hpp"
+#include "heuristic/FastRaxml.hpp"
 #include "../loadbalance/LoadBalancer.hpp"
 #include "../loadbalance/CoarseLoadBalancer.hpp"
 #include "../au/AuTest.hpp"
@@ -56,7 +58,7 @@ public:
           fixed_spr_(name, nullptr, meta_parameters),
           nni_round_(name, nullptr, meta_parameters),
           model_opt_(name, nullptr, meta_parameters, true, true, false, 0.1), // TODO: do not use constant values here
-          constrain_(name, nullptr, msa) {
+          constrain_(name, nullptr, msa), fast_raxml_(FastRaxml(name, nullptr, part_assignments /* this is broken and needs to be replaced */)) {
         for (auto &tree_slh: batch_persite_logh) {
             for (const auto &pinfo: msa->part_list())
                 tree_slh.emplace_back(pinfo.msa().length());
@@ -85,7 +87,8 @@ public:
             part_sizes.assign_sites(i, 0, pinfo->length(), pinfo->model().clv_entry_size());
         }
 
-        this->part_assignments = make_shared<PartitionAssignmentList>(thread_load_balancer.get_all_assignments(part_sizes, threads_per_worker));
+        this->part_assignments = make_shared<PartitionAssignmentList>(
+            thread_load_balancer.get_all_assignments(part_sizes, threads_per_worker));
 
         // load-balance work for AU test, where we have reference trees and trees assigned to one thread need to be
         // contiguous. This is only needed for the first instance of the AU test, afterward we can reuse the bootstrap
@@ -98,7 +101,10 @@ public:
         // load-balance work where one tree can be managed by one thread only
         CoarseAssignment exclusive_tree_access(batch_size);
         std::iota(exclusive_tree_access.begin(), exclusive_tree_access.end(), 0);
-        this->exclusive_assignment = make_shared<CoarseAssignmentList>(load_balancer.get_all_assignments(exclusive_tree_access, num_threads));
+        this->exclusive_assignment = make_shared<CoarseAssignmentList>(
+            load_balancer.get_all_assignments(exclusive_tree_access, num_threads));
+
+        this->fast_raxml_ = FastRaxml(name, nullptr, part_assignments);
     }
 
     // delete copy constructor because of corax partition
@@ -116,7 +122,7 @@ public:
           exclusive_assignment(std::move(other.exclusive_assignment)),
           coarse_assignments(std::move(other.coarse_assignments)),
           part_assignments(std::move(other.part_assignments)),
-          tip_msa_idmap(other.tip_msa_idmap),
+          tip_msa_idmap(std::move(other.tip_msa_idmap)),
           batch_trees(std::move(other.batch_trees)),
           batch_persite_logh(std::move(other.batch_persite_logh)),
           meta_parameters_set(other.meta_parameters_set),
@@ -124,7 +130,9 @@ public:
           plausible_tree_count(other.plausible_tree_count),
           wall_time(other.wall_time),
           tree_topologies(std::move(other.tree_topologies)), fixed_spr_(std::move(other.fixed_spr_)),
-          nni_round_(std::move(other.nni_round_)), model_opt_(std::move(model_opt_)), constrain_(std::move(constrain_)) {
+          nni_round_(std::move(other.nni_round_)), model_opt_(std::move(other.model_opt_)),
+          constrain_(std::move(other.constrain_)),
+          fast_raxml_(std::move(other.fast_raxml_)) {
         *meta_parameters = *other.meta_parameters;
     }
 
@@ -156,6 +164,7 @@ public:
         nni_round_ = std::move(other.nni_round_);
         model_opt_ = std::move(other.model_opt_);
         constrain_ = std::move(other.constrain_);
+        fast_raxml_ = std::move(other.fast_raxml_);
         return *this;
     }
 
@@ -422,6 +431,8 @@ protected:
     ModelOpt model_opt_;
 
     Constrain constrain_;
+
+    FastRaxml fast_raxml_;
 
     /**
      * @return Whether all starting trees have been generated for this batch.
