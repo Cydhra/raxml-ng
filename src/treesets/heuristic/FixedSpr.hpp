@@ -3,11 +3,11 @@
 
 #include "Heuristic.hpp"
 
-class FixedSpr : ImprovingHeuristic {
+class FixedSpr : InferenceHeuristic {
 public:
-    FixedSpr(const std::string &batch_name, std::unique_ptr<ImprovingHeuristic> inner,
+    FixedSpr(const std::string &batch_name, std::unique_ptr<InferenceHeuristic> inner,
              const std::shared_ptr<MetaParameters> &meta_parameters)
-        : ImprovingHeuristic(batch_name, std::move(inner)),
+        : InferenceHeuristic(batch_name, std::move(inner)),
           meta_parameters(meta_parameters) {
     }
 

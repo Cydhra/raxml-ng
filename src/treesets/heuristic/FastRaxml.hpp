@@ -3,12 +3,12 @@
 
 #include "Heuristic.hpp"
 
-class FastRaxml : ImprovingHeuristic {
+class FastRaxml : InferenceHeuristic {
 
 public:
-    FastRaxml(std::string batch_name, std::unique_ptr<ImprovingHeuristic> inner,
+    FastRaxml(std::string batch_name, std::unique_ptr<InferenceHeuristic> inner,
         std::shared_ptr<PartitionAssignmentList> part_assignments)
-        : ImprovingHeuristic(std::move(batch_name), std::move(inner)),
+        : InferenceHeuristic(std::move(batch_name), std::move(inner)),
           part_assignments(std::move(part_assignments)) {
     }
 

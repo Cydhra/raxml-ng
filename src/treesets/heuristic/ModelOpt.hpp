@@ -3,12 +3,12 @@
 
 #include "Heuristic.hpp"
 
-class ModelOpt : ImprovingHeuristic {
+class ModelOpt : InferenceHeuristic {
 public:
-    ModelOpt(const std::string &batch_name, std::unique_ptr<ImprovingHeuristic> inner,
+    ModelOpt(const std::string &batch_name, std::unique_ptr<InferenceHeuristic> inner,
              const std::shared_ptr<MetaParameters> &meta_parameters, const bool model, const bool branches,
              const bool force, const double epsilon)
-        : ImprovingHeuristic(batch_name, std::move(inner)),
+        : InferenceHeuristic(batch_name, std::move(inner)),
           meta_parameters(meta_parameters),
           model(model),
           branches(branches),

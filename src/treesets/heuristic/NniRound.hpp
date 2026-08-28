@@ -3,12 +3,12 @@
 
 #include "Heuristic.hpp"
 
-class NniRound : ImprovingHeuristic {
+class NniRound : InferenceHeuristic {
 
 public:
-    NniRound(const std::string &batch_name, std::unique_ptr<ImprovingHeuristic> inner,
+    NniRound(const std::string &batch_name, std::unique_ptr<InferenceHeuristic> inner,
         const std::shared_ptr<MetaParameters> &meta_parameters)
-        : ImprovingHeuristic(batch_name, std::move(inner)),
+        : InferenceHeuristic(batch_name, std::move(inner)),
           meta_parameters(meta_parameters) {
     }
 

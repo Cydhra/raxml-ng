@@ -28,6 +28,6 @@ void NniRound::do_optimize(std::optional<TreeInfo> &tree, unsigned int, const Op
 
         const auto elapsed = static_cast<unsigned int>(std::chrono::duration_cast<
             std::chrono::milliseconds>(end - begin).count());
-        this->wall_time += elapsed;
+        this->cumulative_wall_time += elapsed;
     }
 }

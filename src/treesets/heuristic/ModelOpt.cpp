@@ -38,7 +38,7 @@ void ModelOpt::do_optimize(std::optional<TreeInfo> &tree, unsigned int, const Op
     if (context.is_group_leader(worker_id, thread_id)) {
         if (!force) {
             const auto end = std::chrono::steady_clock::now();
-            this->wall_time += static_cast<unsigned int>(std::chrono::duration_cast<
+            this->cumulative_wall_time += static_cast<unsigned int>(std::chrono::duration_cast<
                 std::chrono::milliseconds>(end - begin).count());
         }
 

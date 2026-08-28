@@ -3,11 +3,11 @@
 
 #include "Heuristic.hpp"
 
-class Constrain : ImprovingHeuristic {
+class Constrain : InferenceHeuristic {
 
 public:
-    Constrain(const std::string &batch_name, std::unique_ptr<ImprovingHeuristic> inner, const std::shared_ptr<PartitionedMSA> &msa)
-        : ImprovingHeuristic(batch_name, std::move(inner)), msa(msa) {
+    Constrain(const std::string &batch_name, std::unique_ptr<InferenceHeuristic> inner, const std::shared_ptr<PartitionedMSA> &msa)
+        : InferenceHeuristic(batch_name, std::move(inner)), msa(msa) {
     }
 
     Constrain(Constrain &&other) noexcept = default;

@@ -27,7 +27,7 @@ void FastRaxml::do_optimize(std::optional<TreeInfo> &tree, unsigned int, const O
     context.enter_barrier(); // Todo this barrier is awkward, but fast raxml is expected to be slower in some threads
     if (context.is_group_leader(worker_id, thread_id)) {
         const auto end = std::chrono::steady_clock::now();
-        this->wall_time += static_cast<unsigned int>(std::chrono::duration_cast<std::chrono::milliseconds>(
+        this->cumulative_wall_time += static_cast<unsigned int>(std::chrono::duration_cast<std::chrono::milliseconds>(
                 end - begin)
             .count());
     }

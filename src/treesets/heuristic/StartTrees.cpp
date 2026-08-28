@@ -27,9 +27,9 @@ void StartTrees::do_optimize(std::optional<TreeInfo> &tree, const unsigned int t
 
         const unsigned int elapsed = static_cast<unsigned int>(std::chrono::duration_cast<
             std::chrono::milliseconds>(end - begin).count());
-        this->wall_time += elapsed;
+        this->cumulative_wall_time += elapsed;
 
-        LOG_INFO_TS << this->batch_name << ": total batch time after generating starting trees: " << this->wall_time << "ms."
+        LOG_INFO_TS << this->batch_name << ": total batch time after generating starting trees: " << this->cumulative_wall_time << "ms."
                 <<
                 std::endl;
     }

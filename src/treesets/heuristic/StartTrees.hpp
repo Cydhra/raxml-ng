@@ -4,13 +4,13 @@
 #include "Heuristic.hpp"
 #include "../../loadbalance/CoarseLoadBalancer.hpp"
 
-class StartTrees : ImprovingHeuristic {
+class StartTrees : InferenceHeuristic {
 public:
-    StartTrees(std::string batch_name, std::unique_ptr<ImprovingHeuristic> inner,
+    StartTrees(std::string batch_name, std::unique_ptr<InferenceHeuristic> inner,
         shared_ptr<TreeList> batch_start_trees, std::shared_ptr<PartitionAssignmentList> part_assignments,
         std::shared_ptr<ModelMap> initial_model, std::optional<std::string> model_override,
         std::shared_ptr<PartitionedMSA> msa, std::shared_ptr<IDVector> tip_msa_idmap)
-        : ImprovingHeuristic(std::move(batch_name), std::move(inner)),
+        : InferenceHeuristic(std::move(batch_name), std::move(inner)),
           batch_start_trees(std::move(batch_start_trees)),
           part_assignments(std::move(part_assignments)),
           initial_model(std::move(initial_model)),
