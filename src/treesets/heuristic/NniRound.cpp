@@ -6,12 +6,7 @@ void NniRound::do_optimize(std::optional<TreeInfo> &tree, unsigned int tree_id, 
         LOG_INFO_TS << this->batch_name << ": Performing NNI round." << std::endl;
     }
 
-    spr_round_params spr_params;
-
-    this->meta_parameters->auto_configure(opts, spr_params, 2);
-    spr_params.radius_max = 1;
-    spr_params.thorough = false;
-    spr_params.ntopol_keep = 1;
+    auto spr_params = this->auto_configure(opts);
 
     // reset cutoff info for each tree. This has to be done, even if it is just one tree, to avoid
     // uninitialized cutoff problems
