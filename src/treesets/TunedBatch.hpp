@@ -368,21 +368,6 @@ protected:
                                  unsigned int worker_id, unsigned int thread_id);
 
     /**
-     * Perform model and branch length optimization according to the current tuning parameters and the given epsilon.
-     * If model optimization is currently disabled, load models from a backup.
-     *
-     * @param resources Resources shared between batches, either group-local or thread-safe
-     * @param epsilon the likelihood threshold when to stop optimizing
-     * @param model if true, optimize model parameters
-     * @param branches if true, optimize branch lengths
-     * @param force if true, model optimization is forced, even if batch tuning parameters turn it off
-     */
-    void optimize_parameters(const Options &opts, SharedBatchResources &resources, const TaskGroup &context,
-                             unsigned int worker_id,
-                             unsigned int thread_id,
-                             double epsilon, bool model = true, bool branches = true, bool force = false);
-
-    /**
      * Perform the AU test on the trees in the batch, as well as the supplied reference trees.
      *
      * @param au_test test instance
