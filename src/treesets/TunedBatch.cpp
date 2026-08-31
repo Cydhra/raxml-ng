@@ -55,7 +55,11 @@ void TunedBatch::optimize(RaxmlInstance &instance, const Options &opts, SharedBa
         heuristic->optimize(batch_trees[tree_id][thread_id], tree_id, opts, context, resources, worker_id, thread_id);
     }
 
+    // take measurement
+    context.enter_barrier();
     if (context.is_group_leader(worker_id, thread_id)) {
+        // TODO this breaks if the heuristic is reused.
+        this->wall_time += heuristic->get_total_wall_time();
         LOG_INFO_TS << this->name << ": total batch time after heuristics: " << this->wall_time << "ms." << std::endl;
     }
 
