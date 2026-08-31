@@ -42,7 +42,7 @@ void TunedBatch::generate_starting_trees(const RaxmlInstance &instance, const Ta
 
 void TunedBatch::optimize(const RaxmlInstance &instance, const Options &opts, SharedBatchResources &resources,
                           const TaskGroup &context, const unsigned int worker_id, const unsigned int thread_id) {
-    if (!meta_parameters_set) {
+    if (!heuristic) {
         throw RaxmlException("TunedBatch has not been configured with meta heuristics");
     }
 
@@ -193,7 +193,6 @@ void TunedBatch::perform_plausibility_check(const Options &opts, SharedBatchReso
 void TunedBatch::update_meta_parameters(const MetaParameters &new_parameters) {
     this->meta_parameters = new_parameters;
     this->heuristic = HeuristicFactory::build_heuristic(meta_parameters, name, batch_start_trees, part_assignments, initial_model, msa, tip_msa_idmap);
-    this->meta_parameters_set = true;
 }
 
 bool TunedBatch::is_compatible(const MetaParameters &new_parameters) const {

@@ -113,8 +113,6 @@ public:
           tip_msa_idmap(std::move(other.tip_msa_idmap)),
           batch_trees(std::move(other.batch_trees)),
           batch_persite_logh(std::move(other.batch_persite_logh)),
-          meta_parameters_set(other.meta_parameters_set),
-          initial_model_optimized(other.initial_model_optimized),
           plausible_tree_count(other.plausible_tree_count),
           wall_time(other.wall_time),
           tree_topologies(std::move(other.tree_topologies)) {
@@ -140,8 +138,6 @@ public:
         tree_topologies = std::move(other.tree_topologies);
         batch_trees = std::move(other.batch_trees);
         batch_persite_logh = std::move(other.batch_persite_logh);
-        meta_parameters_set = other.meta_parameters_set;
-        initial_model_optimized = other.initial_model_optimized;
         plausible_tree_count = other.plausible_tree_count;
         wall_time = other.wall_time;
         return *this;
@@ -350,21 +346,9 @@ protected:
     shared_ptr<ModelMap> initial_model;
 
     /**
-     * Flag indicating whether the batch has been configured with meta-parameters.
-     */
-    bool meta_parameters_set{false};
-
-    /**
      * How many starting trees have been generated.
      */
     atomic_uint num_trees_generated{0};
-
-    /**
-     * Flag indicating whether the model has been optimized once (or alternatively, if a pre-optimized model
-     * has been loaded).
-     * If this is false, the optimize() function needs to perform one model optimization before doing SPR rounds.
-     */
-    bool initial_model_optimized{false};
 
     /**
      * Number of plausible trees as determined by the last AU test.
