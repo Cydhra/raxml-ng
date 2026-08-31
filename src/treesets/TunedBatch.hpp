@@ -154,7 +154,7 @@ public:
      * @param new_parameters a set of meta parameters that is compared to this batch's parameters
      * @return true, if the batch can continue inference
      */
-    bool is_compatible(const MetaParameters &new_parameters) const;
+    [[nodiscard]] bool is_compatible(const MetaParameters &new_parameters) const;
 
     /**
      * Replace the model parameters with the model parameters of a different batch, which allows restoring the model instead of
@@ -179,7 +179,7 @@ public:
     /**
      * @return the number of trees that are inferred in this batch.
      */
-    unsigned int get_batch_size() const;
+    [[nodiscard]] unsigned int get_batch_size() const;
 
     /**
      * If an AU test has already been performed, count how many of the batch's trees are plausible.
@@ -188,13 +188,13 @@ public:
      *
      * @return Number of trees with a p-value above 0.05.
      */
-    unsigned int get_plausible_tree_count() const;
+    [[nodiscard]] unsigned int get_plausible_tree_count() const;
 
     /**
      * Compute the total (wall) time spent on inferring the batch, ignoring the parallelization.
      * @return Time spent working on inference in milliseconds.
      */
-    unsigned int elapsed_wall_time() const;
+    [[nodiscard]] unsigned int elapsed_wall_time() const;
 
     /**
      * Compute the output tree of the `index`-th tree of this batch.
@@ -203,7 +203,7 @@ public:
      *
      * @return a tree object generated from the information in all partitions of the TreeInfo object
      */
-    Tree get_tree(unsigned int index) const;
+    [[nodiscard]] Tree get_tree(unsigned int index) const;
 
     /**
      * @return the log-likelihoods of all trees in order of the trees
@@ -218,7 +218,7 @@ public:
      */
     void get_plausible_trees(std::vector<Tree> &buffer) const;
 
-    std::string const &get_name() const {
+    [[nodiscard]] std::string const &get_name() const {
         return this->name;
     }
 
@@ -363,6 +363,9 @@ protected:
      * Generate parsimony starting trees for this batch, and initialize the tree inference.
      *
      * @param instance RaxmlInstance which is required for tree generation
+     * @param context task group context
+     * @param worker_id raxml-instance-local id of the worker. Within task groups, they need not start at 0.
+     * @param thread_id worker-local id of the thread, thread numbering start at 0 for each worker.
      */
     void generate_starting_trees(const RaxmlInstance &instance, const TaskGroup &context,
                                  unsigned int worker_id, unsigned int thread_id);
@@ -373,6 +376,9 @@ protected:
      * @param au_test test instance
      * @param initialized if false, the au_test instance is not initialized and memory will be allocated, and the
      * reference trees included in the bootstrap. Otherwise, only the batch trees are included.
+     * @param context task group context
+     * @param worker_id raxml-instance-local id of the worker. Within task groups, they need not start at 0.
+     * @param thread_id worker-local id of the thread, thread numbering start at 0 for each worker.
      */
     void perform_au_test(AuTest &au_test, bool initialized, const TaskGroup &context, unsigned int worker_id,
                          unsigned int thread_id);
