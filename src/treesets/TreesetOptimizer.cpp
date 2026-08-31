@@ -68,7 +68,7 @@ void TreesetOptimizer::run_batch(Bandit<std::shared_ptr<MultiArmedBandit<MetaPar
 
     if (context.is_group_leader(worker_id, thread_id)) {
         // take measurements
-        mab.get_parameters()->get()->take_measurement(bandit, batch, true);
+        mab.get_parameters()->take_measurement(bandit, batch, true);
         this->hierarchical_mab.take_measurement(mab, batch, true);
 
         this->check_mab_modification();
@@ -85,8 +85,8 @@ void TreesetOptimizer::run_batch(Bandit<std::shared_ptr<MultiArmedBandit<MetaPar
 
 BatchTask TreesetOptimizer::next_work_unit() {
     auto &mab = this->hierarchical_mab.select_next_bandit();
-    auto &current_bandit = mab.get_parameters().get()->get()->select_next_bandit();
-    auto &current_batch = this->batch_queue.select_next_batch(*current_bandit.get_parameters(), pool.workers_per_task(),
+    auto &current_bandit = mab.get_parameters().get()->select_next_bandit();
+    auto &current_batch = this->batch_queue.select_next_batch(current_bandit.get_parameters(), pool.workers_per_task(),
                                                               pool.threads_per_task());
     current_batch.update_meta_parameters(current_bandit.get_parameters());
 

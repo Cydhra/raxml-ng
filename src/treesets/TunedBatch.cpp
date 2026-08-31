@@ -4,6 +4,7 @@
 #include "Bandit.hpp"
 #include "SharedBatchResources.hpp"
 #include "Threadpool.hpp"
+#include "HeuristicFactory.hpp"
 
 using namespace std::placeholders;
 
@@ -26,22 +27,6 @@ void TunedBatch::generate_starting_trees(RaxmlInstance &instance, const Options 
         this->num_trees_generated.fetch_add(1);
     }
 
-    // barrier so we dont start building tree-info objects without finished trees (since the thread assignment changes)
-    context.enter_barrier();
-
-    // create context for tree inference and assign the initial model
-    for (const auto id: this->coarse_assignments.at(worker_id)) {
-        if (meta_parameters->model_override.has_value()) {
-            const auto model = Model(*meta_parameters->model_override);
-            this->batch_trees[id][thread_id].emplace(opts, this->batch_start_trees->at(id), *this->msa,
-                                                     *this->tip_msa_idmap, this->part_assignments->at(thread_id), &model);
-        } else {
-            this->batch_trees[id][thread_id].emplace(opts, this->batch_start_trees->at(id), *this->msa,
-                                                     *this->tip_msa_idmap, this->part_assignments->at(thread_id));
-            assign_models(batch_trees[id][thread_id].value(), *this->initial_model);
-        }
-    }
-
     if (context.is_group_leader(worker_id, thread_id)) {
         const auto end = std::chrono::steady_clock::now();
 
@@ -55,31 +40,12 @@ void TunedBatch::generate_starting_trees(RaxmlInstance &instance, const Options 
     }
 }
 
-void TunedBatch::optimize_nni(const Options &opts, SharedBatchResources &resources, const TaskGroup &context,
-                              const unsigned int worker_id, const unsigned int thread_id) {
-    const auto &tree_ids = this->coarse_assignments.at(worker_id);
-
-    if (meta_parameters->nni_round) {
-        for (const auto tree_id: tree_ids) {
-            nni_round_.do_optimize(batch_trees[tree_id][thread_id], tree_id, opts, context, resources, worker_id, thread_id);
-        }
-    }
-}
-
-void TunedBatch::optimize_topology(const Options &opts, const TaskGroup &context, SharedBatchResources &resources,
-                                   const unsigned int worker_id, const unsigned int thread_id) {
-    const auto &tree_ids = this->coarse_assignments.at(worker_id);
-
-    for (const auto tree_id: tree_ids) {
-        fixed_spr_.do_optimize(batch_trees[tree_id][thread_id], tree_id, opts, context, resources, worker_id, thread_id);
-    }
-}
-
 void TunedBatch::optimize_parameters(const Options &opts, SharedBatchResources &resources, const TaskGroup &context,
                                      const unsigned int worker_id, const unsigned int thread_id, double epsilon,
                                      const bool model, const bool branches, const bool force) {
     const auto &tree_ids = this->coarse_assignments.at(worker_id);
 
+    // TODO this must not be implemented with heuristic
     for (const auto tree_id : tree_ids) {
         model_opt_.do_optimize(batch_trees[tree_id][thread_id], tree_id, opts, context, resources, worker_id, thread_id);
     }
@@ -95,45 +61,9 @@ void TunedBatch::optimize(RaxmlInstance &instance, const Options &opts, SharedBa
         this->generate_starting_trees(instance, opts, context, worker_id, thread_id);
     }
 
-    if (!meta_parameters->accept_starting_trees) {
-        if (meta_parameters->fallback_fast_raxml) {
-            const auto &tree_ids = coarse_assignments.at(worker_id);
-            for (const auto tree_id: tree_ids) {
-                fast_raxml_.do_optimize(batch_trees[tree_id][thread_id], tree_id, opts, context, resources, worker_id, thread_id);
-            }
-        } else {
-            // do initial model and branch length optimization
-            if (!this->initial_model_optimized) {
-                this->optimize_parameters(opts, resources, context, worker_id, thread_id, 3.0);
-
-                // barrier required so initial_model_optimized isn't set before all threads optimized model
-                context.enter_barrier();
-
-                if (context.is_group_leader(worker_id, thread_id)) {
-                    this->initial_model_optimized = true;
-                }
-            }
-
-            // pre-optimize
-            this->optimize_nni(opts, resources, context, worker_id, thread_id);
-
-            // apply constraint
-            if (meta_parameters->constrain) {
-                // TODO remove explicit assignment here and move it to strategy construction
-                if (context.is_group_leader(worker_id, thread_id)) {
-                    constrain_.partition_assignments = *part_assignments;
-                }
-                context.enter_barrier();
-
-                const auto my_trees = coarse_assignments.at(worker_id);
-                for (const auto tree_id: my_trees) {
-                    constrain_.do_optimize(this->batch_trees[tree_id][thread_id], tree_id, opts, context, resources, worker_id, thread_id);
-                }
-            }
-
-            // compute all required SPR rounds
-            this->optimize_topology(opts, context, resources, worker_id, thread_id);
-        }
+    const auto &tree_ids = this->coarse_assignments.at(worker_id);
+    for (const auto tree_id : tree_ids) {
+        heuristic->optimize(batch_trees[tree_id][thread_id], tree_id, opts, context, resources, worker_id, thread_id);
     }
 
     if (context.is_group_leader(worker_id, thread_id)) {
@@ -215,8 +145,8 @@ void TunedBatch::perform_plausibility_check(const Options &opts, SharedBatchReso
     // TODO should we backup the less optimized model or just accept that we overspecify the model
 
     // reset model to original for AU test
-    if (meta_parameters->model_override) {
-        for (auto &tree_id: coarse_assignments.at(worker_id)) {
+    if (meta_parameters.model_override) {
+        for (const auto &tree_id: coarse_assignments.at(worker_id)) {
             batch_trees[tree_id][thread_id].emplace(opts, batch_trees[tree_id][thread_id]->tree(), *msa, *tip_msa_idmap,
                                                     part_assignments->at(thread_id));
         }
@@ -264,20 +194,22 @@ void TunedBatch::perform_plausibility_check(const Options &opts, SharedBatchReso
     }
 }
 
-void TunedBatch::update_meta_parameters(const shared_ptr<MetaParameters> &new_parameters) {
-    // TODO the shared pointer is pre-shared with the strategies. But this means we must not re-assign it.
-    *this->meta_parameters = *new_parameters;
+void TunedBatch::update_meta_parameters(const MetaParameters &new_parameters) {
+    this->meta_parameters = new_parameters;
+    this->heuristic = HeuristicFactory::build_heuristic(meta_parameters, name, batch_start_trees, part_assignments, initial_model, msa, tip_msa_idmap);
     this->meta_parameters_set = true;
 }
 
 bool TunedBatch::is_compatible(const MetaParameters &new_parameters) const {
     // a batch that already optimized with these exact parameters cannot be reused for the same parameters again
-    if (*this->meta_parameters == new_parameters) {
+    if (this->meta_parameters == new_parameters) {
         return false;
     }
 
+    return false;
+
     // if the current parameters do the bare minimum, we can always continue with new parameters
-    if (this->meta_parameters->accept_starting_trees) {
+    if (this->meta_parameters.accept_starting_trees) {
         return true;
         // however if we already did something, the other set need not do the bare minimum.
     } else if (new_parameters.accept_starting_trees) {

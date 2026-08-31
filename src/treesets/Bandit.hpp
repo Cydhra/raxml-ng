@@ -205,8 +205,8 @@ public:
     /**
      * @return This bandit's meta parameters
      */
-    std::shared_ptr<Heuristic> get_parameters() const {
-        return this->parameters;
+    Heuristic& get_parameters() const {
+        return *this->parameters;
     }
 
     /**

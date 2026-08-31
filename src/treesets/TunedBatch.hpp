@@ -7,12 +7,7 @@
 #include "MetaParameters.hpp"
 #include "Threadpool.hpp"
 #include "heuristic/Heuristic.hpp"
-#include "heuristic/FixedSpr.hpp"
-#include "heuristic/NniRound.hpp"
 #include "heuristic/ModelOpt.hpp"
-#include "heuristic/Constrain.hpp"
-#include "heuristic/StartTrees.hpp"
-#include "heuristic/FastRaxml.hpp"
 #include "../loadbalance/LoadBalancer.hpp"
 #include "../loadbalance/CoarseLoadBalancer.hpp"
 #include "../au/AuTest.hpp"
@@ -51,14 +46,11 @@ public:
           reference_persite_loglh(reference_persite_loglh),
           msa(msa),
           starting_seed(starting_seed),
-          meta_parameters(make_shared<MetaParameters>()),
           batch_start_trees(new TreeList(batch_size)),
           tip_msa_idmap(make_shared<IDVector>(tip_msa_idmap)),
           batch_persite_logh(std::vector<std::vector<doubleVector> >(batch_size)),
-          fixed_spr_(name, nullptr, 2, 20, false, 10),
-          nni_round_(name, nullptr),
-          model_opt_(name, nullptr, true, true, 0.1), // TODO: do not use constant values here
-          constrain_(name, nullptr, msa), fast_raxml_(FastRaxml(name, nullptr, part_assignments /* this is broken and needs to be replaced */)) {
+          model_opt_(name, nullptr, true, true, 0.1) // TODO: do not use constant values here
+    {
         for (auto &tree_slh: batch_persite_logh) {
             for (const auto &pinfo: msa->part_list())
                 tree_slh.emplace_back(pinfo.msa().length());
@@ -103,8 +95,6 @@ public:
         std::iota(exclusive_tree_access.begin(), exclusive_tree_access.end(), 0);
         this->exclusive_assignment = make_shared<CoarseAssignmentList>(
             load_balancer.get_all_assignments(exclusive_tree_access, num_threads));
-
-        this->fast_raxml_ = FastRaxml(name, nullptr, part_assignments);
     }
 
     // delete copy constructor because of corax partition
@@ -117,6 +107,7 @@ public:
           reference_persite_loglh(other.reference_persite_loglh),
           msa(std::move(other.msa)),
           starting_seed(other.starting_seed),
+          meta_parameters(std::move(other.meta_parameters)),
           batch_start_trees(std::move(other.batch_start_trees)),
           au_assignment(std::move(other.au_assignment)),
           exclusive_assignment(std::move(other.exclusive_assignment)),
@@ -129,11 +120,8 @@ public:
           initial_model_optimized(other.initial_model_optimized),
           plausible_tree_count(other.plausible_tree_count),
           wall_time(other.wall_time),
-          tree_topologies(std::move(other.tree_topologies)), fixed_spr_(std::move(other.fixed_spr_)),
-          nni_round_(std::move(other.nni_round_)), model_opt_(std::move(other.model_opt_)),
-          constrain_(std::move(other.constrain_)),
-          fast_raxml_(std::move(other.fast_raxml_)) {
-        *meta_parameters = *other.meta_parameters;
+          tree_topologies(std::move(other.tree_topologies)),
+          model_opt_(std::move(other.model_opt_)) {
     }
 
     // explicitly implement move-assign to avoid implicit deletion
@@ -143,7 +131,7 @@ public:
             return *this;
         reuse_attempts = other.reuse_attempts;
         name = std::move(other.name);
-        *meta_parameters = *other.meta_parameters;
+        meta_parameters = std::move(other.meta_parameters);
         starting_seed = other.starting_seed;
         batch_start_trees = std::move(other.batch_start_trees);
         msa = std::move(other.msa);
@@ -160,11 +148,7 @@ public:
         initial_model_optimized = other.initial_model_optimized;
         plausible_tree_count = other.plausible_tree_count;
         wall_time = other.wall_time;
-        fixed_spr_ = std::move(other.fixed_spr_);
-        nni_round_ = std::move(other.nni_round_);
         model_opt_ = std::move(other.model_opt_);
-        constrain_ = std::move(other.constrain_);
-        fast_raxml_ = std::move(other.fast_raxml_);
         return *this;
     }
 
@@ -206,7 +190,7 @@ public:
      *
      * @param new_parameters batch treeset inference meta parameters
      */
-    void update_meta_parameters(const shared_ptr<MetaParameters> &new_parameters);
+    void update_meta_parameters(const MetaParameters &new_parameters);
 
     /**
      * Compare the batch's current configuration with a set of new parameters, and check whether the inference can
@@ -310,7 +294,7 @@ protected:
      * The meta-heuristic parameters for inferring trees. These are not the model parameters, but settings of the
      * inference heuristics which are being optimized for plausible tree throughput during tree set inference.
      */
-    const shared_ptr<MetaParameters> meta_parameters;
+    MetaParameters meta_parameters;
 
     /**
      * Starting trees for this inference batch
@@ -423,16 +407,10 @@ protected:
      */
     doubleVector p_values;
 
+    unique_ptr<InferenceHeuristic> heuristic = {};
+
     // TODO temporary
-    FixedSpr fixed_spr_;
-
-    NniRound nni_round_;
-
     ModelOpt model_opt_;
-
-    Constrain constrain_;
-
-    FastRaxml fast_raxml_;
 
     /**
      * @return Whether all starting trees have been generated for this batch.
@@ -464,25 +442,6 @@ protected:
                              unsigned int worker_id,
                              unsigned int thread_id,
                              double epsilon, bool model = true, bool branches = true, bool force = false);
-
-    /**
-     * Perform an NNI round if the meta-parameters say so.
-     * @param opts parsed command line options with defaults and user-mandated search parameters
-     * @param resources Resources shared between batches, either group-local or thread-safe
-     * @param context
-     * @param worker_id
-     * @param thread_id
-     */
-    void optimize_nni(const Options &opts, SharedBatchResources &resources, const TaskGroup &context,
-                      unsigned int worker_id, unsigned int thread_id);
-
-    /**
-     * Perform SPR rounds up to the target count, with meta-parameters according to the batch settings.
-     *
-     * @param opts opts parsed command line options with defaults and user-mandated search parameters
-     */
-    void optimize_topology(const Options &opts, const TaskGroup &context, SharedBatchResources &resources,
-                           unsigned int worker_id, unsigned int thread_id);
 
     /**
      * Perform the AU test on the trees in the batch, as well as the supplied reference trees.
