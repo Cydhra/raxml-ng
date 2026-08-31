@@ -7,7 +7,6 @@
 #include "MetaParameters.hpp"
 #include "Threadpool.hpp"
 #include "heuristic/Heuristic.hpp"
-#include "heuristic/ModelOpt.hpp"
 #include "../loadbalance/LoadBalancer.hpp"
 #include "../loadbalance/CoarseLoadBalancer.hpp"
 #include "../au/AuTest.hpp"
@@ -48,9 +47,7 @@ public:
           starting_seed(starting_seed),
           batch_start_trees(new TreeList(batch_size)),
           tip_msa_idmap(make_shared<IDVector>(tip_msa_idmap)),
-          batch_persite_logh(std::vector<std::vector<doubleVector> >(batch_size)),
-          model_opt_(name, nullptr, true, true, 0.1) // TODO: do not use constant values here
-    {
+          batch_persite_logh(std::vector<std::vector<doubleVector> >(batch_size)) {
         for (auto &tree_slh: batch_persite_logh) {
             for (const auto &pinfo: msa->part_list())
                 tree_slh.emplace_back(pinfo.msa().length());
@@ -120,8 +117,7 @@ public:
           initial_model_optimized(other.initial_model_optimized),
           plausible_tree_count(other.plausible_tree_count),
           wall_time(other.wall_time),
-          tree_topologies(std::move(other.tree_topologies)),
-          model_opt_(std::move(other.model_opt_)) {
+          tree_topologies(std::move(other.tree_topologies)) {
     }
 
     // explicitly implement move-assign to avoid implicit deletion
@@ -148,7 +144,6 @@ public:
         initial_model_optimized = other.initial_model_optimized;
         plausible_tree_count = other.plausible_tree_count;
         wall_time = other.wall_time;
-        model_opt_ = std::move(other.model_opt_);
         return *this;
     }
 
@@ -408,9 +403,6 @@ protected:
     doubleVector p_values;
 
     unique_ptr<InferenceHeuristic> heuristic = {};
-
-    // TODO temporary
-    ModelOpt model_opt_;
 
     /**
      * @return Whether all starting trees have been generated for this batch.

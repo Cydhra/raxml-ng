@@ -40,17 +40,6 @@ void TunedBatch::generate_starting_trees(RaxmlInstance &instance, const Options 
     }
 }
 
-void TunedBatch::optimize_parameters(const Options &opts, SharedBatchResources &resources, const TaskGroup &context,
-                                     const unsigned int worker_id, const unsigned int thread_id, double epsilon,
-                                     const bool model, const bool branches, const bool force) {
-    const auto &tree_ids = this->coarse_assignments.at(worker_id);
-
-    // TODO this must not be implemented with heuristic
-    for (const auto tree_id : tree_ids) {
-        model_opt_.do_optimize(batch_trees[tree_id][thread_id], tree_id, opts, context, resources, worker_id, thread_id);
-    }
-}
-
 void TunedBatch::optimize(RaxmlInstance &instance, const Options &opts, SharedBatchResources &resources,
                           const TaskGroup &context, const unsigned int worker_id, const unsigned int thread_id) {
     if (!meta_parameters_set) {
@@ -142,8 +131,6 @@ void TunedBatch::perform_plausibility_check(const Options &opts, SharedBatchReso
         au_test.replace_persite_loglh(reference_persite_loglh.size(), batch_persite_logh);
     }
 
-    // TODO should we backup the less optimized model or just accept that we overspecify the model
-
     // reset model to original for AU test
     if (meta_parameters.model_override) {
         for (const auto &tree_id: coarse_assignments.at(worker_id)) {
@@ -153,7 +140,12 @@ void TunedBatch::perform_plausibility_check(const Options &opts, SharedBatchReso
     }
 
     const auto begin = std::chrono::steady_clock::now();
-    this->optimize_parameters(opts, resources, context, worker_id, thread_id, 0.1, true, true, true);
+    // forcibly optimize parameters
+    // TODO should we backup the less optimized model or just accept that we overspecify the model
+    const auto &tree_ids = this->coarse_assignments.at(worker_id);
+    for (const auto tree_id : tree_ids) {
+        batch_trees[tree_id][thread_id]->optimize_params(CORAX_OPT_PARAM_ALL, 0.1);
+    }
 
     this->perform_au_test(au_test, initialized, context, worker_id, thread_id);
 
