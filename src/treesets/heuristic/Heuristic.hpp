@@ -68,7 +68,7 @@ public:
      *
      * @return the total cumulative wall-time across the entire heuristic
      */
-    [[nodiscard]] unsigned int get_total_wall_time() const {
+    [[nodiscard]] unsigned int get_total_wall_time() const { // NOLINT(*-no-recursion)
         unsigned int total = 0;
         if (inner) {
             total += inner->get_total_wall_time();

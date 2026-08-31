@@ -157,10 +157,12 @@ public:
      *
      * @param instance Raxml instance, required for tree generation
      * @param opts command line options, required for parameter optimization
-     * @param resources
-     * @param resources
+     * @param resources resources shared between multiple batches, like the AU test instance.
+     * @param context task group context
+     * @param worker_id raxml-instance-local id of the worker. Within task groups, they need not start at 0.
+     * @param thread_id worker-local id of the thread, thread numbering start at 0 for each worker.
      */
-    void optimize(RaxmlInstance &instance, const Options &opts, SharedBatchResources &resources,
+    void optimize(const RaxmlInstance &instance, const Options &opts, SharedBatchResources &resources,
                   const TaskGroup &context,
                   unsigned int worker_id, unsigned int thread_id);
 
@@ -170,7 +172,10 @@ public:
      *
      * @param resources au test instance and profiling, shared between batches
      * @param initialized if false, the au_test instance is not initialized and memory will be allocated, and the
-     * reference trees included in the bootstrap. Otherwise, only the batch trees are included.
+     *                    reference trees included in the bootstrap. Otherwise, only the batch trees are included.
+     * @param context task group context
+     * @param worker_id raxml-instance-local id of the worker. Within task groups, they need not start at 0.
+     * @param thread_id worker-local id of the thread, thread numbering start at 0 for each worker.
      *
      * @return The number of plausible trees.
      */
@@ -415,9 +420,8 @@ protected:
      * Generate parsimony starting trees for this batch, and initialize the tree inference.
      *
      * @param instance RaxmlInstance which is required for tree generation
-     * @param opts parsed command line options with defaults and user-mandated search parameters
      */
-    void generate_starting_trees(RaxmlInstance &instance, const Options &opts, const TaskGroup &context,
+    void generate_starting_trees(const RaxmlInstance &instance, const TaskGroup &context,
                                  unsigned int worker_id, unsigned int thread_id);
 
     /**

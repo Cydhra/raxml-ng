@@ -12,7 +12,7 @@ unsigned int TunedBatch::get_batch_size() const {
     return this->batch_start_trees->size();
 }
 
-void TunedBatch::generate_starting_trees(RaxmlInstance &instance, const Options &opts, const TaskGroup &context,
+void TunedBatch::generate_starting_trees(const RaxmlInstance &instance, const TaskGroup &context,
                                          const unsigned int worker_id, const unsigned int thread_id) {
     // time measurement
     const auto begin = std::chrono::steady_clock::now();
@@ -40,14 +40,14 @@ void TunedBatch::generate_starting_trees(RaxmlInstance &instance, const Options 
     }
 }
 
-void TunedBatch::optimize(RaxmlInstance &instance, const Options &opts, SharedBatchResources &resources,
+void TunedBatch::optimize(const RaxmlInstance &instance, const Options &opts, SharedBatchResources &resources,
                           const TaskGroup &context, const unsigned int worker_id, const unsigned int thread_id) {
     if (!meta_parameters_set) {
         throw RaxmlException("TunedBatch has not been configured with meta heuristics");
     }
 
     if (!this->start_trees_generated()) {
-        this->generate_starting_trees(instance, opts, context, worker_id, thread_id);
+        this->generate_starting_trees(instance, context, worker_id, thread_id);
     }
 
     const auto &tree_ids = this->coarse_assignments.at(worker_id);
@@ -67,7 +67,7 @@ void TunedBatch::optimize(RaxmlInstance &instance, const Options &opts, SharedBa
     resources.set_initialized(context);
 
     if (context.is_group_leader(worker_id, thread_id)) {
-        auto guard = std::lock_guard(*this->topology_access.get());
+        auto guard = std::lock_guard(*this->topology_access);
 
         // clear previous backups
         this->tree_topologies.clear();
@@ -116,7 +116,7 @@ void TunedBatch::perform_au_test(AuTest &au_test, const bool initialized, const 
     if (context.is_group_leader(worker_id, thread_id)) {
         // guard the calculation of AU test p-values with a guard so we don't use partially updated p-values to obtain
         // tree topologies.
-        auto guard = std::lock_guard(*this->topology_access.get());
+        auto guard = std::lock_guard(*this->topology_access);
         au_test.finalize_test_statistics();
         au_test.calculate_p_values();
     }
@@ -267,9 +267,9 @@ bool TunedBatch::is_compatible(const MetaParameters &new_parameters) const {
 }
 
 void TunedBatch::backup_models(ModelMap &target) const {
-    for (size_t thread_id = 0; thread_id < this->batch_trees[0].size(); ++thread_id) {
-        for (size_t part_id: this->batch_trees[0][thread_id].value().parts_master()) {
-            assign(target[part_id], this->batch_trees[0][thread_id].value(), part_id);
+    for (const auto & thread_id : this->batch_trees[0]) {
+        for (size_t part_id: thread_id.value().parts_master()) {
+            assign(target[part_id], thread_id.value(), part_id);
         }
     }
 }
