@@ -24,7 +24,7 @@ void TunedBatch::generate_starting_trees(const RaxmlInstance &instance, const Ta
     // generate trees from seeds
     for (const auto id: this->exclusive_assignment->at(context.get_group_thread_id(worker_id, thread_id))) {
         (*this->batch_start_trees)[id] = generate_tree(instance, StartingTree::parsimony, seeds[id], false);
-        this->num_trees_generated.fetch_add(1);
+        this->num_trees_generated->fetch_add(1);
     }
 
     if (context.is_group_leader(worker_id, thread_id)) {

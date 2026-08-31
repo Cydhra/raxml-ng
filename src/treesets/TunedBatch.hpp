@@ -94,54 +94,13 @@ public:
             load_balancer.get_all_assignments(exclusive_tree_access, num_threads));
     }
 
-    // delete copy constructor because of corax partition
+    // delete copy constructor because of corax partitions in tree vector
     TunedBatch(const TunedBatch &other) = delete;
 
-    // TODO check which property violates the copy/move contract so we dont have to implement this manually
-    TunedBatch(TunedBatch &&other) noexcept
-        : reuse_attempts(other.reuse_attempts),
-          name(std::move(other.name)),
-          reference_persite_loglh(std::move(other.reference_persite_loglh)),
-          msa(std::move(other.msa)),
-          starting_seed(other.starting_seed),
-          meta_parameters(std::move(other.meta_parameters)),
-          batch_start_trees(std::move(other.batch_start_trees)),
-          au_assignment(std::move(other.au_assignment)),
-          exclusive_assignment(std::move(other.exclusive_assignment)),
-          coarse_assignments(std::move(other.coarse_assignments)),
-          part_assignments(std::move(other.part_assignments)),
-          tip_msa_idmap(std::move(other.tip_msa_idmap)),
-          batch_trees(std::move(other.batch_trees)),
-          batch_persite_logh(std::move(other.batch_persite_logh)),
-          plausible_tree_count(other.plausible_tree_count),
-          wall_time(other.wall_time),
-          tree_topologies(std::move(other.tree_topologies)) {
-    }
+    TunedBatch(TunedBatch &&other) noexcept = default;
 
     // explicitly implement move-assign to avoid implicit deletion
-    // TODO check which property violates the copy/move contract so we dont have to implement this manually
-    TunedBatch &operator=(TunedBatch &&other) noexcept {
-        if (this == &other)
-            return *this;
-        reuse_attempts = other.reuse_attempts;
-        name = std::move(other.name);
-        meta_parameters = std::move(other.meta_parameters);
-        starting_seed = other.starting_seed;
-        batch_start_trees = std::move(other.batch_start_trees);
-        msa = std::move(other.msa);
-        reference_persite_loglh = std::move(other.reference_persite_loglh);
-        au_assignment = std::move(other.au_assignment);
-        exclusive_assignment = std::move(other.exclusive_assignment);
-        coarse_assignments = std::move(other.coarse_assignments);
-        part_assignments = std::move(other.part_assignments);
-        tip_msa_idmap = std::move(other.tip_msa_idmap);
-        tree_topologies = std::move(other.tree_topologies);
-        batch_trees = std::move(other.batch_trees);
-        batch_persite_logh = std::move(other.batch_persite_logh);
-        plausible_tree_count = other.plausible_tree_count;
-        wall_time = other.wall_time;
-        return *this;
-    }
+    TunedBatch &operator=(TunedBatch &&other) noexcept = default;
 
     /**
      * How often the batch queue has attempted to reuse this batch.
@@ -295,7 +254,7 @@ protected:
     /**
      * Starting trees for this inference batch
      */
-    shared_ptr<TreeList> batch_start_trees;
+    std::shared_ptr<TreeList> batch_start_trees;
 
     /**
      * Assignment of trees to threads for the AU test. The AU test cannot split between partitions, and so no tree
@@ -324,7 +283,7 @@ protected:
     /**
      * Vector mapping sequence IDs to the MSA.
      */
-    shared_ptr<IDVector> tip_msa_idmap;
+    std::shared_ptr<IDVector> tip_msa_idmap;
 
     /**
      * Treeinfo objects for the trees inferred in this batch. These objects are updated by the inference algorithm.
@@ -343,12 +302,12 @@ protected:
      * Initial model parameters that get loaded into the tree info objects upon creation.
      * This is initialized after creating the TunedBatch with a call to assign_batch_models.
      */
-    shared_ptr<ModelMap> initial_model;
+    std::shared_ptr<ModelMap> initial_model;
 
     /**
      * How many starting trees have been generated.
      */
-    atomic_uint num_trees_generated{0};
+    std::unique_ptr<atomic_uint> num_trees_generated = make_unique<atomic_uint>(0);
 
     /**
      * Number of plausible trees as determined by the last AU test.
@@ -375,7 +334,7 @@ protected:
      * we end the algorithm before the current call to optimize() is finished.
      * Unique pointer to provide inner mutability. Const so the move constructors don't touch it.
      */
-    const std::unique_ptr<std::mutex> topology_access = make_unique<std::mutex>();
+    std::unique_ptr<std::mutex> topology_access = make_unique<std::mutex>();
 
     /**
      * The final tree topologies. This vector is populated by a call to `finalize()` and is otherwise empty.
@@ -391,13 +350,13 @@ protected:
      */
     doubleVector p_values;
 
-    unique_ptr<InferenceHeuristic> heuristic = {};
+    std::unique_ptr<InferenceHeuristic> heuristic = {};
 
     /**
      * @return Whether all starting trees have been generated for this batch.
      */
-    bool start_trees_generated() const {
-        return this->num_trees_generated == get_batch_size();
+    [[nodiscard]] bool start_trees_generated() const {
+        return *this->num_trees_generated == get_batch_size();
     }
 
     /**
