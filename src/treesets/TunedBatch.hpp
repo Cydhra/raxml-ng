@@ -47,13 +47,12 @@ public:
           starting_seed(starting_seed),
           batch_start_trees(new TreeList(batch_size)),
           tip_msa_idmap(tip_msa_idmap),
-          batch_persite_logh(std::vector<std::vector<doubleVector> >(batch_size)) {
+          batch_persite_logh(std::vector<std::vector<doubleVector> >(batch_size)),
+          threads_per_worker(num_threads / num_workers) {
         for (auto &tree_slh: batch_persite_logh) {
             for (const auto &pinfo: msa->part_list())
                 tree_slh.emplace_back(pinfo.msa().length());
         }
-
-        const auto threads_per_worker = num_threads / num_workers;
 
         // prepare space for the tree-info objects
         this->batch_trees = std::vector<std::vector<std::optional<TreeInfo> > >(batch_size);
@@ -66,7 +65,8 @@ public:
         ContiguousCoarseLoadBalancer load_balancer;
         CoarseAssignment tree_ids(batch_size);
         std::iota(tree_ids.begin(), tree_ids.end(), 0);
-        this->coarse_assignments = make_shared<CoarseAssignmentList>(load_balancer.get_all_assignments(tree_ids, num_workers));
+        this->coarse_assignments = make_shared<CoarseAssignmentList>(
+            load_balancer.get_all_assignments(tree_ids, num_workers));
 
         // load balance partitions for such tasks between threads
         PartitionAssignment part_sizes;
@@ -85,7 +85,8 @@ public:
         const unsigned int total_trees_au = reference_persite_loglh->size() + batch_size;
         CoarseAssignment au_tree_ids(total_trees_au);
         std::iota(au_tree_ids.begin(), au_tree_ids.end(), 0);
-        this->au_assignment = make_shared<CoarseAssignmentList>(load_balancer.get_all_assignments(au_tree_ids, num_threads));
+        this->au_assignment = make_shared<CoarseAssignmentList>(
+            load_balancer.get_all_assignments(au_tree_ids, num_threads));
 
         // load-balance work where one tree can be managed by one thread only
         CoarseAssignment exclusive_tree_access(batch_size);
@@ -351,6 +352,11 @@ protected:
     doubleVector p_values;
 
     std::unique_ptr<InferenceHeuristic> heuristic = {};
+
+    /**
+     * How many threads will infer this batch at once (i.e. threads per task-group)
+     */
+    unsigned int threads_per_worker;
 
     /**
      * @return Whether all starting trees have been generated for this batch.

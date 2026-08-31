@@ -67,7 +67,7 @@ void Constrain::do_optimize(std::optional<TreeInfo> &tree, const unsigned int, c
     topology.reset_tip_ids(new_label_id_map);
     constraint->reset_tip_ids(new_label_id_map);
 
-    tree.emplace(TreeInfo(opts, topology, *msa, new_tip_msa_map, partition_assignments.at(thread_id)));
+    tree.emplace(TreeInfo(opts, topology, *msa, new_tip_msa_map, part_assignments->at(thread_id)));
     tree->set_topology_constraint(*constraint);
     assert(constraint->compatible(tree->tree()));
 

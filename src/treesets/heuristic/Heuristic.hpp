@@ -20,9 +20,18 @@ class InferenceHeuristic {
 public:
     virtual ~InferenceHeuristic() = default;
 
-    InferenceHeuristic(std::string batch_name, std::unique_ptr<InferenceHeuristic> inner)
+    /**
+     * @param batch_name name of the batch that uses this heuristic
+     * @param inner inner heuristic stage (which will be executed first)
+     * @param num_trees number of trees inferred by this instance
+     * @param threads_per_worker number of threads per task-group (which will call this strategy)
+     */
+    InferenceHeuristic(std::string batch_name, std::unique_ptr<InferenceHeuristic> inner,
+                       const unsigned int num_trees, const unsigned int threads_per_worker)
         : batch_name(std::move(batch_name)),
-          inner(std::move(inner)) {
+          inner(std::move(inner)),
+          num_trees(num_trees),
+          passed(num_trees * threads_per_worker, 0) {
     }
 
     InferenceHeuristic(const InferenceHeuristic &other) = delete;
@@ -46,21 +55,9 @@ public:
      * @param worker_id raxml-instance-global id of the current thread's worker. Used for work distribution.
      * @param thread_id thread id within the current worker. Used for work distribution.
      */
-    void optimize(std::optional<TreeInfo> &tree, const unsigned int tree_id, const Options &opts, // NOLINT(*-no-recursion)
+    void optimize(std::optional<TreeInfo> &tree, const unsigned int tree_id, const Options &opts,
                   const TaskGroup &context, SharedBatchResources &resources,
-                  const unsigned int worker_id, const unsigned int thread_id) {
-        if (inner) {
-            inner->optimize(tree, tree_id, opts, context, resources, worker_id, thread_id);
-        }
-
-        const auto begin = std::chrono::steady_clock::now();
-        do_optimize(tree, tree_id, opts, context, resources, worker_id, thread_id);
-        const auto end = std::chrono::steady_clock::now();
-        const unsigned int elapsed = static_cast<unsigned int>(std::chrono::duration_cast<
-            std::chrono::milliseconds>(end - begin).count());
-
-        cumulative_wall_time->fetch_add(elapsed);
-    }
+                  const unsigned int worker_id, const unsigned int thread_id);
 
     /**
      * Calculate the cumulative wall-time spent on all inferred trees across the entire heuristic.
@@ -68,13 +65,7 @@ public:
      *
      * @return the total cumulative wall-time across the entire heuristic
      */
-    [[nodiscard]] unsigned int get_total_wall_time() const { // NOLINT(*-no-recursion)
-        unsigned int total = 0;
-        if (inner) {
-            total += inner->get_total_wall_time();
-        }
-        return *cumulative_wall_time + total;
-    }
+    [[nodiscard]] unsigned int get_total_wall_time() const;
 
     /**
      * Implementation of the concrete inference strategy. Inference will modify the `tree` argument, which is passed
@@ -113,6 +104,19 @@ private:
      * called before the current stage is executed.
      */
     std::unique_ptr<InferenceHeuristic> inner = {};
+
+    /**
+     * Number of trees inferred by this instance
+     */
+    unsigned int num_trees;
+
+    /**
+     * Flags indicating if the thread has already passed this stage.
+     * When a heuristic is called, this array must be the same state for each thread.
+     * however during execution some threads may pass other threads, so we cannot use a single flag.
+     * Further, we cannot use bool here, because vector<bool> may use specialization which breaks concurrency.
+     */
+    std::vector<char> passed;
 };
 
 #endif //RAXML_HEURISTIC_HPP_

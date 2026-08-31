@@ -51,7 +51,7 @@ void TunedBatch::optimize(const RaxmlInstance &instance, const Options &opts, Sh
     }
 
     const auto &tree_ids = this->coarse_assignments->at(worker_id);
-    for (const auto tree_id : tree_ids) {
+    for (const auto tree_id: tree_ids) {
         heuristic->optimize(batch_trees[tree_id][thread_id], tree_id, opts, context, resources, worker_id, thread_id);
     }
 
@@ -147,7 +147,7 @@ void TunedBatch::perform_plausibility_check(const Options &opts, SharedBatchReso
     // forcibly optimize parameters
     // TODO should we backup the less optimized model or just accept that we overspecify the model
     const auto &tree_ids = this->coarse_assignments->at(worker_id);
-    for (const auto tree_id : tree_ids) {
+    for (const auto tree_id: tree_ids) {
         batch_trees[tree_id][thread_id]->optimize_params(CORAX_OPT_PARAM_ALL, 0.1);
     }
 
@@ -162,14 +162,17 @@ void TunedBatch::perform_plausibility_check(const Options &opts, SharedBatchReso
         auto reference_p_count = 0;
 
         // count how many reference trees are plausible
-        for (const auto last = au_test.get_p_values().begin() + reference_persite_loglh->size(); first != last; ++first) {
+        for (const auto last = au_test.get_p_values().begin() + reference_persite_loglh->size(); first != last; ++
+             first) {
             if (*first > SIGNIFICANCE_LEVEL) {
                 reference_p_count += 1;
             }
         }
         LOG_DEBUG_TS << "AU Test found " << reference_p_count << " plausible trees in the reference set." << std::endl;
         if (reference_p_count == 0) {
-            LOG_WARN << "Warning: treeset search found strictly better tree than ML search. Plausible treeset no longer plausible." << std::endl;
+            LOG_WARN <<
+                    "Warning: treeset search found strictly better tree than ML search. Plausible treeset no longer plausible."
+                    << std::endl;
         }
 
         // count how many inferred trees are plausible
@@ -192,7 +195,10 @@ void TunedBatch::perform_plausibility_check(const Options &opts, SharedBatchReso
 
 void TunedBatch::update_meta_parameters(const MetaParameters &new_parameters) {
     this->meta_parameters = new_parameters;
-    this->heuristic = HeuristicFactory::build_heuristic(meta_parameters, name, batch_start_trees, part_assignments, initial_model, msa, tip_msa_idmap);
+    this->heuristic = HeuristicFactory::build_heuristic(meta_parameters, name, get_batch_size(),
+                                                        this->threads_per_worker, batch_start_trees, part_assignments,
+                                                        initial_model,
+                                                        msa, tip_msa_idmap);
 }
 
 bool TunedBatch::is_compatible(const MetaParameters &new_parameters) const {
@@ -266,7 +272,7 @@ bool TunedBatch::is_compatible(const MetaParameters &new_parameters) const {
 }
 
 void TunedBatch::backup_models(ModelMap &target) const {
-    for (const auto & thread_id : this->batch_trees[0]) {
+    for (const auto &thread_id: this->batch_trees[0]) {
         for (size_t part_id: thread_id.value().parts_master()) {
             assign(target[part_id], thread_id.value(), part_id);
         }

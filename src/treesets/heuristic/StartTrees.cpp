@@ -2,7 +2,7 @@
 #include <optional>
 #include "../../TreeInfo.hpp"
 
-void StartTrees::do_optimize(std::optional<TreeInfo> &tree, const unsigned int tree_id, const Options &opts, const TaskGroup &context, SharedBatchResources &, const unsigned int worker_id, const unsigned int thread_id) {
+void StartTrees::do_optimize(std::optional<TreeInfo> &tree, const unsigned int tree_id, const Options &opts, const TaskGroup &context, SharedBatchResources &, const unsigned int, const unsigned int thread_id) {
     assert(!tree.has_value());
 
     // barrier so we dont start building tree-info objects without finished trees (since the thread assignment changes,

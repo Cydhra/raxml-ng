@@ -6,9 +6,9 @@
 class FastRaxml : public InferenceHeuristic {
 
 public:
-    FastRaxml(std::string batch_name, std::unique_ptr<InferenceHeuristic> inner,
-        std::shared_ptr<PartitionAssignmentList> part_assignments)
-        : InferenceHeuristic(std::move(batch_name), std::move(inner)),
+    FastRaxml(std::string batch_name, std::unique_ptr<InferenceHeuristic> inner, const unsigned num_trees,
+        const unsigned threads_per_worker, std::shared_ptr<PartitionAssignmentList> part_assignments)
+        : InferenceHeuristic(std::move(batch_name), std::move(inner), num_trees, threads_per_worker),
           part_assignments(std::move(part_assignments)) {
     }
 
