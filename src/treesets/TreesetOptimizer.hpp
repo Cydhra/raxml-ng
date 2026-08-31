@@ -167,8 +167,10 @@ public:
                                                                instance(instance),
                                                                opts(opts),
                                                                batch_queue(
-                                                                   instance, opts, tip_msa_idmap, load_balancer, msa,
-                                                                   persite_loglh, starting_seed,
+                                                                   instance, opts, make_shared<IDVector>(tip_msa_idmap),
+                                                                   load_balancer, msa,
+                                                                   make_shared<std::vector<std::vector<
+                                                                       doubleVector> > >(persite_loglh), starting_seed,
                                                                    DEFAULT_BATCH_SIZE),
                                                                pythia_score(pythia_score),
                                                                target_tree_count(target_tree_count) {

@@ -50,7 +50,7 @@ void TunedBatch::optimize(const RaxmlInstance &instance, const Options &opts, Sh
         this->generate_starting_trees(instance, context, worker_id, thread_id);
     }
 
-    const auto &tree_ids = this->coarse_assignments.at(worker_id);
+    const auto &tree_ids = this->coarse_assignments->at(worker_id);
     for (const auto tree_id : tree_ids) {
         heuristic->optimize(batch_trees[tree_id][thread_id], tree_id, opts, context, resources, worker_id, thread_id);
     }
@@ -81,7 +81,7 @@ void TunedBatch::optimize(const RaxmlInstance &instance, const Options &opts, Sh
 
 void TunedBatch::perform_au_test(AuTest &au_test, const bool initialized, const TaskGroup &context,
                                  const unsigned int worker_id, const unsigned int thread_id) {
-    const auto trees = this->coarse_assignments.at(worker_id);
+    const auto trees = this->coarse_assignments->at(worker_id);
     for (const auto tree_id: trees) {
         // collect the sub-partitions for the local worker
         auto &tree_likelihood_vec = batch_persite_logh[tree_id];
@@ -105,9 +105,9 @@ void TunedBatch::perform_au_test(AuTest &au_test, const bool initialized, const 
     const std::vector<size_t> &tree_ids =
             initialized
                 ? exclusive_assignment->at(context.get_group_thread_id(worker_id, thread_id))
-                : au_assignment.at(context.get_group_thread_id(worker_id, thread_id));
+                : au_assignment->at(context.get_group_thread_id(worker_id, thread_id));
     const unsigned int slice_start = initialized
-                                         ? *tree_ids.begin() + reference_persite_loglh.size()
+                                         ? *tree_ids.begin() + reference_persite_loglh->size()
                                          : *tree_ids.begin();
 
     au_test.run_bootstrap(tree_ids.size(), slice_start);
@@ -132,12 +132,12 @@ void TunedBatch::perform_plausibility_check(const Options &opts, SharedBatchReso
         if (!initialized) {
             au_test.allocate_test_statistics(false);
         }
-        au_test.replace_persite_loglh(reference_persite_loglh.size(), batch_persite_logh);
+        au_test.replace_persite_loglh(reference_persite_loglh->size(), batch_persite_logh);
     }
 
     // reset model to original for AU test
     if (meta_parameters.model_override) {
-        for (const auto &tree_id: coarse_assignments.at(worker_id)) {
+        for (const auto &tree_id: coarse_assignments->at(worker_id)) {
             batch_trees[tree_id][thread_id].emplace(opts, batch_trees[tree_id][thread_id]->tree(), *msa, *tip_msa_idmap,
                                                     part_assignments->at(thread_id));
         }
@@ -146,7 +146,7 @@ void TunedBatch::perform_plausibility_check(const Options &opts, SharedBatchReso
     const auto begin = std::chrono::steady_clock::now();
     // forcibly optimize parameters
     // TODO should we backup the less optimized model or just accept that we overspecify the model
-    const auto &tree_ids = this->coarse_assignments.at(worker_id);
+    const auto &tree_ids = this->coarse_assignments->at(worker_id);
     for (const auto tree_id : tree_ids) {
         batch_trees[tree_id][thread_id]->optimize_params(CORAX_OPT_PARAM_ALL, 0.1);
     }
@@ -162,7 +162,7 @@ void TunedBatch::perform_plausibility_check(const Options &opts, SharedBatchReso
         auto reference_p_count = 0;
 
         // count how many reference trees are plausible
-        for (const auto last = au_test.get_p_values().begin() + reference_persite_loglh.size(); first != last; ++first) {
+        for (const auto last = au_test.get_p_values().begin() + reference_persite_loglh->size(); first != last; ++first) {
             if (*first > SIGNIFICANCE_LEVEL) {
                 reference_p_count += 1;
             }

@@ -15,10 +15,10 @@ class BatchQueue {
 public:
     BatchQueue(RaxmlInstance &instance,
                Options &opts,
-               IDVector &tip_msa_idmap,
+               const std::shared_ptr<IDVector> &tip_msa_idmap,
                LoadBalancer &load_balancer,
                const std::shared_ptr<PartitionedMSA> &msa,
-               const std::vector<std::vector<doubleVector> > &persite_loglh,
+               const std::shared_ptr<std::vector<std::vector<doubleVector> > > &persite_loglh,
                const unsigned long long seed,
                const unsigned int batch_size) : instance(instance),
                                                 opts(opts),
@@ -106,7 +106,7 @@ protected:
     /**
      * Reference to the RAxML-ng instance's tip id-map which is used for starting tree generation.
      */
-    IDVector &tip_msa_idmap;
+    std::shared_ptr<IDVector> tip_msa_idmap;
 
     /**
      * Pointer to the partitioned msa instance of the current RAxML-ng run
@@ -121,7 +121,7 @@ protected:
     /**
      * Pointer to the persite_loglh vector of the reference tree run
      */
-    std::vector<std::vector<doubleVector> > persite_loglh;
+    std::shared_ptr<std::vector<std::vector<doubleVector> > > persite_loglh;
 
     /**
      * List of all batches that are being inferred or were inferred by the optimizer. It is initialized with a

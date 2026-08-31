@@ -32,21 +32,21 @@ Tree generate_tree(const RaxmlInstance &instance, StartingTree type, int random_
 
 class TunedBatch final {
 public:
-    TunedBatch(string name,
+    TunedBatch(const std::string &name,
                const unsigned int starting_seed,
                const unsigned int batch_size,
                const unsigned int num_threads,
                const unsigned int num_workers,
                const std::shared_ptr<PartitionedMSA> &msa,
                LoadBalancer &thread_load_balancer,
-               IDVector &tip_msa_idmap,
-               std::vector<std::vector<doubleVector> > &reference_persite_loglh)
-        : name(std::move(name)),
+               const std::shared_ptr<IDVector> &tip_msa_idmap,
+               std::shared_ptr<std::vector<std::vector<doubleVector> > > &reference_persite_loglh)
+        : name(name),
           reference_persite_loglh(reference_persite_loglh),
           msa(msa),
           starting_seed(starting_seed),
           batch_start_trees(new TreeList(batch_size)),
-          tip_msa_idmap(make_shared<IDVector>(tip_msa_idmap)),
+          tip_msa_idmap(tip_msa_idmap),
           batch_persite_logh(std::vector<std::vector<doubleVector> >(batch_size)) {
         for (auto &tree_slh: batch_persite_logh) {
             for (const auto &pinfo: msa->part_list())
@@ -66,14 +66,14 @@ public:
         ContiguousCoarseLoadBalancer load_balancer;
         CoarseAssignment tree_ids(batch_size);
         std::iota(tree_ids.begin(), tree_ids.end(), 0);
-        this->coarse_assignments = load_balancer.get_all_assignments(tree_ids, num_workers);
+        this->coarse_assignments = make_shared<CoarseAssignmentList>(load_balancer.get_all_assignments(tree_ids, num_workers));
 
         // load balance partitions for such tasks between threads
         PartitionAssignment part_sizes;
         for (unsigned int i = 0; i < this->msa->part_list().size(); ++i) {
             /* init the list of partition sizes */
             auto pinfo = &this->msa->part_list()[i];
-            part_sizes.assign_sites(i, 0, pinfo->length(), pinfo->model().clv_entry_size());
+            part_sizes.assign_sites(i, 0, pinfo->length(), static_cast<double>(pinfo->model().clv_entry_size()));
         }
 
         this->part_assignments = make_shared<PartitionAssignmentList>(
@@ -82,10 +82,10 @@ public:
         // load-balance work for AU test, where we have reference trees and trees assigned to one thread need to be
         // contiguous. This is only needed for the first instance of the AU test, afterward we can reuse the bootstrap
         // values for the reference trees and use the exclusive_tree_access assignment
-        const unsigned int total_trees_au = reference_persite_loglh.size() + batch_size;
+        const unsigned int total_trees_au = reference_persite_loglh->size() + batch_size;
         CoarseAssignment au_tree_ids(total_trees_au);
         std::iota(au_tree_ids.begin(), au_tree_ids.end(), 0);
-        this->au_assignment = load_balancer.get_all_assignments(au_tree_ids, num_threads);
+        this->au_assignment = make_shared<CoarseAssignmentList>(load_balancer.get_all_assignments(au_tree_ids, num_threads));
 
         // load-balance work where one tree can be managed by one thread only
         CoarseAssignment exclusive_tree_access(batch_size);
@@ -101,7 +101,7 @@ public:
     TunedBatch(TunedBatch &&other) noexcept
         : reuse_attempts(other.reuse_attempts),
           name(std::move(other.name)),
-          reference_persite_loglh(other.reference_persite_loglh),
+          reference_persite_loglh(std::move(other.reference_persite_loglh)),
           msa(std::move(other.msa)),
           starting_seed(other.starting_seed),
           meta_parameters(std::move(other.meta_parameters)),
@@ -129,7 +129,7 @@ public:
         starting_seed = other.starting_seed;
         batch_start_trees = std::move(other.batch_start_trees);
         msa = std::move(other.msa);
-        reference_persite_loglh = other.reference_persite_loglh;
+        reference_persite_loglh = std::move(other.reference_persite_loglh);
         au_assignment = std::move(other.au_assignment);
         exclusive_assignment = std::move(other.exclusive_assignment);
         coarse_assignments = std::move(other.coarse_assignments);
@@ -273,7 +273,7 @@ protected:
      * Per-site log-likelihoods of the reference trees already inferred before the treeset heuristic kicked in.
      * These cannot change, and constitute the first part of the AU test input.
      */
-    std::vector<std::vector<doubleVector> > &reference_persite_loglh;
+    shared_ptr<std::vector<std::vector<doubleVector> > > reference_persite_loglh;
 
     /**
      * A reference to the MSA used in inference. We need it for the AU test.
@@ -302,7 +302,7 @@ protected:
      * can have more than one thread assigned.
      * This assignment includes the reference trees of the AU test.
      */
-    CoarseAssignmentList au_assignment;
+    std::shared_ptr<CoarseAssignmentList> au_assignment;
 
     /**
      * Assignment of trees to threads where only one thread can work on a tree. This is relevant for starting trees,
@@ -314,7 +314,7 @@ protected:
      * Assignment of trees to workers for tree inference. The AU test diverges from this assignment because the AU
      * test cannot split partitions between threads.
      */
-    CoarseAssignmentList coarse_assignments;
+    std::shared_ptr<CoarseAssignmentList> coarse_assignments;
 
     /**
      * Fine-grained assignment of partitions to threads within workers (thread groups).
