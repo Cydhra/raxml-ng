@@ -21,14 +21,15 @@ TunedBatch &BatchQueue::generate_batch(const unsigned int num_workers, const uns
     // place new batches at the end of the queue, and mark them as unfinished
     std::string batch_name = name_prefix + std::to_string(batch_name_index);
     this->batches.emplace_back(batch_name,
-                             generate_seed_for_trees(this->batch_size),
-                             this->batch_size,
-                             num_threads,
-                             num_workers,
-                             msa,
-                             load_balancer,
-                             tip_msa_idmap,
-                             persite_loglh);
+                               msa,
+                               tip_msa_idmap,
+                               persite_loglh,
+                               generate_seed_for_trees(this->batch_size),
+                               this->batch_size,
+                               num_threads,
+                               num_workers,
+                               load_balancer);
+
     auto &batch = this->batches.back();
 
     // mark the batch as unfinished
@@ -49,8 +50,8 @@ void BatchQueue::finalize_batch(TunedBatch &batch) {
     batch.finalize();
     this->finalized_plausible_trees += batch.get_plausible_tree_count();
 
-    auto unfinished_plausible = 0;
-    for (auto &batch_ref : this->batches) {
+    unsigned int unfinished_plausible = 0;
+    for (auto &batch_ref: this->batches) {
         if (this->unfinished.find(batch_ref.get_name()) != this->unfinished.cend()) {
             unfinished_plausible += batch_ref.get_plausible_tree_count();
         }
@@ -59,7 +60,8 @@ void BatchQueue::finalize_batch(TunedBatch &batch) {
     this->unfinished_plausible_trees = unfinished_plausible;
 }
 
-TunedBatch &BatchQueue::select_next_batch(const MetaParameters &current_parameters, const unsigned int num_workers, const unsigned int num_threads) {
+TunedBatch &BatchQueue::select_next_batch(const MetaParameters &current_parameters, const unsigned int num_workers,
+                                          const unsigned int num_threads) {
     TunedBatch *selected_batch = nullptr;
 
     batch_mutex.lock();

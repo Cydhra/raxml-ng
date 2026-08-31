@@ -32,16 +32,16 @@ Tree generate_tree(const RaxmlInstance &instance, StartingTree type, int random_
 
 class TunedBatch final {
 public:
-    TunedBatch(const std::string &name,
+    TunedBatch(std::string name,
+               const std::shared_ptr<PartitionedMSA> &msa,
+               const std::shared_ptr<IDVector> &tip_msa_idmap,
+               const std::shared_ptr<std::vector<std::vector<doubleVector> > > &reference_persite_loglh,
                const unsigned int starting_seed,
                const unsigned int batch_size,
                const unsigned int num_threads,
                const unsigned int num_workers,
-               const std::shared_ptr<PartitionedMSA> &msa,
-               LoadBalancer &thread_load_balancer,
-               const std::shared_ptr<IDVector> &tip_msa_idmap,
-               std::shared_ptr<std::vector<std::vector<doubleVector> > > &reference_persite_loglh)
-        : name(name),
+               LoadBalancer &thread_load_balancer)
+        : name(std::move(name)),
           reference_persite_loglh(reference_persite_loglh),
           msa(msa),
           starting_seed(starting_seed),
