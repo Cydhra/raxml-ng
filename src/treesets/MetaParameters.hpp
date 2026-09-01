@@ -40,13 +40,6 @@ struct MetaParameters {
     bool accept_starting_trees;
 
     /**
-     * If true, the 0.1 model optimization is done instantly to commit the tree and model to the current local minimum.
-     * This helps with datasets with discordant signal to commit to a random signal instantly, instead of searching
-     * a global minimum.
-     */
-    bool early_commit;
-
-    /**
      * Maximum SPR radius
      */
     unsigned int max_adaptive_radius;
@@ -76,7 +69,6 @@ struct MetaParameters {
                    const unsigned int num_fast_spr = 0,
                    const unsigned int num_slow_spr = 0,
                    const bool accept_starting_trees = false,
-                   const bool early_commit = false,
                    const int max_radius = 20,
                    const bool nni_round = false,
                    const bool constrain = false,
@@ -87,7 +79,6 @@ struct MetaParameters {
                                                              num_fast_spr(num_fast_spr),
                                                              num_slow_spr(num_slow_spr),
                                                              accept_starting_trees(accept_starting_trees),
-                                                             early_commit(early_commit),
                                                              max_adaptive_radius(max_radius),
                                                              nni_round(nni_round),
                                                              constrain(constrain),
@@ -101,7 +92,6 @@ struct MetaParameters {
                && lhs.num_fast_spr == rhs.num_fast_spr
                && lhs.num_slow_spr == rhs.num_slow_spr
                && lhs.accept_starting_trees == rhs.accept_starting_trees
-               && lhs.early_commit == rhs.early_commit
                && lhs.max_adaptive_radius == rhs.max_adaptive_radius
                && lhs.nni_round == rhs.nni_round
                && lhs.constrain == rhs.constrain
@@ -119,7 +109,6 @@ struct MetaParameters {
         seed ^= (seed << 6) + (seed >> 2) + 0x72773779 + static_cast<std::size_t>(obj.num_fast_spr);
         seed ^= (seed << 6) + (seed >> 2) + 0x4799CDEB + static_cast<std::size_t>(obj.num_slow_spr);
         seed ^= (seed << 6) + (seed >> 2) + 0x20437926 + static_cast<std::size_t>(obj.accept_starting_trees);
-        seed ^= (seed << 6) + (seed >> 2) + 0x3E03390B + static_cast<std::size_t>(obj.early_commit);
         seed ^= (seed << 6) + (seed >> 2) + 0x4AC1F56C + static_cast<std::size_t>(obj.max_adaptive_radius);
         seed ^= (seed << 6) + (seed >> 2) + 0x7BA5D994 + static_cast<std::size_t>(obj.nni_round);
         seed ^= (seed << 6) + (seed >> 2) + 0x1DBD1C1A + static_cast<std::size_t>(obj.constrain);

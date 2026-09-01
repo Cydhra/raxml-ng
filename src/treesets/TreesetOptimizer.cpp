@@ -12,41 +12,41 @@ void TreesetOptimizer::initialize_bandits() {
                                      : DEFAULT_ADAPTIVE_RADIUS;
 
     // init default bandits
-    this->nni_mab->emplace_back("NNI,DoModel", MetaParameters(20, false, 0, 0, false, false, adaptive_radius, true));
-    this->nni_mab->emplace_back("NNI,NoModel", MetaParameters(20, true, 0, 0, false, false, adaptive_radius, true));
+    this->nni_mab->emplace_back("NNI,DoModel", MetaParameters(20, false, 0, 0, false, adaptive_radius, true));
+    this->nni_mab->emplace_back("NNI,NoModel", MetaParameters(20, true, 0, 0, false, adaptive_radius, true));
 
-    this->light_mab->emplace_back("Greedy,DoModel,2spr", MetaParameters(1, false, 2, 0, false, false, adaptive_radius));
-    this->light_mab->emplace_back("Greedy,NoModel,2spr", MetaParameters(1, true, 2, 0, false, false, adaptive_radius));
+    this->light_mab->emplace_back("Greedy,DoModel,2spr", MetaParameters(1, false, 2, 0, false, adaptive_radius));
+    this->light_mab->emplace_back("Greedy,NoModel,2spr", MetaParameters(1, true, 2, 0, false, adaptive_radius));
 
-    this->light_mab->emplace_back("Fast,DoModel,2spr", MetaParameters(20, false, 2, 0, false, false, adaptive_radius));
-    this->light_mab->emplace_back("Fast,NoModel,2spr", MetaParameters(20, true, 2, 0, false, false, adaptive_radius));
+    this->light_mab->emplace_back("Fast,DoModel,2spr", MetaParameters(20, false, 2, 0, false, adaptive_radius));
+    this->light_mab->emplace_back("Fast,NoModel,2spr", MetaParameters(20, true, 2, 0, false, adaptive_radius));
 
     // low radius heuristics
     this->low_mab->emplace_back("Greedy,2spr,low",
                                 MetaParameters(1, false, 2, 0, false, false,
                                                max(adaptive_radius - 5, static_cast<unsigned int>(5))));
     this->low_mab->emplace_back("Fast,2spr,low",
-                                MetaParameters(20, false, 2, 0, false, false,
+                                MetaParameters(20, false, 2, 0, false,
                                                max(adaptive_radius - 5, static_cast<unsigned int>(5))));
     this->low_mab->emplace_back("Fast,2spr,v-low",
-                                MetaParameters(20, false, 2, 0, false, false,
+                                MetaParameters(20, false, 2, 0, false,
                                                max(adaptive_radius - 10, static_cast<unsigned int>(5))));
     this->low_mab->emplace_back("Slow,2spr,low",
-                                MetaParameters(20, false, 0, 2, false, false,
+                                MetaParameters(20, false, 0, 2, false,
                                                max(adaptive_radius - 5, static_cast<unsigned int>(5))));
 
     this->constrained_mab->emplace_back("Fast,DoModel,2spr,NNI,Constrained",
-                                        MetaParameters(20, false, 2, 0, false, false, adaptive_radius, true, true));
+                                        MetaParameters(20, false, 2, 0, false, adaptive_radius, true, true));
     this->constrained_mab->emplace_back("Fast,NoModel,2spr,NNI,Constrained",
-                                        MetaParameters(20, true, 2, 0, false, false, adaptive_radius, true, true));
+                                        MetaParameters(20, true, 2, 0, false, adaptive_radius, true, true));
     this->constrained_mab->emplace_back("Greedy,NoModel,2spr,NNI,Constrained",
-                                        MetaParameters(1, true, 2, 0, false, false, adaptive_radius, true, true));
+                                        MetaParameters(1, true, 2, 0, false, adaptive_radius, true, true));
     this->constrained_mab->emplace_back("Greedy,DoModel,2spr,NNI,Constrained",
-                                        MetaParameters(1, false, 2, 0, false, false, adaptive_radius, true, true));
+                                        MetaParameters(1, false, 2, 0, false, adaptive_radius, true, true));
 
     // fallbacks
     this->fallback_fast_mab->emplace_back("Fast-Raxml",
-                                          MetaParameters(20, true, 0, 0, false, false, 20, false, false, std::nullopt,
+                                          MetaParameters(20, true, 0, 0, false, 20, false, false, std::nullopt,
                                                          true));
 
     // set up successors
