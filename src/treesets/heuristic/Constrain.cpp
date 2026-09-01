@@ -39,7 +39,9 @@ static std::optional<Tree> get_reverse_backbone(const TreeInfo &tree) {
     return constraint;
 }
 
-void Constrain::do_optimize(std::optional<TreeInfo> &tree, const unsigned int, const Options &opts, const TaskGroup &, SharedBatchResources &, unsigned int, unsigned int thread_id) {
+void Constrain::do_optimize(std::optional<TreeInfo> &tree, const unsigned int tree_id, const Options &opts,
+                            const TaskGroup &context, SharedBatchResources &, unsigned int worker_id,
+                            unsigned int thread_id) {
     auto constraint = get_reverse_backbone(tree.value());
 
     if (!constraint) {
@@ -62,6 +64,10 @@ void Constrain::do_optimize(std::optional<TreeInfo> &tree, const unsigned int, c
     assert(cons_tip_id == constraint->num_tips());
     assert(free_tip_id == new_tip_msa_map.size());
     assert(new_label_id_map.size() == msa->taxon_count());
+
+    if (context.is_group_leader(worker_id, thread_id)) {
+        LOG_INFO_TS << "Constraining " << cons_tip_id << " taxa." << std::endl;
+    }
 
     auto topology = tree->tree();
     topology.reset_tip_ids(new_label_id_map);
