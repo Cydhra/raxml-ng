@@ -1,6 +1,7 @@
 #include "HeuristicFactory.hpp"
 
 #include "heuristic/Constrain.hpp"
+#include "heuristic/DynamicSpr.hpp"
 #include "heuristic/FastRaxml.hpp"
 #include "heuristic/FixedSpr.hpp"
 #include "heuristic/StartTrees.hpp"
@@ -59,6 +60,10 @@ static unique_ptr<InferenceHeuristic> from_meta_parameters(const MetaParameters 
                                           1 * meta_parameters.max_adaptive_radius);
     }
 
+    if (meta_parameters.dynamic_spr) {
+        heuristic = make_unique<DynamicSpr>(batch_name, std::move(heuristic), num_trees, threads_per_worker, part_assignments);
+    }
+
     if (meta_parameters.fallback_fast_raxml) {
         heuristic = make_unique<FastRaxml>(batch_name, std::move(heuristic), num_trees, threads_per_worker,
                                            part_assignments);
@@ -104,6 +109,8 @@ unique_ptr<InferenceHeuristic> HeuristicFactory::extend_heuristic(const MetaPara
 
     assert(old_parameters.accept_starting_trees || !old_parameters.constrain || new_parameters.constrain); // we cannot undo a constraint
     delta.constrain = old_parameters.constrain != new_parameters.constrain;
+
+    delta.dynamic_spr = old_parameters.dynamic_spr != new_parameters.dynamic_spr;
 
     assert(old_parameters.num_fast_spr <= new_parameters.num_fast_spr);
     assert(old_parameters.num_fast_spr == new_parameters.num_fast_spr || old_parameters.num_slow_spr == 0);
