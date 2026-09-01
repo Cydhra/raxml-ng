@@ -2,7 +2,7 @@
 #include "TunedBatch.hpp"
 #include "../Optimizer.hpp"
 
-constexpr unsigned int MIN_PAUSE_BETWEEN_MODIFICATIONS = 6;
+constexpr unsigned int MIN_PAUSE_BETWEEN_MODIFICATIONS = 4;
 
 void TreesetOptimizer::initialize_bandits() {
     this->parsimony->emplace_back("Parsimony", MetaParameters(1, false, 0, 0, true, false));
@@ -50,11 +50,11 @@ void TreesetOptimizer::initialize_bandits() {
                                                          true));
 
     // set up successors
-    this->successors.emplace_back(make_tuple(1, "NNI", this->nni_mab));
-    this->successors.emplace_back(make_tuple(2, "Light", this->light_mab));
-    this->successors.emplace_back(make_tuple(3, "Constrained", this->constrained_mab));
-    this->successors.emplace_back(make_tuple(4, "LowRadius", this->low_mab));
-    this->successors.emplace_back(make_tuple(5, "Fallback", this->fallback_fast_mab));
+    this->successors.emplace_back(1, "NNI", this->nni_mab);
+    this->successors.emplace_back(2, "Light", this->light_mab);
+    this->successors.emplace_back(3, "Constrained", this->constrained_mab);
+    this->successors.emplace_back(3, "LowRadius", this->low_mab);
+    this->successors.emplace_back(5, "Fallback", this->fallback_fast_mab);
 
     // second-level MAB
     this->hierarchical_mab.emplace_back("Starting Trees", parsimony);
