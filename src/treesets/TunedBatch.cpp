@@ -200,11 +200,19 @@ void TunedBatch::perform_plausibility_check(const Options &opts, SharedBatchReso
 }
 
 void TunedBatch::update_meta_parameters(const MetaParameters &new_parameters) {
+    if (!this->heuristic) {
+        this->heuristic = HeuristicFactory::build_heuristic(new_parameters, name, get_batch_size(),
+                                                            this->threads_per_worker, batch_start_trees,
+                                                            part_assignments,
+                                                            initial_model,
+                                                            msa, tip_msa_idmap);
+    } else {
+        this->heuristic = HeuristicFactory::extend_heuristic(new_parameters, this->meta_parameters,
+                                                             std::move(this->heuristic), name, get_batch_size(),
+                                                             this->threads_per_worker, part_assignments, msa);
+    }
+
     this->meta_parameters = new_parameters;
-    this->heuristic = HeuristicFactory::build_heuristic(meta_parameters, name, get_batch_size(),
-                                                        this->threads_per_worker, batch_start_trees, part_assignments,
-                                                        initial_model,
-                                                        msa, tip_msa_idmap);
 }
 
 bool TunedBatch::is_compatible(const MetaParameters &new_parameters) const {
@@ -213,7 +221,15 @@ bool TunedBatch::is_compatible(const MetaParameters &new_parameters) const {
         return false;
     }
 
-    return false;
+    // never reuse trees which already failed a fallback
+    if (this->meta_parameters.fallback_fast_raxml) {
+        return false;
+    }
+
+    // if we accept a fallback anyway, we might as well reuse the trees
+    if (new_parameters.fallback_fast_raxml) {
+        return true;
+    }
 
     // if the current parameters do the bare minimum, we can always continue with new parameters
     if (this->meta_parameters.accept_starting_trees) {
@@ -223,58 +239,49 @@ bool TunedBatch::is_compatible(const MetaParameters &new_parameters) const {
         return false;
     }
 
-    // TODO: this method needs to be part of heuristics
-    return false;
+    const auto any_spr_rounds_performed = this->meta_parameters.num_fast_spr > 0 ||
+                                          this->meta_parameters.num_slow_spr > 0;
+    const auto any_rounds_performed = this->meta_parameters.nni_round || any_spr_rounds_performed;
 
     // do not reuse batch if it was created with a different model
-    // if ((this->num_fast_spr_performed > 0 || this->num_slow_spr_performed > 0) && this->meta_parameters->model_override
-    //     != new_parameters.model_override) {
-    //     return false;
-    // }
+    if (any_rounds_performed) {
+        if (this->meta_parameters.skip_model != new_parameters.skip_model) {
+            return false;
+        }
+
+        if (this->meta_parameters.model_override != new_parameters.model_override) {
+            return false;
+        }
+    }
 
     // if settings of the SPR rounds do not match, and we already completed some SPR rounds,
     // the new parameters cannot replace the current ones
-    // if (this->num_fast_spr_performed > 0) {
-    //     if (this->meta_parameters->keep_top_k_topol != new_parameters.keep_top_k_topol) {
-    //         return false;
-    //     }
-    //     if (this->meta_parameters->max_adaptive_radius != new_parameters.max_adaptive_radius) {
-    //         return false;
-    //     }
-    //
-    //     if (this->meta_parameters->num_fast_spr > new_parameters.num_fast_spr) {
-    //         return false;
-    //     }
-    // }
-    //
-    // if (this->num_slow_spr_performed > 0) {
-    //     if (this->meta_parameters->keep_top_k_topol != new_parameters.keep_top_k_topol) {
-    //         return false;
-    //     }
-    //     if (this->meta_parameters->max_adaptive_radius != new_parameters.max_adaptive_radius) {
-    //         return false;
-    //     }
-    //
-    //     // if we already completed some slow rounds, but the other parameter wants to do more fast rounds,
-    //     // we reject, because order matters
-    //     if (this->meta_parameters->num_fast_spr != new_parameters.num_fast_spr) {
-    //         return false;
-    //     }
-    //
-    //     if (this->meta_parameters->num_slow_spr > new_parameters.num_slow_spr) {
-    //         return false;
-    //     }
-    // }
+    if (any_spr_rounds_performed) {
+        if (this->meta_parameters.keep_top_k_topol != new_parameters.keep_top_k_topol) {
+            return false;
+        }
+        if (this->meta_parameters.max_adaptive_radius != new_parameters.max_adaptive_radius) {
+            return false;
+        }
 
-    // if the way the model is obtained doesn't match, the new parameters cannot replace the current ones
-    // if (this->initial_model_optimized && this->meta_parameters->early_commit != new_parameters.early_commit) {
-    //     return false;
-    // }
-    // if (this->initial_model_optimized && this->meta_parameters->skip_model != new_parameters.skip_model) {
-    //     return false;
-    // }
-    //
-    // return true;
+        if (this->meta_parameters.num_fast_spr > new_parameters.num_fast_spr) {
+            return false;
+        }
+
+        if (this->meta_parameters.num_slow_spr > new_parameters.num_slow_spr) {
+            return false;
+        }
+    }
+
+    if (this->meta_parameters.num_slow_spr > 0) {
+        // if we already completed some slow rounds, but the other parameter wants to do more fast rounds,
+        // we reject, because order matters
+        if (this->meta_parameters.num_fast_spr != new_parameters.num_fast_spr) {
+            return false;
+        }
+    }
+
+    return true;
 }
 
 void TunedBatch::backup_models(ModelMap &target) const {
