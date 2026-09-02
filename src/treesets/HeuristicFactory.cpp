@@ -104,28 +104,32 @@ unique_ptr<InferenceHeuristic> HeuristicFactory::extend_heuristic(const MetaPara
 
     assert(!new_parameters.accept_starting_trees); // replacing a heuristic with this one is pointless
 
-    assert(accept_anything || old_parameters.skip_model || !new_parameters.skip_model);
-    // we cannot undo a previously inferred model
-    delta.skip_model = old_parameters.skip_model != new_parameters.skip_model;
+    // if the new parameters arent a fallback, add whatever is remaining to the bandit, otherwise just do what the
+    // parameters say
+    if (!new_parameters.fallback_fast_raxml) {
+        assert(accept_anything || old_parameters.skip_model || !new_parameters.skip_model);
+        // we cannot undo a previously inferred model
+        delta.skip_model = old_parameters.skip_model != new_parameters.skip_model;
 
-    assert(accept_anything || !old_parameters.nni_round || new_parameters.nni_round);
-    // we cannot undo an NNI round
-    delta.nni_round = old_parameters.nni_round != new_parameters.nni_round;
+        assert(accept_anything || !old_parameters.nni_round || new_parameters.nni_round);
+        // we cannot undo an NNI round
+        delta.nni_round = old_parameters.nni_round != new_parameters.nni_round;
 
-    assert(accept_anything || !old_parameters.constrain || new_parameters.constrain);
-    // we cannot undo a constraint
-    delta.constrain = old_parameters.constrain != new_parameters.constrain;
+        assert(accept_anything || !old_parameters.constrain || new_parameters.constrain);
+        // we cannot undo a constraint
+        delta.constrain = old_parameters.constrain != new_parameters.constrain;
 
-    delta.dynamic_spr = old_parameters.dynamic_spr != new_parameters.dynamic_spr;
+        delta.dynamic_spr = old_parameters.dynamic_spr != new_parameters.dynamic_spr;
 
-    assert(accept_anything || old_parameters.num_fast_spr <= new_parameters.num_fast_spr);
-    assert(accept_anything || old_parameters.num_fast_spr == new_parameters.num_fast_spr || old_parameters.num_slow_spr == 0);
-    delta.num_fast_spr = new_parameters.num_fast_spr - old_parameters.num_fast_spr;
+        assert(accept_anything || old_parameters.num_fast_spr <= new_parameters.num_fast_spr);
+        assert(accept_anything || old_parameters.num_fast_spr == new_parameters.num_fast_spr || old_parameters.num_slow_spr == 0);
+        delta.num_fast_spr = new_parameters.num_fast_spr - old_parameters.num_fast_spr;
 
-    assert(accept_anything || old_parameters.num_slow_spr <= new_parameters.num_slow_spr);
-    delta.num_slow_spr = new_parameters.num_slow_spr - old_parameters.num_slow_spr;
+        assert(accept_anything || old_parameters.num_slow_spr <= new_parameters.num_slow_spr);
+        delta.num_slow_spr = new_parameters.num_slow_spr - old_parameters.num_slow_spr;
 
-    delta.fallback_fast_raxml = new_parameters.fallback_fast_raxml;
+        delta.fallback_fast_raxml = new_parameters.fallback_fast_raxml;
+    }
 
     return from_meta_parameters(delta, std::move(old_heuristic), batch_name, num_trees, threads_per_worker,
                                 part_assignments, partitioned_msa);
