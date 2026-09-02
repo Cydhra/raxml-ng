@@ -245,6 +245,10 @@ bool TunedBatch::is_compatible(const MetaParameters &new_parameters) const {
 
     // do not reuse batch if it was created with a different model
     if (any_rounds_performed) {
+        if (this->meta_parameters.nni_round != new_parameters.nni_round) {
+            return false;
+        }
+
         if (this->meta_parameters.skip_model != new_parameters.skip_model) {
             return false;
         }
