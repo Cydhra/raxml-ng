@@ -26,26 +26,20 @@ void TreesetOptimizer::initialize_bandits() {
 
     // low radius heuristics
     this->low_mab->emplace_back("Greedy,2spr,low",
-                                MetaParameters(1, false, 2, 0, false,
-                                    max(adaptive_radius - 5, static_cast<unsigned int>(5)), false));
+                                MetaParameters(1, false, 2, 0, false, small_radius));
     this->low_mab->emplace_back("Fast,2spr,low",
-                                MetaParameters(20, false, 2, 0, false,
-                                               max(adaptive_radius - 5, static_cast<unsigned int>(5))));
+                                MetaParameters(20, false, 2, 0, false, small_radius));
     this->low_mab->emplace_back("Fast,2spr,v-low",
-                                MetaParameters(20, false, 2, 0, false,
-                                               max(adaptive_radius - 10, static_cast<unsigned int>(5))));
+                                MetaParameters(20, false, 2, 0, false, very_small_radius));
     this->low_mab->emplace_back("Slow,2spr,low",
-                                MetaParameters(20, false, 0, 2, false,
-                                               max(adaptive_radius - 5, static_cast<unsigned int>(5))));
+                                MetaParameters(20, false, 0, 2, false, small_radius));
 
     this->constrained_mab->emplace_back("Fast,DoModel,2spr,NNI,Constrained",
                                         MetaParameters(20, false, 2, 0, false, adaptive_radius, true, true));
-    this->constrained_mab->emplace_back("Fast,NoModel,2spr,NNI,Constrained",
-                                        MetaParameters(20, true, 2, 0, false, adaptive_radius, true, true));
-    this->constrained_mab->emplace_back("Greedy,NoModel,2spr,NNI,Constrained",
-                                        MetaParameters(1, true, 2, 0, false, adaptive_radius, true, true));
     this->constrained_mab->emplace_back("Greedy,DoModel,2spr,NNI,Constrained",
                                         MetaParameters(1, false, 2, 0, false, adaptive_radius, true, true));
+    this->constrained_mab->emplace_back("Fast,DoModel,2spr,NNI,Constrained,low",
+                                            MetaParameters(20, false, 2, 0, false, small_radius, true, true));
 
     this->dynamic_mab->emplace_back("Greedy,NoModel,Dynamic,low",
                                     MetaParameters(1, false, 0, 0, false, small_radius, false, false, std::nullopt,
