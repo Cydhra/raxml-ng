@@ -84,6 +84,12 @@ protected:
         MetaParameters> >();
 
     /**
+     * A multi-armed bandit instance that runs a dynamic number of SPR rounds
+     */
+    std::shared_ptr<MultiArmedBandit<MetaParameters> > dynamic_mab = std::make_shared<MultiArmedBandit<
+            MetaParameters> >();
+
+    /**
      * Fallback to fast raxml
      */
     std::shared_ptr<MultiArmedBandit<MetaParameters> > fallback_fast_mab = std::make_shared<MultiArmedBandit<

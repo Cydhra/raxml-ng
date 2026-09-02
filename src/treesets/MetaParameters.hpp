@@ -69,12 +69,12 @@ struct MetaParameters {
      */
     bool dynamic_spr;
 
-    MetaParameters(const unsigned int keep_top_k_topol = 20,
+    explicit MetaParameters(const unsigned int keep_top_k_topol = 20,
                    const bool skip_model = false,
                    const unsigned int num_fast_spr = 0,
                    const unsigned int num_slow_spr = 0,
                    const bool accept_starting_trees = false,
-                   const int max_radius = 20,
+                   const unsigned int max_radius = 20,
                    const bool nni_round = false,
                    const bool constrain = false,
                    const std::optional<std::string> &model_override =

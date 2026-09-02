@@ -1,12 +1,13 @@
 #include "DynamicSpr.hpp"
 #include "../SharedBatchResources.hpp"
 
-void DynamicSpr::do_optimize(std::optional<TreeInfo> &tree, unsigned int, const Options &opts, const TaskGroup &context, SharedBatchResources &resources, const unsigned int worker_id, const unsigned int thread_id) {
+void DynamicSpr::do_optimize(std::optional<TreeInfo> &tree, const unsigned int tree_id, const Options &opts, const TaskGroup &context, SharedBatchResources &resources, const unsigned int worker_id, const unsigned int thread_id) {
     auto &optimizer = resources.get_fast_optimizer();
     const auto stop_criterion = resources.get_fast_stop_criterion();
+    const auto round_name = thorough ? "SLOW" : (keep_top_k_topol < 20 ? " GREEDY" : " FAST");
 
-    if (context.is_group_leader(worker_id, thread_id)) {
-        LOG_INFO_TS << this->batch_name << ": Calling RAxML --fast..." << std::endl;
+    if (context.is_group_leader(worker_id, thread_id) && tree_id == 0) {
+        LOG_INFO_TS << this->batch_name << ": Performing " << round_name << " SPR rounds dynamically." << std::endl;
     }
 
     auto spr_params = this->auto_configure(opts);
@@ -27,8 +28,7 @@ void DynamicSpr::do_optimize(std::optional<TreeInfo> &tree, unsigned int, const 
 
     // run SPR rounds until stop criterion says there is no more improvement
     double loglh = tree->loglh();
-    double old_loglh;
-    bool impr = true;
+    bool improving = true;
     int iter = 0;
 
     do
@@ -37,12 +37,11 @@ void DynamicSpr::do_optimize(std::optional<TreeInfo> &tree, unsigned int, const 
 
         stop_criterion->compute_loglh(tree_info, persite_lnl, true);
 
-        old_loglh = loglh;
+        const double old_loglh = loglh;
         LOG_PROGRESS(old_loglh) << (spr_params.thorough ? "SLOW" : "FAST") <<
-            " spr round " << iter << " (radius: " << spr_params.radius_max << ")" << endl;
+            " spr round " << iter << " (radius: " << spr_params.radius_max << ") for tree #" << tree_id << endl;
 
         loglh = tree_info.spr_round(spr_params);
-
         /* optimize ALL branches */
         loglh = tree_info.optimize_branches(1.0, 1);
 
@@ -58,7 +57,7 @@ void DynamicSpr::do_optimize(std::optional<TreeInfo> &tree, unsigned int, const 
 
         double epsilon = stop_criterion->get_epsilon(ParallelContext::group_id());
         LOG_DEBUG << "KH criterion epsilon = " << epsilon << endl;
-        impr = (loglh - old_loglh > epsilon);
+        improving = (loglh - old_loglh > epsilon);
     }
-    while (impr);
+    while (improving);
 }

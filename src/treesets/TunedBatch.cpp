@@ -240,7 +240,8 @@ bool TunedBatch::is_compatible(const MetaParameters &new_parameters) const {
     }
 
     const auto any_spr_rounds_performed = this->meta_parameters.num_fast_spr > 0 ||
-                                          this->meta_parameters.num_slow_spr > 0;
+                                          this->meta_parameters.num_slow_spr > 0
+                                          || this->meta_parameters.dynamic_spr;
     const auto any_rounds_performed = this->meta_parameters.nni_round || any_spr_rounds_performed;
 
     // do not reuse batch if it was created with a different model
@@ -261,6 +262,10 @@ bool TunedBatch::is_compatible(const MetaParameters &new_parameters) const {
     // if settings of the SPR rounds do not match, and we already completed some SPR rounds,
     // the new parameters cannot replace the current ones
     if (any_spr_rounds_performed) {
+        if (this->meta_parameters.dynamic_spr != new_parameters.dynamic_spr) {
+            return false;
+        }
+
         if (this->meta_parameters.keep_top_k_topol != new_parameters.keep_top_k_topol) {
             return false;
         }

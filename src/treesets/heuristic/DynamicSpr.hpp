@@ -7,9 +7,13 @@ class DynamicSpr : public InferenceHeuristic {
 
 public:
     DynamicSpr(std::string batch_name, std::unique_ptr<InferenceHeuristic> inner, const unsigned num_trees,
-        const unsigned threads_per_worker, std::shared_ptr<PartitionAssignmentList> part_assignments)
+        const unsigned threads_per_worker, std::shared_ptr<PartitionAssignmentList> part_assignments,
+        const unsigned int keep_top_k_topol, const bool thorough, const unsigned int max_radius)
         : InferenceHeuristic(std::move(batch_name), std::move(inner), num_trees, threads_per_worker),
-          part_assignments(std::move(part_assignments)) {
+          part_assignments(std::move(part_assignments)),
+          keep_top_k_topol(keep_top_k_topol),
+          thorough(thorough),
+          max_radius(max_radius) {
     }
 
     DynamicSpr(DynamicSpr &&other) noexcept = default;
@@ -21,6 +25,21 @@ public:
 
 protected:
     std::shared_ptr<PartitionAssignmentList> part_assignments;
+
+    /**
+ * Number of best topologies to keep during SPR rounds.
+ */
+    unsigned int keep_top_k_topol;
+
+    /**
+     * If true, will perform slow SPR rounds.
+     */
+    bool thorough;
+
+    /**
+     * Maximum SPR radius
+     */
+    unsigned int max_radius;
 
     /**
      * Obtain spr_round_params for the SPR rounds.

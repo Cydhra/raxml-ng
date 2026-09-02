@@ -61,7 +61,9 @@ static unique_ptr<InferenceHeuristic> from_meta_parameters(const MetaParameters 
     }
 
     if (meta_parameters.dynamic_spr) {
-        heuristic = make_unique<DynamicSpr>(batch_name, std::move(heuristic), num_trees, threads_per_worker, part_assignments);
+        heuristic = make_unique<DynamicSpr>(batch_name, std::move(heuristic), num_trees, threads_per_worker,
+                                            part_assignments, meta_parameters.keep_top_k_topol, false,
+                                            meta_parameters.max_adaptive_radius);
     }
 
     if (meta_parameters.fallback_fast_raxml) {
