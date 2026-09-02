@@ -313,14 +313,6 @@ protected:
     unsigned int plausible_tree_count{0};
 
     /**
-     * Time spent on this batch. Does not include overhead that could be largely avoided on batches outside the tuning
-     * phase.
-     * This mostly excludes time spent on model optimization (MO) because we only do a MO after all SPR rounds are finished.
-     * During tuning we do BLO between all SPR rounds though, which would throw off the walltime measurement.
-     */
-    unsigned int wall_time{0};
-
-    /**
      * Time spent in AU test. This has to be considered for the total wall time, because the amortized cost of AU test
      * increases if less trees become plausible. But it cannot be added directly on top of the wall time, because
      * batch reusing should not double-count the AU test time.
