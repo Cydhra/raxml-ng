@@ -61,9 +61,9 @@ void TreesetOptimizer::initialize_bandits() {
 
     // set up successors
     this->successors.emplace_back(1, "NNI", this->nni_mab);
-    this->successors.emplace_back(2, "Light", this->light_mab);
-    this->successors.emplace_back(3, "Constrained", this->constrained_mab);
-    this->successors.emplace_back(3, "LowRadius", this->low_mab);
+    this->successors.emplace_back(2, "Constrained", this->constrained_mab);
+    this->successors.emplace_back(2, "LowRadius", this->low_mab);
+    this->successors.emplace_back(4, "Light", this->light_mab);
     this->successors.emplace_back(5, "Dynamic", this->dynamic_mab);
     this->successors.emplace_back(6, "Fallback", this->fallback_fast_mab);
 
