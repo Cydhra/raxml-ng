@@ -98,16 +98,20 @@ unique_ptr<InferenceHeuristic> HeuristicFactory::extend_heuristic(const MetaPara
                                                                   shared_ptr<PartitionAssignmentList> &part_assignments,
                                                                   shared_ptr<PartitionedMSA> &partitioned_msa) {
     MetaParameters delta = new_parameters; // copy everything into the delta
+    const bool accept_anything = old_parameters.accept_starting_trees || new_parameters.fallback_fast_raxml;
 
     assert(!new_parameters.accept_starting_trees); // replacing a heuristic with this one is pointless
 
-    assert(old_parameters.accept_starting_trees || old_parameters.skip_model || !new_parameters.skip_model); // we cannot undo a previously inferred model
+    assert(accept_anything || old_parameters.skip_model || !new_parameters.skip_model);
+    // we cannot undo a previously inferred model
     delta.skip_model = old_parameters.skip_model != new_parameters.skip_model;
 
-    assert(old_parameters.accept_starting_trees || !old_parameters.nni_round || new_parameters.nni_round); // we cannot undo an NNI round
+    assert(accept_anything || !old_parameters.nni_round || new_parameters.nni_round);
+    // we cannot undo an NNI round
     delta.nni_round = old_parameters.nni_round != new_parameters.nni_round;
 
-    assert(old_parameters.accept_starting_trees || !old_parameters.constrain || new_parameters.constrain); // we cannot undo a constraint
+    assert(accept_anything || !old_parameters.constrain || new_parameters.constrain);
+    // we cannot undo a constraint
     delta.constrain = old_parameters.constrain != new_parameters.constrain;
 
     delta.dynamic_spr = old_parameters.dynamic_spr != new_parameters.dynamic_spr;
