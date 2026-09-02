@@ -23,8 +23,8 @@ void TreesetOptimizer::initialize_bandits() {
 
     // low radius heuristics
     this->low_mab->emplace_back("Greedy,2spr,low",
-                                MetaParameters(1, false, 2, 0, false, false,
-                                               max(adaptive_radius - 5, static_cast<unsigned int>(5))));
+                                MetaParameters(1, false, 2, 0, false,
+                                    max(adaptive_radius - 5, static_cast<unsigned int>(5)), false));
     this->low_mab->emplace_back("Fast,2spr,low",
                                 MetaParameters(20, false, 2, 0, false,
                                                max(adaptive_radius - 5, static_cast<unsigned int>(5))));
