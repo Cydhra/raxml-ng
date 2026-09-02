@@ -6,7 +6,7 @@
 #include <utility>
 #include "MetaParameters.hpp"
 #include "Threadpool.hpp"
-#include "heuristic/Heuristic.hpp"
+#include "inference/Heuristic.hpp"
 #include "../loadbalance/LoadBalancer.hpp"
 #include "../loadbalance/CoarseLoadBalancer.hpp"
 #include "../au/AuTest.hpp"
