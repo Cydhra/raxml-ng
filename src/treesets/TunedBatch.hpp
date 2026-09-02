@@ -12,6 +12,7 @@
 #include "../au/AuTest.hpp"
 #include "../Checkpoint.hpp"
 #include "../Optimizer.hpp"
+#include "start/StartTreeHeuristic.hpp"
 
 // forward declaration to avoid cyclic header inclusion
 class SharedBatchResources;
@@ -25,10 +26,6 @@ constexpr double SIGNIFICANCE_LEVEL = 0.05;
 
 // forward declaration of RaxmlInstance
 struct RaxmlInstance;
-
-// forward declaration of generate_tree in main.cpp to make it accessible. If the function in main.cpp
-// changes signature, just update this declaration as well.
-Tree generate_tree(const RaxmlInstance &instance, StartingTree type, int random_seed, bool bootstrap);
 
 class TunedBatch final {
 public:
@@ -351,6 +348,14 @@ protected:
      */
     doubleVector p_values;
 
+    /**
+     * Decorated generation strategy for starting trees, set when `update_meta_parameters` is called.
+     */
+    std::unique_ptr<StartTreeHeuristic> start_tree_heuristic = {};
+
+    /**
+     * Decorated inference strategy, set when `update_meta_parameters` is called.
+     */
     std::unique_ptr<InferenceHeuristic> heuristic = {};
 
     /**
@@ -373,7 +378,7 @@ protected:
      * @param worker_id raxml-instance-local id of the worker. Within task groups, they need not start at 0.
      * @param thread_id worker-local id of the thread, thread numbering start at 0 for each worker.
      */
-    void generate_starting_trees(const RaxmlInstance &instance, const TaskGroup &context,
+    void generate_starting_trees(const RaxmlInstance &instance, SharedBatchResources &resources, const TaskGroup &context,
                                  unsigned int worker_id, unsigned int thread_id);
 
     /**
