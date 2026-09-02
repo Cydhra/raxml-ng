@@ -118,11 +118,11 @@ unique_ptr<InferenceHeuristic> HeuristicFactory::extend_heuristic(const MetaPara
 
     delta.dynamic_spr = old_parameters.dynamic_spr != new_parameters.dynamic_spr;
 
-    assert(old_parameters.num_fast_spr <= new_parameters.num_fast_spr);
-    assert(old_parameters.num_fast_spr == new_parameters.num_fast_spr || old_parameters.num_slow_spr == 0);
+    assert(accept_anything || old_parameters.num_fast_spr <= new_parameters.num_fast_spr);
+    assert(accept_anything || old_parameters.num_fast_spr == new_parameters.num_fast_spr || old_parameters.num_slow_spr == 0);
     delta.num_fast_spr = new_parameters.num_fast_spr - old_parameters.num_fast_spr;
 
-    assert(old_parameters.num_slow_spr <= new_parameters.num_slow_spr);
+    assert(accept_anything || old_parameters.num_slow_spr <= new_parameters.num_slow_spr);
     delta.num_slow_spr = new_parameters.num_slow_spr - old_parameters.num_slow_spr;
 
     delta.fallback_fast_raxml = new_parameters.fallback_fast_raxml;
