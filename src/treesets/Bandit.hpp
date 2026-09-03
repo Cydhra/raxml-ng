@@ -2,6 +2,7 @@
 #define RAXML_BANDIT_HPP_
 
 #include <memory>
+#include <utility>
 #include <vector>
 #include <string>
 
@@ -33,7 +34,7 @@ public:
 template<class Heuristic>
 class Bandit {
 public:
-    explicit Bandit(const std::string &name, Heuristic parameters) : name(name),
+    explicit Bandit(std::string name, Heuristic parameters) : name(std::move(name)),
                                                                      parameters(std::make_shared<Heuristic>(
                                                                          parameters)) {
     }
@@ -41,11 +42,6 @@ public:
     // grant MAB access to protected members, specifically "take_measurement"
     template<class H>
     friend class MultiArmedBandit;
-
-    /**
-     * Whether this bandit is participating in the multiarmed bandit algorithm.
-     */
-    bool participating{true};
 
     /**
      * Initialize the bandit distribution estimation with a constant variance. This allows comparing bandits with some
@@ -247,6 +243,11 @@ protected:
      * existing measurement in `samples`.
      */
     unsigned int estimated_variance_weight{0};
+
+    /**
+     * Whether this bandit is participating in the multiarmed bandit algorithm.
+     */
+    bool participating{true};
 
     /**
      * Take the benchmark data of a tuned batch which has previously run its inference with the parameters of this
