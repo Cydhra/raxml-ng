@@ -1,12 +1,12 @@
 #include "HeuristicFactory.hpp"
 
-#include "inference/Constrain.hpp"
-#include "inference/DynamicSpr.hpp"
-#include "inference/FastRaxml.hpp"
-#include "inference/FixedSpr.hpp"
-#include "inference/StartTrees.hpp"
-#include "inference/ModelOpt.hpp"
-#include "inference/NniRound.hpp"
+#include "Constrain.hpp"
+#include "DynamicSpr.hpp"
+#include "FastRaxml.hpp"
+#include "FixedSpr.hpp"
+#include "StartTrees.hpp"
+#include "ModelOpt.hpp"
+#include "NniRound.hpp"
 
 /**
  * Decorate an existing partial InferenceHeuristic according to the rules of a meta-parameters instance.

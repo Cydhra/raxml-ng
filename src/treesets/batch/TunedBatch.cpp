@@ -1,11 +1,11 @@
 #include "TunedBatch.hpp"
 
 #include <chrono>
-#include "mab/Bandit.hpp"
+#include "../mab/Bandit.hpp"
 #include "SharedBatchResources.hpp"
-#include "../pool/Threadpool.hpp"
-#include "HeuristicFactory.hpp"
-#include "start/Parsimony.hpp"
+#include "../../pool/Threadpool.hpp"
+#include "../inference/HeuristicFactory.hpp"
+#include "../start/Parsimony.hpp"
 
 using namespace std::placeholders;
 

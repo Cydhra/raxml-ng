@@ -1,7 +1,7 @@
 #ifndef RAXML_HEURISTICFACTORY_HPP_
 #define RAXML_HEURISTICFACTORY_HPP_
-#include "MetaParameters.hpp"
-#include "inference/Heuristic.hpp"
+#include "../MetaParameters.hpp"
+#include "Heuristic.hpp"
 
 
 class HeuristicFactory {

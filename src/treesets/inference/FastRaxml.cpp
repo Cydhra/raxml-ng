@@ -1,5 +1,5 @@
 #include "FastRaxml.hpp"
-#include "../SharedBatchResources.hpp"
+#include "../batch/SharedBatchResources.hpp"
 
 void FastRaxml::do_optimize(std::optional<TreeInfo> &tree, const unsigned int tree_id, const Options &,
                             const TaskGroup &context, SharedBatchResources &resources, const unsigned int worker_id,

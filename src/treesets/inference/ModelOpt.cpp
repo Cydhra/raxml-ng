@@ -1,5 +1,5 @@
 #include "ModelOpt.hpp"
-#include "../SharedBatchResources.hpp"
+#include "../batch/SharedBatchResources.hpp"
 
 void ModelOpt::do_optimize(std::optional<TreeInfo> &tree, const unsigned int tree_id, const Options&, const TaskGroup &context, SharedBatchResources &, const unsigned int worker_id, const unsigned int thread_id) {
     if (model && branches) {

@@ -4,15 +4,15 @@
 #include <memory>
 #include <optional>
 #include <utility>
-#include "MetaParameters.hpp"
-#include "../pool/Threadpool.hpp"
-#include "inference/Heuristic.hpp"
-#include "../loadbalance/LoadBalancer.hpp"
-#include "../loadbalance/CoarseLoadBalancer.hpp"
-#include "../au/AuTest.hpp"
-#include "../Checkpoint.hpp"
-#include "../Optimizer.hpp"
-#include "start/StartTreeHeuristic.hpp"
+#include "../MetaParameters.hpp"
+#include "../../pool/Threadpool.hpp"
+#include "../inference/Heuristic.hpp"
+#include "../../loadbalance/LoadBalancer.hpp"
+#include "../../loadbalance/CoarseLoadBalancer.hpp"
+#include "../../au/AuTest.hpp"
+#include "../../Checkpoint.hpp"
+#include "../../Optimizer.hpp"
+#include "../start/StartTreeHeuristic.hpp"
 
 // forward declaration to avoid cyclic header inclusion
 class SharedBatchResources;

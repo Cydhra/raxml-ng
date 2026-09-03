@@ -1,9 +1,9 @@
 #ifndef RAXML_SHAREDBATCHRESOURCES_HPP_
 #define RAXML_SHAREDBATCHRESOURCES_HPP_
 
-#include "../pool/Threadpool.hpp"
-#include "../au/AuTest.hpp"
-#include "../Optimizer.hpp"
+#include "../../pool/Threadpool.hpp"
+#include "../../au/AuTest.hpp"
+#include "../../Optimizer.hpp"
 
 /**
  * Shallow replication counts for a faster AU test.

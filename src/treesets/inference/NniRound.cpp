@@ -1,5 +1,5 @@
 #include "NniRound.hpp"
-#include "../SharedBatchResources.hpp"
+#include "../batch/SharedBatchResources.hpp"
 
 void NniRound::do_optimize(std::optional<TreeInfo> &tree, unsigned int tree_id, const Options &opts, const TaskGroup &context, SharedBatchResources &, const unsigned int worker_id, const unsigned int thread_id) {
     if (context.is_group_leader(worker_id, thread_id) && tree_id == 0) {

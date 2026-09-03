@@ -1,5 +1,5 @@
 #include "DynamicSpr.hpp"
-#include "../SharedBatchResources.hpp"
+#include "../batch/SharedBatchResources.hpp"
 
 void DynamicSpr::do_optimize(std::optional<TreeInfo> &tree, const unsigned int tree_id, const Options &opts, const TaskGroup &context, SharedBatchResources &resources, const unsigned int worker_id, const unsigned int thread_id) {
     auto &optimizer = resources.get_fast_optimizer();

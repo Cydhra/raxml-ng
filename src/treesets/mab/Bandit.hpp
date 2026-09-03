@@ -6,7 +6,7 @@
 #include <vector>
 #include <string>
 
-#include "../TunedBatch.hpp"
+#include "../batch/TunedBatch.hpp"
 
 /**
  * A measurement sample obtained from inferring a TunedBatch with a given set of parameters. The bandits are keeping

@@ -14,6 +14,7 @@ file(GLOB RAXML_SOURCES ${PROJECT_SOURCE_DIR}/src/common.h
                         ${PROJECT_SOURCE_DIR}/src/pool/*.cpp
                         ${PROJECT_SOURCE_DIR}/src/au/*.cpp
                         ${PROJECT_SOURCE_DIR}/src/treesets/*.cpp
+                        ${PROJECT_SOURCE_DIR}/src/treesets/batch/*.cpp
                         ${PROJECT_SOURCE_DIR}/src/treesets/inference/*.cpp
                         ${PROJECT_SOURCE_DIR}/src/treesets/mab/*.cpp
                         ${PROJECT_SOURCE_DIR}/src/treesets/start/*.cpp)

@@ -4,11 +4,11 @@
 #include <vector>
 #include "mab/Bandit.hpp"
 #include "mab/MultiArmedBandit.hpp"
-#include "BatchQueue.hpp"
+#include "batch/BatchQueue.hpp"
+#include "batch/SharedBatchResources.hpp"
 #include "../loadbalance/LoadBalancer.hpp"
 #include "../Checkpoint.hpp"
 #include "../pool/Threadpool.hpp"
-#include "SharedBatchResources.hpp"
 
 constexpr unsigned int DEFAULT_BATCH_SIZE = 16;
 

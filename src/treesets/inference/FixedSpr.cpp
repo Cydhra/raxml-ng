@@ -1,5 +1,5 @@
 #include "FixedSpr.hpp"
-#include "../SharedBatchResources.hpp"
+#include "../batch/SharedBatchResources.hpp"
 
 void FixedSpr::do_optimize(std::optional<TreeInfo> &tree, const unsigned int tree_id, const Options &opts,
                            const TaskGroup &context,

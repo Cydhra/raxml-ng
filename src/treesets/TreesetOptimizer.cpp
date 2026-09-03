@@ -1,5 +1,5 @@
 #include "TreesetOptimizer.hpp"
-#include "TunedBatch.hpp"
+#include "batch/TunedBatch.hpp"
 #include "../Optimizer.hpp"
 
 constexpr unsigned int MIN_PAUSE_BETWEEN_MODIFICATIONS = 4;
