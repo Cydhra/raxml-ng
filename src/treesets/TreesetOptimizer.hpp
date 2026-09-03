@@ -2,9 +2,9 @@
 #define RAXML_TREESETOPTIMIZER_HPP_
 
 #include <vector>
-#include "Bandit.hpp"
+#include "mab/Bandit.hpp"
+#include "mab/MultiArmedBandit.hpp"
 #include "BatchQueue.hpp"
-#include "MultiArmedBandit.hpp"
 #include "../loadbalance/LoadBalancer.hpp"
 #include "../Checkpoint.hpp"
 #include "../pool/Threadpool.hpp"

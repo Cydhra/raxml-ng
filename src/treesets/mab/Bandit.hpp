@@ -6,7 +6,7 @@
 #include <vector>
 #include <string>
 
-#include "TunedBatch.hpp"
+#include "../TunedBatch.hpp"
 
 /**
  * A measurement sample obtained from inferring a TunedBatch with a given set of parameters. The bandits are keeping
@@ -71,7 +71,7 @@ public:
      *
      * @return true if this bandit has worse success rate with high probability.
      */
-    bool is_worse_than(const Bandit &other, const unsigned int total_samples) const {
+    [[nodiscard]] bool is_worse_than(const Bandit &other, const unsigned int total_samples) const {
         // each bandit needs to be sampled at least once
         if (this->samples.empty() || other.samples.empty()) {
             return false;
@@ -89,7 +89,7 @@ public:
     *
     * @return true if this bandit has no conceivable chance of becoming relevant in the algorithm again.
     */
-    bool is_hopeless(const Bandit &other, const unsigned int total_samples) const {
+    [[nodiscard]] bool is_hopeless(const Bandit &other, const unsigned int total_samples) const {
         // if either bandit is not sampled enough to allow a good estimate of the mean, return false
         if (this->samples.size() < 3 || other.samples.size() < 3) {
             return false;
@@ -101,7 +101,7 @@ public:
     /**
      * @return the mean expected reward (throughput) of the underlying distribution.
      */
-    double get_mean_throughput() const {
+    [[nodiscard]] double get_mean_throughput() const {
         double expectation = 0.0;
 
         for (auto &sample: this->samples) {
@@ -117,7 +117,7 @@ public:
     /**
      * @return the mean success rate (between 0 and 1) of yielding a plausible tree under this bandit's parameters.
      */
-    double get_expected_tree_rate() const {
+    [[nodiscard]] double get_expected_tree_rate() const {
         double success = 0.0;
         for (auto &sample: this->samples) {
             success += static_cast<double>(sample.plausible_trees) / static_cast<double>(sample.batch_size);
@@ -131,7 +131,7 @@ public:
      * being interpolated between an initial value and the measured value depending on how many measurements are
      * available.
      */
-    double get_variance() const {
+    [[nodiscard]] double get_variance() const {
         const double mean = get_mean_throughput();
         double variance_sum = this->estimated_variance;
 
@@ -158,7 +158,7 @@ public:
      *
      * @return the upper bound on the mean expected success that can be determined with high confidence.
      */
-    double get_upper_confidence(const unsigned int total_samples) const {
+    [[nodiscard]] double get_upper_confidence(const unsigned int total_samples) const {
         const auto mean_throughput = this->get_mean_throughput();
         const auto variance = this->get_variance();
 
@@ -185,7 +185,7 @@ public:
      *
      * @return the expected success two standard deviations higher than the mean.
      */
-    double get_upmost_confidence(const unsigned int total_samples) const {
+    [[nodiscard]] double get_upmost_confidence(const unsigned int total_samples) const {
         const auto mean_throughput = this->get_mean_throughput();
         const auto variance = this->get_variance();
 
@@ -198,18 +198,18 @@ public:
     /**
      * @return This bandit's meta parameters
      */
-    Heuristic& get_parameters() const {
+    [[nodiscard]] Heuristic& get_parameters() const {
         return *this->parameters;
     }
 
     /**
      * @return Bandit name for debug output
      */
-    std::string get_name() const {
+    [[nodiscard]] std::string get_name() const {
         return this->name;
     }
 
-    unsigned int num_samples() const {
+    [[nodiscard]] unsigned int num_samples() const {
         return this->samples.size();
     }
 
@@ -255,7 +255,7 @@ protected:
      */
     void take_measurement(const TunedBatch &batch) {
         // if we have no other samples yet, we initialize the variance estimate by overestimating it intentionally
-        if (samples.size() == 0) {
+        if (samples.empty()) {
             const auto mean = static_cast<double>(batch.get_plausible_tree_count()) / static_cast<double>(batch.
                                   elapsed_wall_time());
             constexpr auto worst_case = 0.0;

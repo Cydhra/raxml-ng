@@ -1,7 +1,7 @@
 #include "TunedBatch.hpp"
 
 #include <chrono>
-#include "Bandit.hpp"
+#include "mab/Bandit.hpp"
 #include "SharedBatchResources.hpp"
 #include "../pool/Threadpool.hpp"
 #include "HeuristicFactory.hpp"

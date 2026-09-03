@@ -1,11 +1,7 @@
 #ifndef RAXML_MULTIARMEDBANDIT_HPP_
 #define RAXML_MULTIARMEDBANDIT_HPP_
-#include "Bandit.hpp"
 
-/**
- * How many samples the initial variance measurement replaces in the bandits.
- */
-constexpr unsigned int INITIAL_VARIANCE_WEIGHT = 6;
+#include "Bandit.hpp"
 
 /**
  * A multi-armed bandit is an algorithm that selects between different heuristics and balances exploration (testing new
