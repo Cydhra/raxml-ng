@@ -103,7 +103,7 @@ public:
                 // because this requires both trees to have been selected thrice, this likely only ever excludes parsimony
                 // TODO the exclusion mechanism should be encapsulated a bit better
                 if (selected_bandit.is_hopeless(best_bandit, iterations_completed)) {
-                    LOG_WORKER_TS(LogLevel::info) << "Excluding bandit " << selected_bandit.get_name() <<
+                    LOG_INFO_TS << "Excluding bandit " << selected_bandit.get_name() <<
                             " from algorithm because it is much worse than the others." << std::endl;
                     selected_bandit.participating = false;
                 }
