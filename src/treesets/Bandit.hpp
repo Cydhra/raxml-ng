@@ -147,10 +147,7 @@ public:
             variance_sum += (mean - sample_throughput) * (mean - sample_throughput);
         }
 
-        // bessel correction because the population variance is much more important than the sample variance
-        // this likely overestimates the variance because of low sample sizes, but relying less on the estimated variance
-        // and thus do a little bit more exploration rarely hurts.
-        return variance_sum / (this->samples.size() + weight - 1);
+        return variance_sum / (this->samples.size() + weight);
     }
 
     /**
