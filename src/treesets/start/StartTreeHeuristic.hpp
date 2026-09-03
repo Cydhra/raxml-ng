@@ -5,7 +5,7 @@
 
 #include "../../Tree.hpp"
 #include "../../Options.hpp"
-#include "../Threadpool.hpp"
+#include "../../pool/Threadpool.hpp"
 
 // forward declaration of RaxmlInstance
 struct RaxmlInstance;

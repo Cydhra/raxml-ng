@@ -3,7 +3,7 @@
 #include <chrono>
 #include "Bandit.hpp"
 #include "SharedBatchResources.hpp"
-#include "Threadpool.hpp"
+#include "../pool/Threadpool.hpp"
 #include "HeuristicFactory.hpp"
 #include "start/Parsimony.hpp"
 

@@ -4,7 +4,7 @@
 #include <memory>
 #include <string>
 #include "../MetaParameters.hpp"
-#include "../Threadpool.hpp"
+#include "../../pool/Threadpool.hpp"
 
 // forward declaration to avoid cyclic header inclusion.
 // only implementations of subclasses may import this type, headers must only refer to the forward declaration.

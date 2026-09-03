@@ -1,7 +1,7 @@
 #ifndef RAXML_SHAREDBATCHRESOURCES_HPP_
 #define RAXML_SHAREDBATCHRESOURCES_HPP_
 
-#include "Threadpool.hpp"
+#include "../pool/Threadpool.hpp"
 #include "../au/AuTest.hpp"
 #include "../Optimizer.hpp"
 

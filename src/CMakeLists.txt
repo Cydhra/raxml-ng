@@ -11,6 +11,7 @@ file(GLOB RAXML_SOURCES ${PROJECT_SOURCE_DIR}/src/common.h
                         ${PROJECT_SOURCE_DIR}/src/topology/*.cpp
                         ${PROJECT_SOURCE_DIR}/src/adaptive/*.cpp
                         ${PROJECT_SOURCE_DIR}/src/modeltest/*.cpp
+                        ${PROJECT_SOURCE_DIR}/src/pool/*.cpp
                         ${PROJECT_SOURCE_DIR}/src/au/*.cpp
                         ${PROJECT_SOURCE_DIR}/src/treesets/*.cpp
                         ${PROJECT_SOURCE_DIR}/src/treesets/inference/*.cpp

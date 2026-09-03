@@ -1,5 +1,4 @@
 #include "Threadpool.hpp"
-
 #include "../log.hpp"
 
 void ThreadPool::work(const Options &opts) {
@@ -27,7 +26,7 @@ void ThreadPool::thread_main() {
     while (this->running) {
         // obtain new task for this thread
         if (context.is_group_leader(worker_id, local_thread_id)) {
-            const auto task = this->task_generator();
+            auto task = this->task_generator();
             context.assign_task(std::move(task));
             context.enter_barrier();
         } else {

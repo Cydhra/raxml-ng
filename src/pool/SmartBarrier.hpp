@@ -6,6 +6,9 @@
 /**
  * A unique smart pointer for pthread_barrier_t that handles initialization and deletion automatically,
  * and therefore upholds a RAII contract and move construction.
+ *
+ * The smart barrier is more expensive than the standard barrier used by RAxML-ng, but is platform-independent,
+ * well-defined, and re-entry-safe.
  */
 class SmartBarrier : std::unique_ptr<pthread_barrier_t, std::function<void(pthread_barrier_t *)> > {
 public:

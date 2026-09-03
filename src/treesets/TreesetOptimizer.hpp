@@ -7,7 +7,7 @@
 #include "MultiArmedBandit.hpp"
 #include "../loadbalance/LoadBalancer.hpp"
 #include "../Checkpoint.hpp"
-#include "Threadpool.hpp"
+#include "../pool/Threadpool.hpp"
 #include "SharedBatchResources.hpp"
 
 constexpr unsigned int DEFAULT_BATCH_SIZE = 16;
