@@ -34,7 +34,7 @@ static std::optional<Tree> get_reverse_backbone(const TreeInfo &tree) {
     // TODO verify that we do not obtain a constraint containing all or no branches, but only a certain portion are in
     //  the constraint.
 
-    constraint.collapse_long_branches(cutoff_threshold);
+    constraint.collapse_long_branches(cutoff_threshold * 2);
 
     return constraint;
 }
