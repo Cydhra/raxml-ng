@@ -13,6 +13,10 @@ void DynamicSpr::do_optimize(std::optional<TreeInfo> &tree, const unsigned int t
     auto spr_params = this->auto_configure(opts);
     auto &tree_info = tree.value();
 
+    unsigned long int total_moves = 0, increasing_moves = 0;
+    spr_params.total_moves = &total_moves;
+    spr_params.increasing_moves = &increasing_moves;
+
     // reset search state
     auto &cm = resources.get_fast_cm();
     cm.reset_search_state();
@@ -35,10 +39,16 @@ void DynamicSpr::do_optimize(std::optional<TreeInfo> &tree, const unsigned int t
     {
         ++iter;
 
+        if(spr_params.increasing_moves)
+        {
+            *(spr_params.increasing_moves) = 0;
+            *(spr_params.total_moves) = 0;
+        }
+
         stop_criterion->compute_loglh(tree_info, persite_lnl, true);
 
         const double old_loglh = loglh;
-        LOG_PROGRESS(old_loglh) << (spr_params.thorough ? "SLOW" : "FAST") <<
+        LOG_PROGRESS(old_loglh) << round_name <<
             " spr round " << iter << " (radius: " << spr_params.radius_max << ") for tree #" << tree_id << endl;
 
         loglh = tree_info.spr_round(spr_params);
@@ -46,9 +56,7 @@ void DynamicSpr::do_optimize(std::optional<TreeInfo> &tree, const unsigned int t
         loglh = tree_info.optimize_branches(1.0, 1);
 
         stop_criterion->compute_loglh(tree_info, persite_lnl_new, false);
-
-        // if(stop_criterion->multi_test_correction())
-        //     stop_criterion->set_increasing_moves((*increasing_moves));
+        stop_criterion->set_increasing_moves(increasing_moves);
 
         if(ParallelContext::group_master_thread())
             stop_criterion->run_test();

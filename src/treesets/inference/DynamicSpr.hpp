@@ -62,7 +62,7 @@ protected:
         // taken from the fast heuristic
         spr_params.radius_max = 10; // TODO obtain from parameters
 
-        // we don't need those
+        // we configure this inside the inference method
         spr_params.increasing_moves = nullptr;
         spr_params.total_moves = nullptr;
 
