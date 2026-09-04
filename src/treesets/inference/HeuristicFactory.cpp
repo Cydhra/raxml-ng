@@ -109,7 +109,8 @@ unique_ptr<InferenceHeuristic> HeuristicFactory::extend_heuristic(const MetaPara
     if (!new_parameters.fallback_fast_raxml) {
         assert(accept_anything || old_parameters.skip_model || !new_parameters.skip_model);
         // we cannot undo a previously inferred model
-        delta.skip_model = old_parameters.skip_model != new_parameters.skip_model;
+        // skip model is inverse of do-model, so we need == here instead of !=
+        delta.skip_model = old_parameters.skip_model == new_parameters.skip_model;
 
         assert(accept_anything || !old_parameters.nni_round || new_parameters.nni_round);
         // we cannot undo an NNI round
