@@ -50,17 +50,17 @@ protected:
         spr_round_params spr_params{};
 
         // update options according to MetaParameters:
-        spr_params.ntopol_keep = static_cast<int>(20); // TODO obtain from parameters
+        spr_params.ntopol_keep = this->keep_top_k_topol;
         spr_params.subtree_cutoff = opts.spr_cutoff;
         spr_params.radius_min = 1;
 
         // if all fast spr rounds have been performed, set thorough to true, so further spr rounds are slow
-        spr_params.thorough = false; // start with fast
+        spr_params.thorough = this->thorough;
         spr_params.lh_epsilon_brlen_full = opts.lh_epsilon;
         spr_params.lh_epsilon_brlen_triplet = opts.lh_epsilon_brlen_triplet;
 
         // taken from the fast heuristic
-        spr_params.radius_max = 10; // TODO obtain from parameters
+        spr_params.radius_max = this->max_radius;
 
         // we configure this inside the inference method
         spr_params.increasing_moves = nullptr;
