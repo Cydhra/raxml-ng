@@ -105,8 +105,9 @@ unique_ptr<InferenceHeuristic> HeuristicFactory::extend_heuristic(const MetaPara
     assert(!new_parameters.accept_starting_trees); // replacing a heuristic with this one is pointless
 
     // if the new parameters arent a fallback, add whatever is remaining to the bandit, otherwise just do what the
-    // parameters say
-    if (!new_parameters.fallback_fast_raxml) {
+    // parameters say. If the old parameters accepted starting trees, we also don't need to mind old parameters and simply
+    // do what the new_parameters say
+    if (!new_parameters.fallback_fast_raxml && !old_parameters.accept_starting_trees) {
         assert(accept_anything || old_parameters.skip_model || !new_parameters.skip_model);
         // we cannot undo a previously inferred model
         // skip model is inverse of do-model, so we need == here instead of !=
