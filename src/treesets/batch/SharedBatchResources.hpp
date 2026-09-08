@@ -8,7 +8,7 @@
 /**
  * Shallow replication counts for a faster AU test.
  */
-const uintVector SHALLOW_REPS = {500, 500, 500, 500, 500, 500, 500, 500, 500, 500};
+const uintVector SHALLOW_REPS = {2000, 2000, 2000, 2000, 2000, 2000, 2000, 2000, 2000, 2000};
 
 /**
  * We share AUTest instances between batches, one per TaskGroup of the threadpool, to save on resource and reuse
