@@ -1,5 +1,10 @@
 #ifndef RAXML_MULTIARMEDBANDIT_HPP_
 #define RAXML_MULTIARMEDBANDIT_HPP_
+#include <algorithm>
+#include <cmath>
+#include <deque>
+#include <mutex>
+#include <stdexcept>
 
 #include "Bandit.hpp"
 
@@ -59,19 +64,47 @@ public:
     }
 
     /**
+     * Disable one arm and immediately repair best_known_bandit.
+     *
+     * @return true if at least one participating arm remains.
+     */
+    bool disable_bandit(Bandit<Heuristic> &bandit) {
+        std::lock_guard<std::mutex> lock(selection_mutex);
+
+        auto found = std::find_if(
+            bandits.begin(),
+            bandits.end(),
+            [&bandit](Bandit<Heuristic> &candidate) {
+                return &candidate == &bandit;
+            });
+
+        if (found == bandits.end()) {
+            throw std::logic_error("cannot disable a bandit that is not registered");
+        }
+
+        found->participating = false;
+        return refresh_best_known_bandit_locked();
+    }
+
+    /**
      * Select the next bandit according to the knowledge learned so far.
      * Bandits that are expected to be worse than the best known bandit are replaced with the best known bandit.
      *
      * @return A reference to the bandit that should be used according to the selection rule.
      */
     Bandit<Heuristic> &select_next_bandit() {
-        // shortcut if we forced the selection of only one bandit, to keep the logs clean
+        std::lock_guard<std::mutex> lock(selection_mutex);
+
+        // This also repairs a stale best_known_bandit left by an exhausted arm.
+        if (!refresh_best_known_bandit_locked()) {
+            throw std::runtime_error("cannot select a bandit: no participating arms remain");
+        }
+
+        // Keep the single-arm shortcut, but only after checking participation.
         if (this->bandits.size() == 1) {
             return this->bandits[0];
         }
 
-        selection_mutex.lock();
-        // select next participating bandit
         do {
             this->bandit_cursor += 1;
             this->bandit_cursor %= this->bandits.size();
@@ -82,51 +115,58 @@ public:
 
         if (selected_bandit.num_samples() == 0) {
             LOG_INFO << std::endl;
-            LOG_WORKER_TS(LogLevel::info) << "Initial estimation of " << selected_bandit.get_name() << "." << std::endl;
-        } else {
-            if (this->bandit_cursor != this->best_known_bandit && !std::isnan(this->bandits[this->best_known_bandit].get_mean_throughput()) && selected_bandit.is_worse_than(
-                    best_bandit, iterations_completed)) {
+            LOG_WORKER_TS(LogLevel::info)
+                << "Initial estimation of " << selected_bandit.get_name() << "."
+                << std::endl;
+        }
+        else {
+            if (this->bandit_cursor != this->best_known_bandit &&
+                !std::isnan(best_bandit.get_mean_throughput()) &&
+                selected_bandit.is_worse_than(best_bandit, iterations_completed)) {
                 LOG_INFO << std::endl;
-                LOG_WORKER_TS(LogLevel::info) << "Switching to best bandit " << best_bandit.get_name() <<
-                        " because its mean expected success ("
-                        << (best_bandit.get_mean_throughput() * 1000.0) <<
-                        " t/s) exceeds the largest reasonable success of "
-                        << selected_bandit.get_name() << " (" << (
-                            selected_bandit.get_upper_confidence(iterations_completed) * 1000.0) << " t/s)." <<
-                        std::endl;
+                LOG_WORKER_TS(LogLevel::info)
+                    << "Switching to best bandit " << best_bandit.get_name()
+                    << " because its mean expected success ("
+                    << (best_bandit.get_mean_throughput() * 1000.0)
+                    << " t/s) exceeds the largest reasonable success of "
+                    << selected_bandit.get_name() << " ("
+                    << (selected_bandit.get_upper_confidence(iterations_completed) * 1000.0)
+                    << " t/s)." << std::endl;
 
-                // check if the selected bandit is so bad that we can just delete it from the round-robin
-                // because this requires both trees to have been selected thrice, this likely only ever excludes parsimony
-                // TODO the exclusion mechanism should be encapsulated a bit better
                 if (selected_bandit.is_hopeless(best_bandit, iterations_completed)) {
-                    LOG_INFO_TS << "Excluding bandit " << selected_bandit.get_name() <<
-                            " from algorithm because it is much worse than the others." << std::endl;
+                    LOG_WORKER_TS(LogLevel::info)
+                        << "Excluding bandit " << selected_bandit.get_name()
+                        << " from algorithm because it is much worse than the others."
+                        << std::endl;
                     selected_bandit.participating = false;
                 }
 
-                selection_mutex.unlock();
                 return best_bandit;
             }
 
             if (!std::isnan(selected_bandit.get_upper_confidence(iterations_completed))) {
                 if (this->bandit_cursor != this->best_known_bandit) {
                     LOG_INFO << std::endl;
-                    LOG_WORKER_TS(LogLevel::info) << "Selecting bandit " << selected_bandit.get_name() <<
-                            " because its largest reasonable success ("
-                            << (selected_bandit.get_upper_confidence(iterations_completed) * 1000.0) <<
-                            " t/s) exceeds the mean expected success of current best bandit "
-                            << best_bandit.get_name() << " (" << (best_bandit.get_mean_throughput() * 1000.0) <<
-                            " t/s)." <<
-                            std::endl;
-                } else {
+                    LOG_WORKER_TS(LogLevel::info)
+                        << "Selecting bandit " << selected_bandit.get_name()
+                        << " because its largest reasonable success ("
+                        << (selected_bandit.get_upper_confidence(iterations_completed) * 1000.0)
+                        << " t/s) exceeds the mean expected success of current best bandit "
+                        << best_bandit.get_name() << " ("
+                        << (best_bandit.get_mean_throughput() * 1000.0)
+                        << " t/s)." << std::endl;
+                }
+                else {
                     LOG_INFO << std::endl;
-                    LOG_WORKER_TS(LogLevel::info) << "Selecting bandit " << selected_bandit.get_name() << " (mean: " << (
-                        best_bandit.get_mean_throughput() * 1000.0) << " t/s)." << std::endl;
+                    LOG_WORKER_TS(LogLevel::info)
+                        << "Selecting bandit " << selected_bandit.get_name()
+                        << " (mean: "
+                        << (best_bandit.get_mean_throughput() * 1000.0)
+                        << " t/s)." << std::endl;
                 }
             }
         }
 
-        selection_mutex.unlock();
         return selected_bandit;
     }
 
@@ -176,7 +216,11 @@ public:
         return false;
     }
 
-    Bandit<shared_ptr<MultiArmedBandit<MetaParameters>>> & get_best_bandit() {
+    Bandit<Heuristic> &get_best_bandit() {
+        std::lock_guard<std::mutex> lock(selection_mutex);
+        if (!refresh_best_known_bandit_locked()) {
+            throw std::runtime_error("cannot get best bandit: no participating arms remain");
+        }
         return bandits[this->best_known_bandit];
     }
 
@@ -216,6 +260,35 @@ private:
     std::mutex measurement_mutex;
 
     std::mutex selection_mutex;
+
+    bool refresh_best_known_bandit_locked() {
+        bool found_participating = false;
+        unsigned int replacement = 0;
+
+        for (unsigned int index = 0; index < bandits.size(); ++index) {
+            if (!bandits[index].participating) {
+                continue;
+            }
+
+            if (!found_participating) {
+                replacement = index;
+                found_participating = true;
+                continue;
+            }
+
+            const double candidate_mean = bandits[index].get_mean_throughput();
+            const double replacement_mean = bandits[replacement].get_mean_throughput();
+            if (!std::isnan(candidate_mean) &&
+                (std::isnan(replacement_mean) || candidate_mean > replacement_mean)) {
+                replacement = index;
+            }
+        }
+
+        if (found_participating) {
+            best_known_bandit = replacement;
+        }
+        return found_participating;
+    }
 };
 
 

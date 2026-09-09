@@ -19,6 +19,7 @@ public:
                LoadBalancer &load_balancer,
                const std::shared_ptr<PartitionedMSA> &msa,
                const std::shared_ptr<std::vector<std::vector<doubleVector> > > &persite_loglh,
+               const ModelMap &initial_ml_model,
                const unsigned long long seed,
                const unsigned int batch_size) : instance(instance),
                                                 opts(opts),
@@ -26,6 +27,7 @@ public:
                                                 msa(msa),
                                                 load_balancer(load_balancer),
                                                 persite_loglh(persite_loglh),
+                                                initial_ml_model(initial_ml_model),
                                                 batch_size(batch_size),
                                                 current_seed(seed) {
         // initialize the model map for all partitions
@@ -48,7 +50,7 @@ public:
      * @param num_workers number of workers assigned to the batch
      * @param num_threads total number of threads (not per worker) assigned to the batch
      */
-    TunedBatch &generate_batch(unsigned int num_workers, unsigned int num_threads);
+    TunedBatch &generate_batch(unsigned int num_workers, unsigned int num_threads, TreeList inject_trees = {}, AggressiveSourceFamily source = AggressiveSourceFamily::none, bool pin_initial_ml_model = false);
 
     /**
      * Select a TunedBatch instance for inference with the given parameters.
@@ -62,7 +64,7 @@ public:
     /**
      * Return a batch to the queue after inference is completed.
      */
-    void finish_batch(TunedBatch &batch);
+    void finish_batch(TunedBatch &batch, bool pin_initial_ml_model);
 
     /**
      * Backup the model of a batch.
@@ -153,6 +155,9 @@ protected:
      * Model parameter backup to initialize batch trees with.
      */
     std::unique_ptr<ModelMap> backup_model = unique_ptr<ModelMap>(new ModelMap());
+
+    //TODO comment
+    ModelMap initial_ml_model;
 
     /**
      * Number of plausible trees that finalized batches provide right now.

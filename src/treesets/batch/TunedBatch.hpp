@@ -106,6 +106,8 @@ public:
      */
     unsigned int reuse_attempts = 0;
 
+    AggressiveSourceFamily aggressive_source_family = AggressiveSourceFamily::none;
+
     /**
      * Using the batch configuration, infer K trees in parallel.
      *
@@ -161,6 +163,16 @@ public:
      * applied.
      */
     void assign_batch_models(const ModelMap &other);
+
+    void set_starting_trees(TreeList start_trees);
+
+    void set_aggressive_source(AggressiveSourceFamily source) {
+        aggressive_source_family = source;
+    }
+
+    bool is_aggressive_source() const {
+        return aggressive_source_family != AggressiveSourceFamily::none;
+    }
 
     /**
      * Store the model of the first tree in the batch into a given model map.

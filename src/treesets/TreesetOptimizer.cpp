@@ -5,7 +5,15 @@
 constexpr unsigned int MIN_PAUSE_BETWEEN_MODIFICATIONS = 4;
 
 void TreesetOptimizer::initialize_bandits() {
-    this->parsimony->emplace_back("Parsimony", MetaParameters(1, false, 0, 0, true, false));
+    if (opts.treeset_aggressive) {
+        this->parsimony->emplace_back("AggressiveST,Parsimony", MetaParameters::aggressive_starting_tree_acceptance());
+        this->aggressive_seed_greedy_mab->emplace_back("Aggressive,seed_greedy,StartOnly", MetaParameters::aggressive_candidate_source(AggressiveSourceFamily::seed_greedy));
+        this->aggressive_constrained_parsimony_mab->emplace_back("Aggressive,constrained_parsimony,StartOnly", MetaParameters::aggressive_candidate_source(AggressiveSourceFamily::constrained_parsimony));
+    }
+    else {
+        this->parsimony->emplace_back("Parsimony", MetaParameters(1, false, 0, 0, true, false));
+    }
+
 
     const auto adaptive_radius = pythia_score >= 0.0
                                      ? Optimizer::adaptive_radius(pythia_score)
@@ -68,24 +76,47 @@ void TreesetOptimizer::initialize_bandits() {
     this->successors.emplace_back(6, "Fallback", this->fallback_fast_mab);
 
     // second-level MAB
-    this->hierarchical_mab.emplace_back("Starting Trees", parsimony);
+    if (opts.treeset_aggressive) {
+        this->hierarchical_mab.emplace_back("aggressive-ST", parsimony);
+        this->hierarchical_mab.emplace_back("aggressive-seed-greedy", aggressive_seed_greedy_mab);
+        this->hierarchical_mab.emplace_back("aggressive-constrained-parsimony", aggressive_constrained_parsimony_mab);
+    }
+    else {
+        this->hierarchical_mab.emplace_back("Starting Trees", parsimony);
+    }
 }
 
-void TreesetOptimizer::run_batch(Bandit<std::shared_ptr<MultiArmedBandit<MetaParameters> > > &mab,
-                                 Bandit<MetaParameters> &bandit,
-                                 TunedBatch &batch, TaskGroup &context, unsigned int worker_id,
-                                 unsigned int thread_id) {
+void TreesetOptimizer::run_batch(
+        Bandit<std::shared_ptr<MultiArmedBandit<MetaParameters>>> &mab,
+        Bandit<MetaParameters> &bandit,
+        TunedBatch &batch,
+        TaskGroup &context,
+        unsigned int worker_id,
+        unsigned int thread_id) {
     batch.optimize(instance, opts, shared_batch_resources, context, worker_id, thread_id);
 
     if (context.is_group_leader(worker_id, thread_id)) {
-        // take measurements
-        mab.get_parameters()->take_measurement(bandit, batch, true);
+        auto &inner_mab = *mab.get_parameters();
+
+        inner_mab.take_measurement(bandit, batch, true);
         this->hierarchical_mab.take_measurement(mab, batch, true);
 
         this->check_mab_modification();
 
-        // inform the batch queue that the batch has been inferred
-        this->batch_queue.finish_batch(batch);
+        const bool zero_yield_aggressive =
+            bandit.get_parameters().is_external_aggressive_source() &&
+            batch.get_plausible_tree_count() == 0;
+
+        this->batch_queue.finish_batch(
+            batch,
+            bandit.get_parameters().pin_initial_ml_model);
+
+        if (zero_yield_aggressive) {
+            // Disable the whole one-arm aggressive source group and repair both
+            // cached best-bandit indices.
+            inner_mab.disable_bandit(bandit);
+            this->hierarchical_mab.disable_bandit(mab);
+        }
 
         if (this->batch_queue.num_plausible_trees() > this->target_tree_count || this->batch_queue.view_batches().size()
             >= 250) {
@@ -94,19 +125,92 @@ void TreesetOptimizer::run_batch(Bandit<std::shared_ptr<MultiArmedBandit<MetaPar
     }
 }
 
+AggressiveCandidateManager &TreesetOptimizer::aggressive_manager_for_source(AggressiveSourceFamily source) {
+    switch (source) {
+        case AggressiveSourceFamily::seed_greedy:
+            return this->aggressive_seed_greedy_candidate_manager;
+        case AggressiveSourceFamily::constrained_parsimony:
+            return this->aggressive_constrained_parsimony_candidate_manager;
+        case AggressiveSourceFamily::none:
+            throw RaxmlException("external aggressive source requested without source family");
+    }
+    throw RaxmlException("unknown external aggressive source family");
+}
+
 BatchTask TreesetOptimizer::next_work_unit() {
-    auto &mab = this->hierarchical_mab.select_next_bandit();
-    auto &current_bandit = mab.get_parameters().get()->select_next_bandit();
-    auto &current_batch = this->batch_queue.select_next_batch(current_bandit.get_parameters(), pool.workers_per_task(),
-                                                              pool.threads_per_task());
-    current_batch.update_meta_parameters(current_bandit.get_parameters());
+    for (;;) {
+        auto &mab = this->hierarchical_mab.select_next_bandit();
+        auto &inner_mab = *mab.get_parameters();
+        auto &current_bandit = inner_mab.select_next_bandit();
 
-    BatchTask runner = [this, &mab, &current_bandit, &current_batch](TaskGroup &context, const unsigned int worker_id,
-                                                                     const unsigned int thread_id) {
-        this->run_batch(mab, current_bandit, current_batch, context, worker_id, thread_id);
-    };
+        if (current_bandit.get_parameters().is_external_aggressive_source()) {
+            const auto source =
+                current_bandit.get_parameters().external_aggressive_source_family();
+            auto &manager = this->aggressive_manager_for_source(source);
 
-    return runner;
+            TreeList trees = manager.take_batch(DEFAULT_BATCH_SIZE);
+            if (trees.size() != DEFAULT_BATCH_SIZE) {
+                LOG_WORKER_TS(LogLevel::info)
+                    << mab.get_name()
+                    << " disabled: no complete aggressive candidate batch."
+                    << std::endl;
+
+                inner_mab.disable_bandit(current_bandit);
+                this->hierarchical_mab.disable_bandit(mab);
+
+                // Retry without growing the call stack. Selection will now use
+                // another participating source.
+                continue;
+            }
+
+            LOG_WORKER_TS(LogLevel::info)
+                << mab.get_name()
+                << " scheduled " << trees.size()
+                << " supplied starting trees."
+                << std::endl;
+
+            auto &current_batch = this->batch_queue.generate_batch(
+                pool.workers_per_task(),
+                pool.threads_per_task(),
+                std::move(trees),
+                source,
+                current_bandit.get_parameters().pin_initial_ml_model);
+
+            current_batch.update_meta_parameters(current_bandit.get_parameters());
+
+            return [this, &mab, &current_bandit, &current_batch](
+                    TaskGroup &context,
+                    const unsigned int worker_id,
+                    const unsigned int thread_id) {
+                this->run_batch(
+                    mab,
+                    current_bandit,
+                    current_batch,
+                    context,
+                    worker_id,
+                    thread_id);
+            };
+        }
+
+        auto &current_batch = this->batch_queue.select_next_batch(
+            current_bandit.get_parameters(),
+            pool.workers_per_task(),
+            pool.threads_per_task());
+        current_batch.update_meta_parameters(current_bandit.get_parameters());
+
+        return [this, &mab, &current_bandit, &current_batch](
+                TaskGroup &context,
+                const unsigned int worker_id,
+                const unsigned int thread_id) {
+            this->run_batch(
+                mab,
+                current_bandit,
+                current_batch,
+                context,
+                worker_id,
+                thread_id);
+        };
+    }
 }
 
 void TreesetOptimizer::run() {

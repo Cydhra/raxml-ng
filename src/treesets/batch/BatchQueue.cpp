@@ -10,8 +10,13 @@ void guarded_backup_batch_model(const TunedBatch &batch, ModelMap &backup_model,
     batch.backup_models(backup_model);
 }
 
-TunedBatch &BatchQueue::generate_batch(const unsigned int num_workers, const unsigned int num_threads) {
-    const std::string name_prefix = "Batch";
+TunedBatch &BatchQueue::generate_batch(const unsigned int num_workers, const unsigned int num_threads, TreeList inject_trees, AggressiveSourceFamily source, bool pin_initial_ml_model) {
+    const std::string name_prefix =
+        source == AggressiveSourceFamily::seed_greedy
+            ? "AggressiveSeedGreedyBatch"
+            : source == AggressiveSourceFamily::constrained_parsimony
+                ? "AggressiveConstrainedParsimonyBatch"
+                : "Batch";
 
     // lock the mutex for the batch queue
     const std::lock_guard<std::mutex> lock(batch_mutex);
@@ -32,12 +37,25 @@ TunedBatch &BatchQueue::generate_batch(const unsigned int num_workers, const uns
 
     auto &batch = this->batches.back();
 
+    if (!inject_trees.empty()) {
+        batch.set_starting_trees(std::move(inject_trees));
+    }
+
+    if (source != AggressiveSourceFamily::none) {
+        batch.set_aggressive_source(source);
+        in_flight.emplace(batch.get_name());
+    }
+
     // mark the batch as unfinished
     this->unfinished.emplace(batch.get_name());
 
     // assign the prepared model. If we have no model backed up yet, this is initialized with the default model,
     // so nothing will break. This requires that the batch mutex is locked
-    batch.assign_batch_models(*this->backup_model);
+    if (pin_initial_ml_model) {
+        batch.assign_batch_models(initial_ml_model);
+    } else {
+        batch.assign_batch_models(*backup_model);
+    }
 
     // return (which drops the mutex guard)
     return this->batches[batch_name_index];
@@ -90,7 +108,7 @@ TunedBatch &BatchQueue::select_next_batch(const MetaParameters &current_paramete
         // unlock mutex to allow generation of batches without keeping the queue locked, and because generate_batches
         // will attempt to lock it again when the batch is added to the vector.
         batch_mutex.unlock();
-        selected_batch = &generate_batch(num_workers, num_threads);
+        selected_batch = &generate_batch(num_workers, num_threads, {}, AggressiveSourceFamily::none, current_parameters.pin_initial_ml_model);
 
         // relock to add batch to in-flight set
         batch_mutex.lock();
@@ -102,11 +120,13 @@ TunedBatch &BatchQueue::select_next_batch(const MetaParameters &current_paramete
     return *selected_batch;
 }
 
-void BatchQueue::finish_batch(TunedBatch &batch) {
+void BatchQueue::finish_batch(TunedBatch &batch, bool pin_initial_ml_model) {
     const std::lock_guard<std::mutex> lock(batch_mutex);
-    guarded_backup_batch_model(batch, *this->backup_model, lock);
+    if (!pin_initial_ml_model && !batch.is_aggressive_source()) {
+        guarded_backup_batch_model(batch, *this->backup_model, lock);
+    }
 
-    if (batch.get_plausible_tree_count() > this->batch_size / 2) {
+    if (batch.is_aggressive_source() || batch.get_plausible_tree_count() > this->batch_size / 2) {
         this->finalize_batch(batch);
     }
 

@@ -112,9 +112,12 @@ static struct option long_options[] =
   {"au-test",            no_argument,       0, 0 },  /*  79 */
   {"treeset",            no_argument,       0, 0 },  /*  80 */
   // TODO these three arguments are placeholders since we have no autotuning yet
-  {"ts-groups",            required_argument, 0, 0 },  /*  81 */
-  {"ts-threads",            required_argument, 0, 0 },  /*  82 */
-{"ts-workers",            required_argument, 0, 0 }, /*  83 */
+  {"ts-groups",          required_argument, 0, 0 },  /*  81 */
+  {"ts-threads",         required_argument, 0, 0 },  /*  82 */
+  {"ts-workers",         required_argument, 0, 0 },  /*  83 */
+  {"ts-aggressive",      no_argument,       0, 0 },  /*  84 */
+  {"ts-target-trees",    required_argument, 0, 0 },  /*  85 */
+  {"ts-baseline-tree",   required_argument, 0, 0 },  /*  86 */
   { 0, 0, 0, 0 }
 };
 
@@ -1649,6 +1652,16 @@ void CommandLineParser::parse_options(int argc, char** argv, Options &opts)
       case 83: /* ts-workers */
         sscanf(optarg, "%d", &opts.treeset_workers);
         break;
+      case 84: /* ts-aggressive */
+        opts.treeset_aggressive = true;
+        break;
+      case 85: /* ts-target-trees */
+        sscanf(optarg, "%d", &opts.treeset_target_trees);
+        break;
+      case 86: /* ts-baseline-tree */
+        opts.treeset_baseline_tree_file = optarg;
+        break;
+
       default:
         throw  OptionException("Internal error in option parsing");
     }
@@ -1683,6 +1696,16 @@ void CommandLineParser::parse_options(int argc, char** argv, Options &opts)
     else if (optarg_tree == "default1")
       optarg_tree = compat_ver < 120 ? RAXML_DEF_START_TREE1_V11 : RAXML_DEF_START_TREE1;
   }
+
+  /* Reuse supplied ML trees instead of generating pars{16}. */
+  if (!opts.treeset_baseline_tree_file.empty())
+  {
+    if (opts.command != Command::treeset)
+      throw OptionException("--ts-baseline-tree requires --treeset");
+
+    optarg_tree = opts.treeset_baseline_tree_file;
+  }
+
   parse_start_trees(opts, optarg_tree);
 
   /* process LH epsilon defaults */
@@ -1747,6 +1770,7 @@ void CommandLineParser::print_help()
             "  --pythia                                   compute and print Pythia MSA difficulty score\n"
             "  --moose [ OPTIONS ]                        select best-fit MOdel Of Sequence Evolution (OPTIONS: see below)\n"
             "  --treeset                                  compute a plausible tree set\n"
+            "  --ts-aggressive                            enable aggressive heuristic for treeset\n"
             "\n"
             "Command shortcuts (mutually exclusive):\n"
             "  --search1                                  Alias for: --search --tree pars{1}\n"
