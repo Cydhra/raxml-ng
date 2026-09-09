@@ -305,7 +305,7 @@ void TunedBatch::finalize() {
 }
 
 unsigned int TunedBatch::elapsed_wall_time() const {
-    return (this->start_tree_heuristic->get_total_wall_time() + this->heuristic->get_total_wall_time()) / this->get_batch_size() + this->au_wall_time;
+    return (this->start_tree_heuristic->get_total_wall_time() + this->heuristic->get_total_wall_time()) / (num_workers * threads_per_worker) + this->au_wall_time;
 }
 
 unsigned int TunedBatch::get_plausible_tree_count() const {
@@ -313,7 +313,7 @@ unsigned int TunedBatch::get_plausible_tree_count() const {
 }
 
 Tree TunedBatch::get_tree(const unsigned int index) const {
-    auto guard = std::lock_guard(*this->topology_access.get());
+    auto guard = std::lock_guard(*this->topology_access);
 
     if (this->tree_topologies.empty()) {
         throw RaxmlException("cannot obtain trees from non-optimized batch");
@@ -338,7 +338,7 @@ std::vector<double> TunedBatch::get_tree_likelihoods() {
 
 void TunedBatch::get_plausible_trees(std::vector<Tree> &buffer) const {
     // access to both p-values and topology backups has to be guarded
-    auto guard = std::lock_guard(*this->topology_access.get());
+    auto guard = std::lock_guard(*this->topology_access);
 
     for (unsigned int i = 0; i < this->tree_topologies.size(); ++i) {
         if (this->p_values[i] > SIGNIFICANCE_LEVEL) {

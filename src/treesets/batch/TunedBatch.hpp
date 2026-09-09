@@ -45,6 +45,7 @@ public:
           batch_start_trees(new TreeList(batch_size)),
           tip_msa_idmap(tip_msa_idmap),
           batch_persite_logh(std::vector<std::vector<doubleVector> >(batch_size)),
+          num_workers(num_workers),
           threads_per_worker(num_threads / num_workers) {
         for (auto &tree_slh: batch_persite_logh) {
             for (const auto &pinfo: msa->part_list())
@@ -351,7 +352,12 @@ protected:
     std::unique_ptr<InferenceHeuristic> heuristic = {};
 
     /**
-     * How many threads will infer this batch at once (i.e. threads per task-group)
+     * How many workers work on this batch
+     */
+    unsigned int num_workers;
+
+    /**
+     * How many threads will infer a tree per worker.
      */
     unsigned int threads_per_worker;
 
@@ -370,7 +376,8 @@ protected:
      * @param worker_id raxml-instance-local id of the worker. Within task groups, they need not start at 0.
      * @param thread_id worker-local id of the thread, thread numbering start at 0 for each worker.
      */
-    void generate_starting_trees(const RaxmlInstance &instance, SharedBatchResources &resources, const TaskGroup &context,
+    void generate_starting_trees(const RaxmlInstance &instance, SharedBatchResources &resources,
+                                 const TaskGroup &context,
                                  unsigned int worker_id, unsigned int thread_id);
 
     /**
