@@ -9,6 +9,8 @@
 
 using namespace std::placeholders;
 
+constexpr double AU_TEST_EPSILON = 1.0;
+
 unsigned int TunedBatch::get_batch_size() const {
     return this->batch_start_trees->size();
 }
@@ -139,7 +141,15 @@ void TunedBatch::perform_plausibility_check(const Options &opts, SharedBatchReso
     // TODO should we backup the less optimized model or just accept that we overspecify the model
     const auto &tree_ids = this->coarse_assignments->at(worker_id);
     for (const auto tree_id: tree_ids) {
-        batch_trees[tree_id][thread_id]->optimize_params(CORAX_OPT_PARAM_ALL, 0.1);
+        auto &tree = batch_trees[tree_id][thread_id];
+        tree->optimize_params(CORAX_OPT_PARAM_ALL, AU_TEST_EPSILON);
+        double loglh = tree->optimize_params(CORAX_OPT_PARAM_ALL & ~CORAX_OPT_PARAM_BRANCHES_ITERATIVE, AU_TEST_EPSILON);
+        double new_loglh = tree->optimize_params(CORAX_OPT_PARAM_BRANCHES_ITERATIVE, AU_TEST_EPSILON);
+
+        while (new_loglh - loglh > AU_TEST_EPSILON) {
+            loglh = new_loglh;
+            new_loglh = tree->optimize_params(CORAX_OPT_PARAM_ALL, AU_TEST_EPSILON);
+        }
     }
 
     this->perform_au_test(au_test, initialized, context, worker_id, thread_id);
