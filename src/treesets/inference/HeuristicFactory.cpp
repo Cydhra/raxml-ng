@@ -71,6 +71,12 @@ static unique_ptr<InferenceHeuristic> from_meta_parameters(const MetaParameters 
                                            part_assignments);
     }
 
+    if (meta_parameters.do_final_model) {
+        // TODO get rid of magic numbers
+        heuristic = make_unique<ModelOpt>(batch_name, std::move(heuristic), num_trees, threads_per_worker, true, true,
+                                          1.0);
+    }
+
     return heuristic;
 }
 
@@ -109,9 +115,12 @@ unique_ptr<InferenceHeuristic> HeuristicFactory::extend_heuristic(const MetaPara
     // do what the new_parameters say
     if (!new_parameters.fallback_fast_raxml && !old_parameters.accept_starting_trees) {
         assert(accept_anything || !old_parameters.do_first_model || new_parameters.do_first_model);
+        assert(accept_anything || !old_parameters.do_final_model || new_parameters.do_final_model);
+        
         // we cannot undo a previously inferred model
         // skip model is inverse of do-model, so we need == here instead of !=
         delta.do_first_model = old_parameters.do_first_model != new_parameters.do_first_model;
+        delta.do_final_model = old_parameters.do_final_model != new_parameters.do_final_model;
 
         assert(accept_anything || !old_parameters.nni_round || new_parameters.nni_round);
         // we cannot undo an NNI round

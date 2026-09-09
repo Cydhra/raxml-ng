@@ -40,7 +40,8 @@ void TunedBatch::optimize(const RaxmlInstance &instance, const Options &opts, Sh
 
         // take measurement
         if (context.is_group_leader(worker_id, thread_id)) {
-            LOG_INFO_TS << this->name << ": total batch time after start trees: " << this->elapsed_wall_time() << "ms." << std::endl;
+            LOG_INFO_TS << this->name << ": total batch time after start trees: " << this->elapsed_wall_time() << "ms."
+                    << std::endl;
         }
     }
 
@@ -54,7 +55,8 @@ void TunedBatch::optimize(const RaxmlInstance &instance, const Options &opts, Sh
 
     // take measurement
     if (context.is_group_leader(worker_id, thread_id)) {
-        LOG_INFO_TS << this->name << ": total batch time after heuristics: " << this->elapsed_wall_time() << "ms." << std::endl;
+        LOG_INFO_TS << this->name << ": total batch time after heuristics: " << this->elapsed_wall_time() << "ms." <<
+                std::endl;
     }
 
     perform_plausibility_check(opts, resources, resources.is_initialized(context), context, worker_id, thread_id);
@@ -137,19 +139,12 @@ void TunedBatch::perform_plausibility_check(const Options &opts, SharedBatchReso
     }
 
     const auto begin = std::chrono::steady_clock::now();
-    // forcibly optimize parameters
-    // TODO should we backup the less optimized model or just accept that we overspecify the model
+    // forcibly optimize model parameters once. This is to have somewhat reasonable model parameters, but we
+    // dont want to invest much time. If they are required, do_final_model in meta parameters handles this
     const auto &tree_ids = this->coarse_assignments->at(worker_id);
     for (const auto tree_id: tree_ids) {
         auto &tree = batch_trees[tree_id][thread_id];
-        tree->optimize_params(CORAX_OPT_PARAM_ALL, AU_TEST_EPSILON);
-        double loglh = tree->optimize_params(CORAX_OPT_PARAM_ALL & ~CORAX_OPT_PARAM_BRANCHES_ITERATIVE, AU_TEST_EPSILON);
-        double new_loglh = tree->optimize_params(CORAX_OPT_PARAM_BRANCHES_ITERATIVE, AU_TEST_EPSILON);
-
-        while (new_loglh - loglh > AU_TEST_EPSILON) {
-            loglh = new_loglh;
-            new_loglh = tree->optimize_params(CORAX_OPT_PARAM_ALL, AU_TEST_EPSILON);
-        }
+        tree->optimize_params(CORAX_OPT_PARAM_ALL & ~CORAX_OPT_PARAM_BRANCHES_ITERATIVE, AU_TEST_EPSILON);
     }
 
     this->perform_au_test(au_test, initialized, context, worker_id, thread_id);
@@ -255,9 +250,20 @@ bool TunedBatch::is_compatible(const MetaParameters &new_parameters) const {
             return false;
         }
 
+        // dont skip first model if we did final model, as it falsifies the results
+        if (this->meta_parameters.do_final_model && !new_parameters.do_first_model) {
+            return false;
+        }
+
         if (this->meta_parameters.model_override != new_parameters.model_override) {
             return false;
         }
+    }
+
+    // if we already did final model optimization, dont accept parameters that dont. We do not mind changing order here
+    // though.
+    if (this->meta_parameters.do_final_model && !new_parameters.do_final_model) {
+        return false;
     }
 
     // if settings of the SPR rounds do not match, and we already completed some SPR rounds,
@@ -314,7 +320,8 @@ void TunedBatch::finalize() {
 }
 
 unsigned int TunedBatch::elapsed_wall_time() const {
-    return (this->start_tree_heuristic->get_total_wall_time() + this->heuristic->get_total_wall_time()) / (num_workers * threads_per_worker) + this->au_wall_time;
+    return (this->start_tree_heuristic->get_total_wall_time() + this->heuristic->get_total_wall_time()) / (
+               num_workers * threads_per_worker) + this->au_wall_time;
 }
 
 unsigned int TunedBatch::get_plausible_tree_count() const {

@@ -25,6 +25,11 @@ struct MetaParameters {
     bool do_first_model;
 
     /**
+     * If true, does a final model and branch length optimization.
+     */
+    bool do_final_model;
+
+    /**
      * How many fast SPR rounds to perform for each tree search
      */
     unsigned int num_fast_spr;
@@ -70,27 +75,29 @@ struct MetaParameters {
     bool dynamic_spr;
 
     explicit MetaParameters(const unsigned int keep_top_k_topol = 20,
-                   const bool do_first_model = false,
-                   const unsigned int num_fast_spr = 0,
-                   const unsigned int num_slow_spr = 0,
-                   const bool accept_starting_trees = false,
-                   const unsigned int max_radius = 20,
-                   const bool nni_round = false,
-                   const bool constrain = false,
-                   const std::optional<std::string> &model_override =
-                           std::nullopt,
-                   const bool fallback_fast_raxml = false,
-                   const bool dynamic_spr = false) : keep_top_k_topol(keep_top_k_topol),
-                                                     do_first_model(do_first_model),
-                                                     num_fast_spr(num_fast_spr),
-                                                     num_slow_spr(num_slow_spr),
-                                                     accept_starting_trees(accept_starting_trees),
-                                                     max_adaptive_radius(max_radius),
-                                                     nni_round(nni_round),
-                                                     constrain(constrain),
-                                                     model_override(model_override),
-                                                     fallback_fast_raxml(fallback_fast_raxml),
-                                                     dynamic_spr(dynamic_spr) {
+                            const bool do_first_model = false,
+                            const unsigned int num_fast_spr = 0,
+                            const unsigned int num_slow_spr = 0,
+                            const bool accept_starting_trees = false,
+                            const unsigned int max_radius = 20,
+                            const bool nni_round = false,
+                            const bool constrain = false,
+                            const std::optional<std::string> &model_override =
+                                    std::nullopt,
+                            const bool fallback_fast_raxml = false,
+                            const bool dynamic_spr = false,
+                            const bool do_final_model = true) : keep_top_k_topol(keep_top_k_topol),
+                                                                do_first_model(do_first_model),
+                                                                do_final_model(do_final_model),
+                                                                num_fast_spr(num_fast_spr),
+                                                                num_slow_spr(num_slow_spr),
+                                                                accept_starting_trees(accept_starting_trees),
+                                                                max_adaptive_radius(max_radius),
+                                                                nni_round(nni_round),
+                                                                constrain(constrain),
+                                                                model_override(model_override),
+                                                                fallback_fast_raxml(fallback_fast_raxml),
+                                                                dynamic_spr(dynamic_spr) {
     }
 
     friend bool operator==(const MetaParameters &lhs, const MetaParameters &rhs) {
@@ -104,7 +111,8 @@ struct MetaParameters {
                && lhs.constrain == rhs.constrain
                && lhs.model_override == rhs.model_override
                && lhs.fallback_fast_raxml == rhs.fallback_fast_raxml
-               && lhs.dynamic_spr == rhs.dynamic_spr;
+               && lhs.dynamic_spr == rhs.dynamic_spr
+               && lhs.do_final_model == rhs.do_final_model;
     }
 
     friend bool operator!=(const MetaParameters &lhs, const MetaParameters &rhs) {
@@ -126,6 +134,7 @@ struct MetaParameters {
                                                               : 0);
         seed ^= (seed << 6) + (seed >> 2) + 0x5458316A + static_cast<std::size_t>(obj.fallback_fast_raxml);
         seed ^= (seed << 6) + (seed >> 2) + 0x39D34241 + static_cast<std::size_t>(obj.dynamic_spr);
+        seed ^= (seed << 6) + (seed >> 2) + 0x72C16A1E + static_cast<std::size_t>(obj.do_final_model);
         return seed;
     }
 };
