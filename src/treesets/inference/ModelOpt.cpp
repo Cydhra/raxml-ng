@@ -16,10 +16,6 @@ void ModelOpt::do_optimize(std::optional<TreeInfo> &tree, const unsigned int tre
             loglh = new_loglh;
             new_loglh = tree->optimize_params(CORAX_OPT_PARAM_ALL, epsilon);
         }
-
-        if (context.is_group_leader(worker_id, thread_id) && tree_id == 0) {
-            LOG_INFO_TS << this->batch_name << ": after: " << new_loglh << std::endl;
-        }
     } else if (model) {
         if (context.is_group_leader(worker_id, thread_id) && tree_id == 0) {
             LOG_INFO_TS << this->batch_name << ": Optimizing model (eps: " << epsilon << ")" << std::endl;
