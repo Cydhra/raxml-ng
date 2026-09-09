@@ -87,7 +87,6 @@ void TunedBatch::perform_au_test(AuTest &au_test, const bool initialized, const 
         batch_trees[tree_id][thread_id]->persite_loglh(thread_partition_view);
     }
 
-    // replace with group barrier
     context.enter_barrier();
 
     // next, change the parallelization scheme to avoid splitting trees between workers. If we have more workers than
