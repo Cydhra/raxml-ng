@@ -20,9 +20,9 @@ struct MetaParameters {
     unsigned int keep_top_k_topol;
 
     /**
-     * If true, skip the first model optimization by reusing model parameters from a previous search.
+     * If true, does a model optimization before doing topology moves.
      */
-    bool skip_model;
+    bool do_first_model;
 
     /**
      * How many fast SPR rounds to perform for each tree search
@@ -70,7 +70,7 @@ struct MetaParameters {
     bool dynamic_spr;
 
     explicit MetaParameters(const unsigned int keep_top_k_topol = 20,
-                   const bool skip_model = false,
+                   const bool do_first_model = false,
                    const unsigned int num_fast_spr = 0,
                    const unsigned int num_slow_spr = 0,
                    const bool accept_starting_trees = false,
@@ -81,7 +81,7 @@ struct MetaParameters {
                            std::nullopt,
                    const bool fallback_fast_raxml = false,
                    const bool dynamic_spr = false) : keep_top_k_topol(keep_top_k_topol),
-                                                     skip_model(skip_model),
+                                                     do_first_model(do_first_model),
                                                      num_fast_spr(num_fast_spr),
                                                      num_slow_spr(num_slow_spr),
                                                      accept_starting_trees(accept_starting_trees),
@@ -95,7 +95,7 @@ struct MetaParameters {
 
     friend bool operator==(const MetaParameters &lhs, const MetaParameters &rhs) {
         return lhs.keep_top_k_topol == rhs.keep_top_k_topol
-               && lhs.skip_model == rhs.skip_model
+               && lhs.do_first_model == rhs.do_first_model
                && lhs.num_fast_spr == rhs.num_fast_spr
                && lhs.num_slow_spr == rhs.num_slow_spr
                && lhs.accept_starting_trees == rhs.accept_starting_trees
@@ -114,7 +114,7 @@ struct MetaParameters {
     friend std::size_t hash_value(const MetaParameters &obj) {
         std::size_t seed = 0x148BCA29;
         seed ^= (seed << 6) + (seed >> 2) + 0x26C25243 + static_cast<std::size_t>(obj.keep_top_k_topol);
-        seed ^= (seed << 6) + (seed >> 2) + 0x0341DCC9 + static_cast<std::size_t>(obj.skip_model);
+        seed ^= (seed << 6) + (seed >> 2) + 0x0341DCC9 + static_cast<std::size_t>(obj.do_first_model);
         seed ^= (seed << 6) + (seed >> 2) + 0x674CC085 + static_cast<std::size_t>(obj.num_fast_spr);
         seed ^= (seed << 6) + (seed >> 2) + 0x61730347 + static_cast<std::size_t>(obj.num_slow_spr);
         seed ^= (seed << 6) + (seed >> 2) + 0x49932C6A + static_cast<std::size_t>(obj.accept_starting_trees);

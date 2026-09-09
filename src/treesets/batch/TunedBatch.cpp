@@ -251,7 +251,7 @@ bool TunedBatch::is_compatible(const MetaParameters &new_parameters) const {
             return false;
         }
 
-        if (this->meta_parameters.skip_model != new_parameters.skip_model) {
+        if (this->meta_parameters.do_first_model != new_parameters.do_first_model) {
             return false;
         }
 
