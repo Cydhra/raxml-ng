@@ -156,7 +156,9 @@ protected:
      */
     std::unique_ptr<ModelMap> backup_model = unique_ptr<ModelMap>(new ModelMap());
 
-    //TODO comment
+    /**
+     * Best model of the best tree (of the initial ML search) that we plagiarize in the aggressive mode because model opt is slow.
+     */
     ModelMap initial_ml_model;
 
     /**
