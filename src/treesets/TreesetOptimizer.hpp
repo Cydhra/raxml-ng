@@ -2,6 +2,7 @@
 #define RAXML_TREESETOPTIMIZER_HPP_
 
 #include <vector>
+#include "AggressiveCandidateManager.hpp"
 #include "mab/Bandit.hpp"
 #include "mab/MultiArmedBandit.hpp"
 #include "batch/BatchQueue.hpp"
@@ -57,6 +58,16 @@ protected:
      */
     const unsigned int target_tree_count;
 
+    /**
+     * Manager for aggressive heuristic. It's supposed to make sure candidates are created
+     * and ranked before they get pulled into batches and evaluated.
+     */
+    AggressiveCandidateManager aggressive_seed_greedy_candidate_manager;
+    AggressiveCandidateManager aggressive_constrained_parsimony_candidate_manager;
+
+    std::shared_ptr<MultiArmedBandit<MetaParameters> > aggressive_seed_greedy_mab = std::make_shared<MultiArmedBandit<MetaParameters> >();
+    std::shared_ptr<MultiArmedBandit<MetaParameters> > aggressive_constrained_parsimony_mab = std::make_shared<MultiArmedBandit<MetaParameters> >();
+
     MultiArmedBandit<std::shared_ptr<MultiArmedBandit<MetaParameters> > > hierarchical_mab;
 
     std::shared_ptr<MultiArmedBandit<MetaParameters> > parsimony = std::make_shared<MultiArmedBandit<
@@ -109,6 +120,11 @@ protected:
     void initialize_bandits();
 
     /**
+     *
+     */
+    AggressiveCandidateManager &aggressive_manager_for_source(AggressiveSourceFamily source);
+
+    /**
      * Main method for the threadpool workers.
      * This method runs one batch and then handles the updates to the MABs.
      * It is bound into a BatchTask by next_work_unit.
@@ -152,6 +168,8 @@ public:
                      Options &opts,
                      const std::shared_ptr<PartitionedMSA> &msa,
                      const Tree &tree,
+                     const ModelMap &initial_ml_model,
+                     TreeList initial_ml_trees,
                      IDVector &tip_msa_idmap,
                      const std::vector<std::vector<doubleVector> > &persite_loglh,
                      LoadBalancer &load_balancer,
@@ -176,10 +194,17 @@ public:
                                                                    instance, opts, make_shared<IDVector>(tip_msa_idmap),
                                                                    load_balancer, msa,
                                                                    make_shared<std::vector<std::vector<
-                                                                       doubleVector> > >(persite_loglh), starting_seed,
+                                                                       doubleVector> > >(persite_loglh), initial_ml_model,
+                                                                   starting_seed,
                                                                    DEFAULT_BATCH_SIZE),
                                                                pythia_score(pythia_score),
-                                                               target_tree_count(target_tree_count) {
+                                                               target_tree_count(target_tree_count),
+                                                               aggressive_seed_greedy_candidate_manager(
+                                                                   instance, opts, tree, initial_ml_trees, target_tree_count,
+                                                                   AggressiveSourceFamily::seed_greedy),
+                                                               aggressive_constrained_parsimony_candidate_manager(
+                                                                   instance, opts, tree, std::move(initial_ml_trees), target_tree_count,
+                                                                   AggressiveSourceFamily::constrained_parsimony) {
     }
 
     /**

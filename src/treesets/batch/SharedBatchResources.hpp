@@ -27,10 +27,10 @@ public:
                          long seed) {
         // prepare a dummy matrix with empty vectors to correctly initialize the AU-Test. These dummy vectors
         // will be replaced by the TunedBatch instance before the AU test is called.
-        std::vector<std::vector<doubleVector> > batch_loglh_dummy(batch_size);
-        for (unsigned int i = 0; i < reference_logh_matrix.size(); ++i) {
-            batch_loglh_dummy[i] = std::vector<doubleVector>(reference_logh_matrix[i].size());
-        }
+        std::vector<std::vector<doubleVector>> batch_loglh_dummy(
+            batch_size,
+            std::vector<doubleVector>(msa->part_count())
+        );
 
         for (unsigned int group = 0; group < num_task_groups; ++group) {
             screening_au_tests.emplace_back(msa, reference_logh_matrix, batch_loglh_dummy, AU_DEFAULT_SCALES,

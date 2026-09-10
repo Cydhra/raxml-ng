@@ -1576,6 +1576,40 @@ Tree generate_tree(const RaxmlInstance& instance, StartingTree type, int random_
   return tree;
 }
 
+Tree generate_constrained_parsimony_tree(const RaxmlInstance &instance,
+                                         const Tree &constraint_tree,
+                                         int random_seed) {
+    assert(instance.parted_msa_parsimony);
+
+    unsigned int score;
+    const ParsimonyMSA &pars_msa = *instance.parted_msa_parsimony.get();
+
+    Tree tree = Tree::buildParsimonyConstrained(pars_msa,
+                                                random_seed,
+                                                instance.pars_spr_enabled,
+                                                &score,
+                                                constraint_tree,
+                                                instance.tip_msa_idmap);
+
+    const double avg_pars_brlen =
+        static_cast<double>(score) / tree.num_branches() / pars_msa.part_msa().total_sites();
+
+    if (instance.opts.use_pars_brlen) {
+        tree.reset_brlens(avg_pars_brlen);
+    }
+
+    LOG_WORKER_TS(LogLevel::verbose)
+        << "Generated a CONSTRAINED PARSIMONY tree, seed: " << random_seed
+        << ", constraint_splits: " << constraint_tree.num_splits()
+        << ", score: " << score
+        << ", avg_brlen: " << FMT_BL(avg_pars_brlen)
+        << std::endl;
+
+    assert(!tree.empty());
+    prepare_tree(instance, tree);
+    return tree;
+}
+
 void load_start_trees(RaxmlInstance& instance, bool assert_count = false)
 {
   const auto& opts = instance.opts;
@@ -2418,7 +2452,47 @@ void init_treeset_optimizer(RaxmlInstance &instance, CheckpointManager &cm) {
   if (opts.command != Command::treeset)
     return;
 
-   instance.treeset_optimizer.reset(new TreesetOptimizer(instance, opts, instance.parted_msa, instance.random_tree, instance.tip_msa_idmap, instance.persite_loglh, *instance.load_balancer, cm.pythia_score(), 300, opts.random_seed + 1));
+  const auto &checkpoint = cm.checkp_file();
+  instance.ml_tree = checkpoint.best_tree();
+
+  std::vector<ScoredTopology> scored_topologies;
+  scored_topologies.reserve(checkpoint.ml_trees.size());
+  for (const auto &entry: checkpoint.ml_trees)
+      scored_topologies.push_back(entry.second);
+
+  std::sort(scored_topologies.begin(), scored_topologies.end(),
+            [](const ScoredTopology &lhs, const ScoredTopology &rhs) {
+                return lhs.first > rhs.first;
+            });
+
+  TreeList initial_ml_trees;
+  initial_ml_trees.reserve(scored_topologies.size());
+  for (const auto &scored_topology: scored_topologies) {
+      Tree initial_ml_tree = instance.ml_tree.tree;
+      initial_ml_tree.topology(scored_topology.second);
+      initial_ml_trees.push_back(std::move(initial_ml_tree));
+  }
+  if (initial_ml_trees.empty()) {
+      initial_ml_trees.push_back(instance.ml_tree.tree);
+  }
+
+  if (opts.treeset_aggressive)
+    LOG_INFO_TS << "Treeset aggressive initial ML trees: "
+                << scored_topologies.size() << endl;
+
+  instance.treeset_optimizer.reset(new TreesetOptimizer(
+      instance,
+      opts,
+      instance.parted_msa,
+      instance.ml_tree.tree,
+      instance.ml_tree.models,
+      std::move(initial_ml_trees),
+      instance.tip_msa_idmap,
+      instance.persite_loglh,
+      *instance.load_balancer,
+      cm.pythia_score(),
+      opts.treeset_target_trees,
+      opts.random_seed + 1));
 }
 
 unsigned int read_newick_trees_custom(SplitsTree& ref_tree, const std::string& fname,
@@ -3683,7 +3757,25 @@ void thread_infer_ml(RaxmlInstance& instance, CheckpointManager& cm)
     else
       optimizer.disable_stopping_rule();
 
-    if (opts.command == Command::evaluate || opts.command == Command::sitelh ||
+    const bool reuse_treeset_baseline =
+      opts.command == Command::treeset &&
+      !opts.treeset_baseline_tree_file.empty();
+
+    if (reuse_treeset_baseline)
+    {
+      const double loglh = treeinfo->loglh();
+
+      if (ParallelContext::group_master_thread())
+        cm.search_state().loglh = loglh;
+
+      cm.update_and_write(*treeinfo);
+
+      LOG_WORKER_TS(log_level)
+          << "Baseline ML tree #" << start_tree_num
+          << ", logLikelihood: " << FMT_LH(loglh)
+          << endl;
+    }
+    else if (opts.command == Command::evaluate || opts.command == Command::sitelh ||
         opts.command == Command::ancestral || opts.command == Command::mutmap ||
         opts.command == Command::au_test)
     { 

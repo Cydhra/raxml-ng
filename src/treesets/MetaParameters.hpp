@@ -7,6 +7,13 @@
 #include "../Options.hpp"
 #include "../Optimizer.hpp"
 
+
+enum class AggressiveSourceFamily {
+    none,
+    seed_greedy,
+    constrained_parsimony
+};
+
 /**
  * Holds the meta-parameters of self-tuning tree inference. The parameters are held by a bandit and can
  * be applied to TunedBatches to configure the tree inference.
@@ -70,9 +77,17 @@ struct MetaParameters {
     bool fallback_fast_raxml;
 
     /**
-     * If set, run SPR rounds with stop criterion
+     * If set, run SPR rounds with stop criterion.
      */
     bool dynamic_spr;
+
+    /**
+     * Metadata used by externally generated aggressive starting-tree batches.
+     */
+    bool aggressive_source = false;
+    AggressiveSourceFamily aggressive_source_family = AggressiveSourceFamily::none;
+    bool fixed_model_au_precheck = false;
+    bool pin_initial_ml_model = false;
 
     explicit MetaParameters(const unsigned int keep_top_k_topol = 20,
                             const bool do_first_model = false,
@@ -100,6 +115,32 @@ struct MetaParameters {
                                                                 dynamic_spr(dynamic_spr) {
     }
 
+    static MetaParameters aggressive_starting_tree_acceptance() {
+        MetaParameters p = starting_tree_acceptance();
+        p.fixed_model_au_precheck = true;
+        p.pin_initial_ml_model = true;
+        return p;
+    }
+
+    static MetaParameters aggressive_candidate_source(AggressiveSourceFamily source) {
+        MetaParameters p = aggressive_starting_tree_acceptance();
+        p.aggressive_source = true;
+        p.aggressive_source_family = source;
+        return p;
+    }
+
+    static MetaParameters starting_tree_acceptance() {
+        return MetaParameters(1, false, 0, 0, true, false);
+    }
+
+    bool is_external_aggressive_source() const {
+        return aggressive_source;
+    }
+
+    AggressiveSourceFamily external_aggressive_source_family() const {
+        return aggressive_source_family;
+    }
+
     friend bool operator==(const MetaParameters &lhs, const MetaParameters &rhs) {
         return lhs.keep_top_k_topol == rhs.keep_top_k_topol
                && lhs.do_first_model == rhs.do_first_model
@@ -112,7 +153,11 @@ struct MetaParameters {
                && lhs.model_override == rhs.model_override
                && lhs.fallback_fast_raxml == rhs.fallback_fast_raxml
                && lhs.dynamic_spr == rhs.dynamic_spr
-               && lhs.do_final_model == rhs.do_final_model;
+               && lhs.do_final_model == rhs.do_final_model
+               && lhs.aggressive_source == rhs.aggressive_source
+               && lhs.aggressive_source_family == rhs.aggressive_source_family
+               && lhs.fixed_model_au_precheck == rhs.fixed_model_au_precheck
+               && lhs.pin_initial_ml_model == rhs.pin_initial_ml_model;
     }
 
     friend bool operator!=(const MetaParameters &lhs, const MetaParameters &rhs) {
@@ -135,6 +180,10 @@ struct MetaParameters {
         seed ^= (seed << 6) + (seed >> 2) + 0x5458316A + static_cast<std::size_t>(obj.fallback_fast_raxml);
         seed ^= (seed << 6) + (seed >> 2) + 0x39D34241 + static_cast<std::size_t>(obj.dynamic_spr);
         seed ^= (seed << 6) + (seed >> 2) + 0x72C16A1E + static_cast<std::size_t>(obj.do_final_model);
+        seed ^= (seed << 6) + (seed >> 2) + 0x50E7A8B9 + static_cast<std::size_t>(obj.aggressive_source);
+        seed ^= (seed << 6) + (seed >> 2) + 0x38D9B7C1 + static_cast<std::size_t>(obj.aggressive_source_family);
+        seed ^= (seed << 6) + (seed >> 2) + 0x2228A3E7 + static_cast<std::size_t>(obj.fixed_model_au_precheck);
+        seed ^= (seed << 6) + (seed >> 2) + 0x4D1A2F0B + static_cast<std::size_t>(obj.pin_initial_ml_model);
         return seed;
     }
 };

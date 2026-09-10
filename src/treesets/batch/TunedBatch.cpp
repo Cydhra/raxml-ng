@@ -19,10 +19,30 @@ void TunedBatch::generate_starting_trees(const RaxmlInstance &instance, SharedBa
                                          const TaskGroup &context,
                                          const unsigned int worker_id, const unsigned int thread_id) {
     for (const auto id: this->exclusive_assignment->at(context.get_group_thread_id(worker_id, thread_id))) {
-        start_tree_heuristic->generate(this->batch_start_trees->at(id), id, instance, context, resources, worker_id,
-                                       thread_id);
+        if (this->batch_start_trees->at(id).empty()) {
+            start_tree_heuristic->generate(this->batch_start_trees->at(id), id, instance, context, resources, worker_id,
+                                           thread_id);
+        }
         this->num_trees_generated->fetch_add(1);
     }
+}
+
+void TunedBatch::set_starting_trees(TreeList start_trees) {
+    if (start_trees.size() != this->get_batch_size()) {
+        throw RaxmlException("provided starting tree count does not match batch size");
+    }
+
+    for (const auto &tree: start_trees) {
+        if (tree.empty()) {
+            throw RaxmlException("provided starting tree is empty");
+        }
+
+        if (tree.num_tips() != this->msa->taxon_count()) {
+            throw RaxmlException("provided starting tree has incompatible taxon count");
+        }
+    }
+
+    *this->batch_start_trees = std::move(start_trees);
 }
 
 void TunedBatch::optimize(const RaxmlInstance &instance, const Options &opts, SharedBatchResources &resources,
@@ -139,12 +159,15 @@ void TunedBatch::perform_plausibility_check(const Options &opts, SharedBatchReso
     }
 
     const auto begin = std::chrono::steady_clock::now();
-    // forcibly optimize model parameters once. This is to have somewhat reasonable model parameters, but we
-    // dont want to invest much time. If they are required, do_final_model in meta parameters handles this
+    // For ordinary batches, optimize model parameters once so they are reasonable.
+    // Aggressive batches retain the baseline ML model and optimize only branch lengths.
     const auto &tree_ids = this->coarse_assignments->at(worker_id);
+    const auto params_to_optimize = meta_parameters.fixed_model_au_precheck
+                                        ? CORAX_OPT_PARAM_BRANCHES_ITERATIVE
+                                        : CORAX_OPT_PARAM_ALL & ~CORAX_OPT_PARAM_BRANCHES_ITERATIVE;
     for (const auto tree_id: tree_ids) {
         auto &tree = batch_trees[tree_id][thread_id];
-        tree->optimize_params(CORAX_OPT_PARAM_ALL & ~CORAX_OPT_PARAM_BRANCHES_ITERATIVE, AU_TEST_EPSILON);
+        tree->optimize_params(params_to_optimize, AU_TEST_EPSILON);
     }
 
     this->perform_au_test(au_test, initialized, context, worker_id, thread_id);

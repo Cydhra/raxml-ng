@@ -175,9 +175,15 @@ public:
   std::vector<std::string> modeltest_subst_models;
   bool modeltest_json_output;
 
+  /* treeset stuff */
   unsigned int treeset_groups = 0;
   unsigned int treeset_workers = 0;
   unsigned int treeset_threads = 0;
+
+  /* aggressive treeset stuff */
+  unsigned int treeset_target_trees = 300;
+  bool treeset_aggressive = false;
+  std::string treeset_baseline_tree_file;     // path to baseline-ML-trees
 
   bool coarse() const { return num_workers > 1; };
   bool auto_model() const {
