@@ -190,7 +190,7 @@ public:
         return false;
     }
 
-    Bandit<shared_ptr<MultiArmedBandit<MetaParameters> > > &get_best_bandit() {
+    Bandit<Heuristic> &get_best_bandit() {
         return bandits[this->best_known_bandit];
     }
 
