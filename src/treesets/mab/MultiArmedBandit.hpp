@@ -78,7 +78,7 @@ public:
             return this->bandits[0];
         }
 
-        selection_mutex.lock();
+        selection_mutex->lock();
         // select next participating bandit
         do {
             this->bandit_cursor += 1;
@@ -113,7 +113,7 @@ public:
                     selected_bandit.participating = false;
                 }
 
-                selection_mutex.unlock();
+                selection_mutex->unlock();
                 return best_bandit;
             }
 
@@ -136,7 +136,7 @@ public:
             }
         }
 
-        selection_mutex.unlock();
+        selection_mutex->unlock();
         return selected_bandit;
     }
 
@@ -151,7 +151,7 @@ public:
      * measurements from prior knowledge or heuristics that are not part of the selection rule.
      */
     void take_measurement(Bandit<Heuristic> &current_bandit, const TunedBatch &batch, const bool iteration_completed) {
-        measurement_mutex.lock();
+        measurement_mutex->lock();
         current_bandit.take_measurement(batch);
 
         // if the current bandit is not the best one, check if the best one has to be updated
@@ -177,7 +177,7 @@ public:
             this->iterations_completed += 1;
         }
 
-        measurement_mutex.unlock();
+        measurement_mutex->unlock();
     }
 
     bool has_bandit(std::string name) const {
@@ -226,10 +226,9 @@ private:
      */
     unsigned int iterations_completed = 0;
 
-private:
-    std::mutex measurement_mutex;
+    std::unique_ptr<std::mutex> measurement_mutex = make_unique<std::mutex>();
 
-    std::mutex selection_mutex;
+    std::unique_ptr<std::mutex> selection_mutex = make_unique<std::mutex>();
 };
 
 
