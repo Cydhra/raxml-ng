@@ -18,9 +18,13 @@ public:
      * It will be returned by the round-robin style selection as long it isn't assumed to be worse.
      *
      * @param bandit a bandit instance to add to this MAB
+     *
+     * @return the unique index of the bandit. This bandit can be identified and retrieved with this index as long as
+     * this MAB instance exists.
      */
-    void register_bandit(Bandit<Heuristic> &&bandit) {
+    size_t register_bandit(Bandit<Heuristic> &&bandit) {
         this->bandits.emplace_back(bandit);
+        return this->bandits.size() - 1;
     }
 
     /**
@@ -29,9 +33,13 @@ public:
      *
      * @param name bandit's name
      * @param parameters the bandit's meta-parameters
+     *
+     * @return the unique index of the bandit. This bandit can be identified and retrieved with this index as long as
+     * this MAB instance exists.
      */
-    void emplace_back(std::string name, Heuristic parameters) {
+    size_t emplace_back(std::string name, Heuristic parameters) {
         this->bandits.emplace_back(name, parameters);
+        return this->bandits.size() - 1;
     }
 
     /**
@@ -84,7 +92,8 @@ public:
             LOG_INFO << std::endl;
             LOG_WORKER_TS(LogLevel::info) << "Initial estimation of " << selected_bandit.get_name() << "." << std::endl;
         } else {
-            if (this->bandit_cursor != this->best_known_bandit && !std::isnan(this->bandits[this->best_known_bandit].get_mean_throughput()) && selected_bandit.is_worse_than(
+            if (this->bandit_cursor != this->best_known_bandit && !std::isnan(
+                    this->bandits[this->best_known_bandit].get_mean_throughput()) && selected_bandit.is_worse_than(
                     best_bandit, iterations_completed)) {
                 LOG_INFO << std::endl;
                 LOG_WORKER_TS(LogLevel::info) << "Switching to best bandit " << best_bandit.get_name() <<
@@ -120,7 +129,8 @@ public:
                             std::endl;
                 } else {
                     LOG_INFO << std::endl;
-                    LOG_WORKER_TS(LogLevel::info) << "Selecting bandit " << selected_bandit.get_name() << " (mean: " << (
+                    LOG_WORKER_TS(LogLevel::info) << "Selecting bandit " << selected_bandit.get_name() << " (mean: " <<
+                    (
                         best_bandit.get_mean_throughput() * 1000.0) << " t/s)." << std::endl;
                 }
             }
@@ -145,11 +155,15 @@ public:
         current_bandit.take_measurement(batch);
 
         // if the current bandit is not the best one, check if the best one has to be updated
-        if (current_bandit.get_parameters() != this->bandits[best_known_bandit].get_parameters() && !std::isnan(this->bandits[best_known_bandit].get_mean_throughput())) {
+        if (current_bandit.get_parameters() != this->bandits[best_known_bandit].get_parameters() && !std::isnan(
+                this->bandits[best_known_bandit].get_mean_throughput())) {
             if (current_bandit.get_mean_throughput() > this->bandits[best_known_bandit].get_mean_throughput()) {
                 // find which index is the current bandit. We cannot rely on the cursor since that has been advanced by
                 // concurrent batch groups
-                auto cursor = std::find_if(this->bandits.begin(), this->bandits.end(), [current_bandit](const Bandit<Heuristic>& element) { return element.get_parameters() == current_bandit.get_parameters(); });
+                auto cursor = std::find_if(this->bandits.begin(), this->bandits.end(),
+                                           [current_bandit](const Bandit<Heuristic> &element) {
+                                               return element.get_parameters() == current_bandit.get_parameters();
+                                           });
                 if (cursor != this->bandits.end()) {
                     best_known_bandit = std::distance(this->bandits.begin(), cursor);
                 } else {
@@ -176,7 +190,7 @@ public:
         return false;
     }
 
-    Bandit<shared_ptr<MultiArmedBandit<MetaParameters>>> & get_best_bandit() {
+    Bandit<shared_ptr<MultiArmedBandit<MetaParameters> > > &get_best_bandit() {
         return bandits[this->best_known_bandit];
     }
 
