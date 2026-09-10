@@ -187,10 +187,10 @@ public:
         return iterations_completed;
     }
 
-protected:
+private:
     /**
      * Registered bandits in this MAB.
-     * Bandits must not be removed from this list.
+     * Bandits must not be removed from this list, because they can be uniquely identified by their index.
      * This list is implemented with a deque to avoid reallocations while batches hold references to the bandits
      * in the list.
      */
