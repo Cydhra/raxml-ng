@@ -221,6 +221,10 @@ public:
         return this->name;
     }
 
+    [[nodiscard]] MetaParameters const &get_parameters() const {
+        return this->meta_parameters;
+    }
+
 protected:
     /**
      * Name of the batch for outputting debug information.

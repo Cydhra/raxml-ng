@@ -2,13 +2,11 @@
 #define RAXML_TREESETOPTIMIZER_HPP_
 
 #include <vector>
-#include "mab/Bandit.hpp"
-#include "mab/MultiArmedBandit.hpp"
 #include "batch/BatchQueue.hpp"
 #include "batch/SharedBatchResources.hpp"
 #include "../loadbalance/LoadBalancer.hpp"
-#include "../Checkpoint.hpp"
 #include "../pool/Threadpool.hpp"
+#include "mab/DynamicMAB.hpp"
 
 constexpr unsigned int DEFAULT_BATCH_SIZE = 16;
 
@@ -16,8 +14,6 @@ constexpr unsigned int DEFAULT_BATCH_SIZE = 16;
  * SPR radius used when pythia is disabled. Fast SPR will multiply this radius with 2.
  */
 constexpr unsigned int DEFAULT_ADAPTIVE_RADIUS = 10;
-
-typedef std::shared_ptr<MultiArmedBandit<MetaParameters>> BanditArm;
 
 class TreesetOptimizer {
 protected:
@@ -59,14 +55,7 @@ protected:
      */
     const unsigned int target_tree_count;
 
-    MultiArmedBandit<BanditArm> hierarchical_mab;
-
-    /**
-     * A list of bandit arms that are successors to previous arms in case they are not yet optimal.
-     * They are each given a rank, and are added if the best performing bandit does not have high success rate.
-     * Each time, all bandits with a rank as high or lower than the number of currently active bandits are added.
-     */
-    std::vector<std::tuple<unsigned int, std::string, std::shared_ptr<MultiArmedBandit<MetaParameters> > > > successors;
+    DynamicMAB mab = {};
 
     /**
      * Initialize the bandit algorithms we use during the inference. These depend on the parameters derivded from initial
@@ -79,8 +68,8 @@ protected:
      * This method runs one batch and then handles the updates to the MABs.
      * It is bound into a BatchTask by next_work_unit.
      */
-    void run_batch(Bandit<std::shared_ptr<MultiArmedBandit<MetaParameters> > > &mab, Bandit<MetaParameters> &bandit,
-                   TunedBatch &batch, TaskGroup &context, unsigned int worker_id, unsigned int thread_id);
+    void run_batch(
+        TunedBatch &batch, TaskGroup &context, unsigned int worker_id, unsigned int thread_id);
 
     /**
      * Select a unit of work of the current state of the optimizer algorithm.
@@ -91,15 +80,6 @@ protected:
      * @return the main method of the next tuned batch to call by all threads of the work group that called this method.
      */
     BatchTask next_work_unit();
-
-    /**
-     * Check whether we should insert new arms into the MAB depending on the performance of the current bandit arm.
-     * This implements a heuristic that enables exploration for new arms if they have potential to be useful within
-     * the algorithm.
-     * This enables us to skip exploring arms that have no potential gain over currently explored arms.
-     *
-     */
-    void check_mab_modification();
 
 public:
     /**

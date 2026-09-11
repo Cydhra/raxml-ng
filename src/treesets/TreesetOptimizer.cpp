@@ -1,11 +1,10 @@
 #include "TreesetOptimizer.hpp"
 #include "batch/TunedBatch.hpp"
 #include "../Optimizer.hpp"
-
-constexpr unsigned int MIN_PAUSE_BETWEEN_MODIFICATIONS = 4;
+#include "mab/DynamicMAB.hpp"
 
 void TreesetOptimizer::initialize_bandits() {
-    BanditArm parsimony = make_shared<MultiArmedBandit<MetaParameters>>();
+    auto parsimony = make_shared<MultiArmedBandit<MetaParameters>>();
     parsimony->emplace_back("Parsimony", MetaParameters(1, false, 0, 0, true, false));
 
     const auto adaptive_radius = pythia_score >= 0.0
@@ -15,37 +14,44 @@ void TreesetOptimizer::initialize_bandits() {
     const auto very_small_radius = static_cast<unsigned int>(max(static_cast<signed int>(adaptive_radius) - 10, 5));
 
 
-    BanditArm nni_mab = make_shared<MultiArmedBandit<MetaParameters>>();
+    auto nni_mab = make_shared<MultiArmedBandit<MetaParameters>>();
     nni_mab->emplace_back("NNI,DoModel", MetaParameters(20, true, 0, 0, false, adaptive_radius, true));
     nni_mab->emplace_back("NNI,NoModel", MetaParameters(20, false, 0, 0, false, adaptive_radius, true));
+    this->mab.register_new_successor(1, "NNI", std::move(nni_mab));
 
-    BanditArm light_mab = make_shared<MultiArmedBandit<MetaParameters>>();
+    auto light_mab = make_shared<MultiArmedBandit<MetaParameters>>();
     light_mab->emplace_back("Greedy,DoModel,2spr", MetaParameters(1, true, 2, 0, false, adaptive_radius));
     light_mab->emplace_back("Greedy,NoModel,2spr", MetaParameters(1, false, 2, 0, false, adaptive_radius));
-
     light_mab->emplace_back("Fast,DoModel,2spr", MetaParameters(20, true, 2, 0, false, adaptive_radius));
     light_mab->emplace_back("Fast,NoModel,2spr", MetaParameters(20, false, 2, 0, false, adaptive_radius));
+    this->mab.register_new_successor(4, "Light", std::move(light_mab));
 
     // low radius heuristics
-    BanditArm low_mab = make_shared<MultiArmedBandit<MetaParameters>>();
+    auto low_mab = make_shared<MultiArmedBandit<MetaParameters>>();
     low_mab->emplace_back("Greedy,2spr,low",
                                 MetaParameters(1, true, 2, 0, false, small_radius));
     low_mab->emplace_back("Fast,2spr,low",
                                 MetaParameters(20, true, 2, 0, false, small_radius));
-    low_mab->emplace_back("Fast,2spr,v-low",
-                                MetaParameters(20, true, 2, 0, false, very_small_radius));
-    low_mab->emplace_back("Slow,2spr,low",
-                                MetaParameters(20, true, 0, 2, false, small_radius));
+    if (very_small_radius < small_radius) {
+        low_mab->emplace_back("Fast,2spr,v-low",
+                          MetaParameters(20, true, 2, 0, false, very_small_radius));
+    }
 
-    BanditArm constrained_mab = make_shared<MultiArmedBandit<MetaParameters>>();
+    low_mab->emplace_back("Slow,2spr,low",
+                          MetaParameters(20, true, 0, 2, false, small_radius));
+    this->mab.register_new_successor(2, "LowRadius", std::move(low_mab));
+
+    auto constrained_mab = make_shared<MultiArmedBandit<MetaParameters>>();
     constrained_mab->emplace_back("Fast,DoModel,2spr,NNI,Constrained",
                                         MetaParameters(20, true, 2, 0, false, adaptive_radius, true, true));
     constrained_mab->emplace_back("Greedy,DoModel,2spr,NNI,Constrained",
                                         MetaParameters(1, true, 2, 0, false, adaptive_radius, true, true));
     constrained_mab->emplace_back("Fast,DoModel,2spr,NNI,Constrained,low",
                                             MetaParameters(20, true, 2, 0, false, small_radius, true, true));
+    this->mab.register_new_successor(2, "Constrained", std::move(constrained_mab));
 
-    BanditArm dynamic_mab = make_shared<MultiArmedBandit<MetaParameters>>();
+
+    auto dynamic_mab = make_shared<MultiArmedBandit<MetaParameters>>();
     dynamic_mab->emplace_back("Greedy,NoModel,Dynamic,low",
                                     MetaParameters(1, true, 0, 0, false, small_radius, false, false, std::nullopt,
                                                    false, true));
@@ -58,37 +64,27 @@ void TreesetOptimizer::initialize_bandits() {
     dynamic_mab->emplace_back("Fast,DoModel,Dynamic",
                                     MetaParameters(20, true, 0, 0, false, adaptive_radius, false, false, std::nullopt,
                                                    false, true));
+    this->mab.register_new_successor(5, "Dynamic", std::move(dynamic_mab));
 
     // fallbacks
-    BanditArm fallback_fast_mab = make_shared<MultiArmedBandit<MetaParameters>>();
+    auto fallback_fast_mab = make_shared<MultiArmedBandit<MetaParameters>>();
     fallback_fast_mab->emplace_back("Fast-Raxml",
                                           MetaParameters(20, false, 0, 0, false, 20, false, false, std::nullopt,
                                                          true));
-
-    // set up successors
-    this->successors.emplace_back(1, "NNI", std::move(nni_mab));
-    this->successors.emplace_back(2, "Constrained", std::move(constrained_mab));
-    this->successors.emplace_back(2, "LowRadius", std::move(low_mab));
-    this->successors.emplace_back(4, "Light", std::move(light_mab));
-    this->successors.emplace_back(5, "Dynamic", std::move(dynamic_mab));
-    this->successors.emplace_back(6, "Fallback", std::move(fallback_fast_mab));
+    this->mab.register_new_successor(6, "Fallback", std::move(fallback_fast_mab));
 
     // second-level MAB
-    this->hierarchical_mab.emplace_back("Starting Trees", std::move(parsimony));
+    this->mab.register_new_arm("Starting Trees", std::move(parsimony));
 }
 
-void TreesetOptimizer::run_batch(Bandit<std::shared_ptr<MultiArmedBandit<MetaParameters>> > &mab,
-                                 Bandit<MetaParameters> &bandit,
-                                 TunedBatch &batch, TaskGroup &context, unsigned int worker_id,
-                                 unsigned int thread_id) {
+void TreesetOptimizer::run_batch(
+    TunedBatch &batch, TaskGroup &context, unsigned int worker_id,
+    unsigned int thread_id) {
     batch.optimize(instance, opts, shared_batch_resources, context, worker_id, thread_id);
 
     if (context.is_group_leader(worker_id, thread_id)) {
-        // take measurements
-        mab.get_parameters()->take_measurement(bandit, batch, true);
-        this->hierarchical_mab.take_measurement(mab, batch, true);
-
-        this->check_mab_modification();
+        // inform the mab about the results
+        this->mab.take_measurement(batch);
 
         // inform the batch queue that the batch has been inferred
         this->batch_queue.finish_batch(batch);
@@ -101,15 +97,14 @@ void TreesetOptimizer::run_batch(Bandit<std::shared_ptr<MultiArmedBandit<MetaPar
 }
 
 BatchTask TreesetOptimizer::next_work_unit() {
-    auto &mab = this->hierarchical_mab.select_next_bandit();
-    auto &current_bandit = mab.get_parameters().get()->select_next_bandit();
-    auto &current_batch = this->batch_queue.select_next_batch(current_bandit.get_parameters(), pool.workers_per_task(),
+    const auto &parameters = this->mab.select_next_bandit();
+    auto &current_batch = this->batch_queue.select_next_batch(parameters, pool.workers_per_task(),
                                                               pool.threads_per_task());
-    current_batch.update_meta_parameters(current_bandit.get_parameters());
+    current_batch.update_meta_parameters(parameters);
 
-    BatchTask runner = [this, &mab, &current_bandit, &current_batch](TaskGroup &context, const unsigned int worker_id,
+    BatchTask runner = [this, &current_batch](TaskGroup &context, const unsigned int worker_id,
                                                                      const unsigned int thread_id) {
-        this->run_batch(mab, current_bandit, current_batch, context, worker_id, thread_id);
+        this->run_batch(current_batch, context, worker_id, thread_id);
     };
 
     return runner;
@@ -128,30 +123,6 @@ void TreesetOptimizer::run() {
     LOG_INFO_TS << "Inferred " << this->batch_queue.num_plausible_trees() << " plausible trees in " << this->batch_queue
             .num_batches() <<
             " batches." << std::endl;
-}
-
-void TreesetOptimizer::check_mab_modification() {
-    // TODO implement a proper heuristic here. For now, we check if the current arm exceeds 75% success per batch,
-    //  and if not, we add arms according to a pre-defined mapping.
-
-    // check if we have more than a trivial amount of data, if the success rate is low, and we had at least 4 batches since the last modification
-    if (last_mab_modification + MIN_PAUSE_BETWEEN_MODIFICATIONS < hierarchical_mab.get_iterations_completed() &&
-        hierarchical_mab.get_best_bandit().num_samples() >= 4 && hierarchical_mab.get_best_bandit().
-        get_expected_tree_rate() < 0.75) {
-        const auto current_level = hierarchical_mab.num_bandits();
-
-        // add all bandits of the current level
-        for (auto it = this->successors.begin(); it != this->successors.end(); it += 1) {
-            if (std::get<0>(*it) <= current_level) {
-                if (!hierarchical_mab.has_bandit(std::get<1>(*it))) {
-                    LOG_WORKER_TS(LogLevel::info) << std::endl << "Adding bandit " << std::get<1>(*it) <<
-                            " to algorithm." << std::endl;
-                    hierarchical_mab.emplace_back(std::get<1>(*it), std::get<2>(*it));
-                    last_mab_modification = hierarchical_mab.get_iterations_completed();
-                }
-            }
-        }
-    }
 }
 
 std::vector<Tree> TreesetOptimizer::get_all_trees() const {
