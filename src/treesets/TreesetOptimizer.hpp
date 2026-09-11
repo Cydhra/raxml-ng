@@ -17,6 +17,8 @@ constexpr unsigned int DEFAULT_BATCH_SIZE = 16;
  */
 constexpr unsigned int DEFAULT_ADAPTIVE_RADIUS = 10;
 
+typedef std::shared_ptr<MultiArmedBandit<MetaParameters>> BanditArm;
+
 class TreesetOptimizer {
 protected:
     /**
@@ -57,43 +59,7 @@ protected:
      */
     const unsigned int target_tree_count;
 
-    MultiArmedBandit<std::shared_ptr<MultiArmedBandit<MetaParameters> > > hierarchical_mab;
-
-    std::shared_ptr<MultiArmedBandit<MetaParameters> > parsimony = std::make_shared<MultiArmedBandit<
-        MetaParameters> >();
-
-    std::shared_ptr<MultiArmedBandit<MetaParameters> > nni_mab = std::make_shared<MultiArmedBandit<
-        MetaParameters> >();
-
-    /**
-     * A multi-armed bandit instance that contains aggressive heuristics
-     */
-    std::shared_ptr<MultiArmedBandit<MetaParameters> > light_mab = std::make_shared<MultiArmedBandit<
-        MetaParameters> >();
-
-    /**
-    * A multi-armed bandit instance that contains slower heuristics
-    */
-    std::shared_ptr<MultiArmedBandit<MetaParameters> > low_mab = std::make_shared<MultiArmedBandit<
-        MetaParameters> >();
-
-    /**
-     * A multi-armed bandit instance that contains light and mixed heuristics with tree constrains
-     */
-    std::shared_ptr<MultiArmedBandit<MetaParameters> > constrained_mab = std::make_shared<MultiArmedBandit<
-        MetaParameters> >();
-
-    /**
-     * A multi-armed bandit instance that runs a dynamic number of SPR rounds
-     */
-    std::shared_ptr<MultiArmedBandit<MetaParameters> > dynamic_mab = std::make_shared<MultiArmedBandit<
-            MetaParameters> >();
-
-    /**
-     * Fallback to fast raxml
-     */
-    std::shared_ptr<MultiArmedBandit<MetaParameters> > fallback_fast_mab = std::make_shared<MultiArmedBandit<
-        MetaParameters> >();
+    MultiArmedBandit<BanditArm> hierarchical_mab;
 
     /**
      * A list of bandit arms that are successors to previous arms in case they are not yet optimal.

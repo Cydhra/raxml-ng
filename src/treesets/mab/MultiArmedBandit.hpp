@@ -13,6 +13,16 @@
 template<class Heuristic>
 class MultiArmedBandit {
 public:
+    explicit MultiArmedBandit() = default;
+
+    MultiArmedBandit(const MultiArmedBandit &other) = delete;
+
+    MultiArmedBandit(MultiArmedBandit &&other) noexcept = default;
+
+    MultiArmedBandit & operator=(const MultiArmedBandit &other) = delete;
+
+    MultiArmedBandit & operator=(MultiArmedBandit &&other) noexcept = default;
+
     /**
      * Add a single-arm bandit to this MAB instance.
      * It will be returned by the round-robin style selection as long it isn't assumed to be worse.
@@ -155,14 +165,14 @@ public:
         current_bandit.take_measurement(batch);
 
         // if the current bandit is not the best one, check if the best one has to be updated
-        if (current_bandit.get_parameters() != this->bandits[best_known_bandit].get_parameters() && !std::isnan(
+        if (&current_bandit.get_parameters() != &this->bandits[best_known_bandit].get_parameters() && !std::isnan(
                 this->bandits[best_known_bandit].get_mean_throughput())) {
             if (current_bandit.get_mean_throughput() > this->bandits[best_known_bandit].get_mean_throughput()) {
                 // find which index is the current bandit. We cannot rely on the cursor since that has been advanced by
                 // concurrent batch groups
                 auto cursor = std::find_if(this->bandits.begin(), this->bandits.end(),
                                            [current_bandit](const Bandit<Heuristic> &element) {
-                                               return element.get_parameters() == current_bandit.get_parameters();
+                                               return &element.get_parameters() == &current_bandit.get_parameters();
                                            });
                 if (cursor != this->bandits.end()) {
                     best_known_bandit = std::distance(this->bandits.begin(), cursor);

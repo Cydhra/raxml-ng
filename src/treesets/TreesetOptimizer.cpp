@@ -5,7 +5,8 @@
 constexpr unsigned int MIN_PAUSE_BETWEEN_MODIFICATIONS = 4;
 
 void TreesetOptimizer::initialize_bandits() {
-    this->parsimony->emplace_back("Parsimony", MetaParameters(1, false, 0, 0, true, false));
+    BanditArm parsimony = make_shared<MultiArmedBandit<MetaParameters>>();
+    parsimony->emplace_back("Parsimony", MetaParameters(1, false, 0, 0, true, false));
 
     const auto adaptive_radius = pythia_score >= 0.0
                                      ? Optimizer::adaptive_radius(pythia_score)
@@ -14,64 +15,69 @@ void TreesetOptimizer::initialize_bandits() {
     const auto very_small_radius = static_cast<unsigned int>(max(static_cast<signed int>(adaptive_radius) - 10, 5));
 
 
-    // init default bandits
-    this->nni_mab->emplace_back("NNI,DoModel", MetaParameters(20, true, 0, 0, false, adaptive_radius, true));
-    this->nni_mab->emplace_back("NNI,NoModel", MetaParameters(20, false, 0, 0, false, adaptive_radius, true));
+    BanditArm nni_mab = make_shared<MultiArmedBandit<MetaParameters>>();
+    nni_mab->emplace_back("NNI,DoModel", MetaParameters(20, true, 0, 0, false, adaptive_radius, true));
+    nni_mab->emplace_back("NNI,NoModel", MetaParameters(20, false, 0, 0, false, adaptive_radius, true));
 
-    this->light_mab->emplace_back("Greedy,DoModel,2spr", MetaParameters(1, true, 2, 0, false, adaptive_radius));
-    this->light_mab->emplace_back("Greedy,NoModel,2spr", MetaParameters(1, false, 2, 0, false, adaptive_radius));
+    BanditArm light_mab = make_shared<MultiArmedBandit<MetaParameters>>();
+    light_mab->emplace_back("Greedy,DoModel,2spr", MetaParameters(1, true, 2, 0, false, adaptive_radius));
+    light_mab->emplace_back("Greedy,NoModel,2spr", MetaParameters(1, false, 2, 0, false, adaptive_radius));
 
-    this->light_mab->emplace_back("Fast,DoModel,2spr", MetaParameters(20, true, 2, 0, false, adaptive_radius));
-    this->light_mab->emplace_back("Fast,NoModel,2spr", MetaParameters(20, false, 2, 0, false, adaptive_radius));
+    light_mab->emplace_back("Fast,DoModel,2spr", MetaParameters(20, true, 2, 0, false, adaptive_radius));
+    light_mab->emplace_back("Fast,NoModel,2spr", MetaParameters(20, false, 2, 0, false, adaptive_radius));
 
     // low radius heuristics
-    this->low_mab->emplace_back("Greedy,2spr,low",
+    BanditArm low_mab = make_shared<MultiArmedBandit<MetaParameters>>();
+    low_mab->emplace_back("Greedy,2spr,low",
                                 MetaParameters(1, true, 2, 0, false, small_radius));
-    this->low_mab->emplace_back("Fast,2spr,low",
+    low_mab->emplace_back("Fast,2spr,low",
                                 MetaParameters(20, true, 2, 0, false, small_radius));
-    this->low_mab->emplace_back("Fast,2spr,v-low",
+    low_mab->emplace_back("Fast,2spr,v-low",
                                 MetaParameters(20, true, 2, 0, false, very_small_radius));
-    this->low_mab->emplace_back("Slow,2spr,low",
+    low_mab->emplace_back("Slow,2spr,low",
                                 MetaParameters(20, true, 0, 2, false, small_radius));
 
-    this->constrained_mab->emplace_back("Fast,DoModel,2spr,NNI,Constrained",
+    BanditArm constrained_mab = make_shared<MultiArmedBandit<MetaParameters>>();
+    constrained_mab->emplace_back("Fast,DoModel,2spr,NNI,Constrained",
                                         MetaParameters(20, true, 2, 0, false, adaptive_radius, true, true));
-    this->constrained_mab->emplace_back("Greedy,DoModel,2spr,NNI,Constrained",
+    constrained_mab->emplace_back("Greedy,DoModel,2spr,NNI,Constrained",
                                         MetaParameters(1, true, 2, 0, false, adaptive_radius, true, true));
-    this->constrained_mab->emplace_back("Fast,DoModel,2spr,NNI,Constrained,low",
+    constrained_mab->emplace_back("Fast,DoModel,2spr,NNI,Constrained,low",
                                             MetaParameters(20, true, 2, 0, false, small_radius, true, true));
 
-    this->dynamic_mab->emplace_back("Greedy,NoModel,Dynamic,low",
+    BanditArm dynamic_mab = make_shared<MultiArmedBandit<MetaParameters>>();
+    dynamic_mab->emplace_back("Greedy,NoModel,Dynamic,low",
                                     MetaParameters(1, true, 0, 0, false, small_radius, false, false, std::nullopt,
                                                    false, true));
-    this->dynamic_mab->emplace_back("Fast,DoModel,Dynamic,low",
+    dynamic_mab->emplace_back("Fast,DoModel,Dynamic,low",
                                     MetaParameters(20, true, 0, 0, false, small_radius, false, false, std::nullopt,
                                                    false, true));
-    this->dynamic_mab->emplace_back("Greedy,NoModel,Dynamic",
+    dynamic_mab->emplace_back("Greedy,NoModel,Dynamic",
                                     MetaParameters(1, true, 0, 0, false, adaptive_radius, false, false, std::nullopt,
                                                    false, true));
-    this->dynamic_mab->emplace_back("Fast,DoModel,Dynamic",
+    dynamic_mab->emplace_back("Fast,DoModel,Dynamic",
                                     MetaParameters(20, true, 0, 0, false, adaptive_radius, false, false, std::nullopt,
                                                    false, true));
 
     // fallbacks
-    this->fallback_fast_mab->emplace_back("Fast-Raxml",
+    BanditArm fallback_fast_mab = make_shared<MultiArmedBandit<MetaParameters>>();
+    fallback_fast_mab->emplace_back("Fast-Raxml",
                                           MetaParameters(20, false, 0, 0, false, 20, false, false, std::nullopt,
                                                          true));
 
     // set up successors
-    this->successors.emplace_back(1, "NNI", this->nni_mab);
-    this->successors.emplace_back(2, "Constrained", this->constrained_mab);
-    this->successors.emplace_back(2, "LowRadius", this->low_mab);
-    this->successors.emplace_back(4, "Light", this->light_mab);
-    this->successors.emplace_back(5, "Dynamic", this->dynamic_mab);
-    this->successors.emplace_back(6, "Fallback", this->fallback_fast_mab);
+    this->successors.emplace_back(1, "NNI", std::move(nni_mab));
+    this->successors.emplace_back(2, "Constrained", std::move(constrained_mab));
+    this->successors.emplace_back(2, "LowRadius", std::move(low_mab));
+    this->successors.emplace_back(4, "Light", std::move(light_mab));
+    this->successors.emplace_back(5, "Dynamic", std::move(dynamic_mab));
+    this->successors.emplace_back(6, "Fallback", std::move(fallback_fast_mab));
 
     // second-level MAB
-    this->hierarchical_mab.emplace_back("Starting Trees", parsimony);
+    this->hierarchical_mab.emplace_back("Starting Trees", std::move(parsimony));
 }
 
-void TreesetOptimizer::run_batch(Bandit<std::shared_ptr<MultiArmedBandit<MetaParameters> > > &mab,
+void TreesetOptimizer::run_batch(Bandit<std::shared_ptr<MultiArmedBandit<MetaParameters>> > &mab,
                                  Bandit<MetaParameters> &bandit,
                                  TunedBatch &batch, TaskGroup &context, unsigned int worker_id,
                                  unsigned int thread_id) {
