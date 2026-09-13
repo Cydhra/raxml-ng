@@ -70,6 +70,8 @@ protected:
     // TODO get rid of this heuristic
     unsigned int last_mab_modification = 0;
 
+    std::unordered_map<MetaParameters, unsigned int> past_mutations = {};
+
     /**
      * Check whether we should insert new arms into the MAB depending on the performance of the current bandit arm.
      * This implements a heuristic that enables exploration for new arms if they have potential to be useful within
@@ -77,6 +79,12 @@ protected:
      * This enables us to skip exploring arms that have no potential gain over currently explored arms.
      */
     void check_update();
+
+    void propose_more_effort();
+
+    void propose_less_effort();
+
+    MetaParameters mutate(const MetaParameters &parameters);
 };
 
 
