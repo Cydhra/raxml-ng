@@ -113,8 +113,3 @@ void BatchQueue::finish_batch(TunedBatch &batch) {
     this->in_flight.erase(batch.get_name());
 }
 
-// ReSharper disable once CppMemberFunctionMayBeConst (confusing contract due to inner mutability)
-void BatchQueue::backup_batch_model(const TunedBatch &batch) {
-    const std::lock_guard<std::mutex> lock(batch_mutex);
-    guarded_backup_batch_model(batch, *this->backup_model, lock);
-}
