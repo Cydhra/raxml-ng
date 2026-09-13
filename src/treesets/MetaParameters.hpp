@@ -70,6 +70,12 @@ struct MetaParameters {
     bool fallback_fast_raxml = false;
 
     /**
+     * If set, fall back to adaptive tree search for inference.
+     * fallback_fast_raxml overrides this.
+     */
+    bool fallback_adaptive_raxml = false;
+
+    /**
      * If set, run SPR rounds with stop criterion
      */
     bool dynamic_spr = false;
@@ -128,6 +134,11 @@ struct MetaParameters {
 
     MetaParameters &with_fallback_fast_raxml(const bool fallback_fast_raxml) {
         this->fallback_fast_raxml = fallback_fast_raxml;
+        return *this;
+    }
+
+    MetaParameters &with_fallback_adaptive(const bool fallback_adaptive_raxml) {
+        this->fallback_adaptive_raxml = fallback_adaptive_raxml;
         return *this;
     }
 

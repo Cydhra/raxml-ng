@@ -115,7 +115,8 @@ public:
                                                                    opts, msa, tree,
                                                                    persite_loglh,
                                                                    DEFAULT_BATCH_SIZE,
-                                                                   starting_seed),
+                                                                   starting_seed,
+                                                                   pythia_score),
                                                                instance(instance),
                                                                opts(opts),
                                                                batch_queue(

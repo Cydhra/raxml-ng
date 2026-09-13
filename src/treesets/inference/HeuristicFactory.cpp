@@ -1,5 +1,6 @@
 #include "HeuristicFactory.hpp"
 
+#include "AdaptiveRaxml.hpp"
 #include "Constrain.hpp"
 #include "DynamicSpr.hpp"
 #include "FastRaxml.hpp"
@@ -69,6 +70,8 @@ static unique_ptr<InferenceHeuristic> from_meta_parameters(const MetaParameters 
     if (meta_parameters.fallback_fast_raxml) {
         heuristic = make_unique<FastRaxml>(batch_name, std::move(heuristic), num_trees, threads_per_worker,
                                            part_assignments);
+    } else if (meta_parameters.fallback_adaptive_raxml) {
+        heuristic = make_unique<AdaptiveRaxml>(batch_name, std::move(heuristic), num_trees, threads_per_worker);
     }
 
     if (meta_parameters.do_final_model) {
@@ -116,7 +119,7 @@ unique_ptr<InferenceHeuristic> HeuristicFactory::extend_heuristic(const MetaPara
     if (!new_parameters.fallback_fast_raxml && !old_parameters.accept_starting_trees) {
         assert(accept_anything || !old_parameters.do_first_model || new_parameters.do_first_model);
         assert(accept_anything || !old_parameters.do_final_model || new_parameters.do_final_model);
-        
+
         // we cannot undo a previously inferred model
         // skip model is inverse of do-model, so we need == here instead of !=
         delta.do_first_model = old_parameters.do_first_model != new_parameters.do_first_model;
@@ -133,7 +136,9 @@ unique_ptr<InferenceHeuristic> HeuristicFactory::extend_heuristic(const MetaPara
         delta.dynamic_spr = old_parameters.dynamic_spr != new_parameters.dynamic_spr;
 
         assert(accept_anything || old_parameters.num_fast_spr <= new_parameters.num_fast_spr);
-        assert(accept_anything || old_parameters.num_fast_spr == new_parameters.num_fast_spr || old_parameters.num_slow_spr == 0);
+        assert(
+            accept_anything || old_parameters.num_fast_spr == new_parameters.num_fast_spr || old_parameters.num_slow_spr
+            == 0);
         delta.num_fast_spr = new_parameters.num_fast_spr - old_parameters.num_fast_spr;
 
         assert(accept_anything || old_parameters.num_slow_spr <= new_parameters.num_slow_spr);

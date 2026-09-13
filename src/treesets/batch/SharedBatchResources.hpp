@@ -24,7 +24,8 @@ public:
                          const Tree &tree,
                          const std::vector<std::vector<doubleVector> > &reference_logh_matrix,
                          const unsigned int batch_size,
-                         long seed) {
+                         long seed,
+                         const double pythia_score) {
         // prepare a dummy matrix with empty vectors to correctly initialize the AU-Test. These dummy vectors
         // will be replaced by the TunedBatch instance before the AU test is called.
         std::vector<std::vector<doubleVector> > batch_loglh_dummy(batch_size);
@@ -45,9 +46,17 @@ public:
         fast_options->nofiles_mode = true;
         fast_options->num_searches = 16; // TODO sync with batch size
 
+        adaptive_options = make_shared<Options>(opts);
+        adaptive_options->topology_opt_method = TopologyOptMethod::adaptive;
+        adaptive_options->stopping_rule = StoppingRule::none;
+        adaptive_options->nofiles_mode = true;
+        adaptive_options->num_searches = 16; // TODO see above
+
         // initialize an optimizer and checkpoint manager for raxml-fast.
         fast_optimizer = make_shared<Optimizer>(*fast_options);
-        fast_checkpoint_manager = make_shared<CheckpointManager>(*fast_options);
+        adaptive_optimizer = make_shared<Optimizer>(*adaptive_options);
+        checkpoint_manager = make_shared<CheckpointManager>(*fast_options);
+        adaptive_checkpoint_manager = make_shared<CheckpointManager>(*adaptive_options);
 
         fast_stop = make_shared<KHStoppingTest>(msa,
                                                 workers_per_group * num_task_groups,
@@ -59,14 +68,24 @@ public:
         // unfortunately this method wants a tree. Please do not ask why it wants that, it doesn't deserve the tree.
         // But we have to comply, so we give it one of the reference trees since
         // any tree that conforms to the MSA will do.
-        fast_checkpoint_manager->init_checkpoints(tree, msa->models(), num_task_groups * workers_per_group);
+        checkpoint_manager->init_checkpoints(tree, msa->models(), num_task_groups * workers_per_group);
+
+        adaptive_checkpoint_manager->pythia_score(pythia_score);
+        adaptive_checkpoint_manager->init_checkpoints(tree, msa->models(), num_task_groups * workers_per_group);
     }
 
     /**
      * @return An Optimizer instance pre-configured to run `RAxML-ng --fast` inference
      */
-    Optimizer &get_fast_optimizer() const {
+    [[nodiscard]] Optimizer &get_fast_optimizer() const {
         return *fast_optimizer;
+    }
+
+    /**
+     * @return An Optimizer instance pre-configured to run `RAxML-ng --adaptive` inference
+     */
+    Optimizer &get_adaptive_optimizer() const {
+        return *adaptive_optimizer;
     }
 
     /**
@@ -79,8 +98,15 @@ public:
     /**
      * @return an instance of the CheckpointManager that is configured to work for raxml fast inference
      */
-    CheckpointManager &get_fast_cm() const {
-        return *fast_checkpoint_manager;
+    [[nodiscard]] CheckpointManager &get_fast_cm() const {
+        return *checkpoint_manager;
+    }
+
+    /**
+     * @return an instance of the CheckpointManager that is configured to work for raxml adaptive inference
+     */
+    [[nodiscard]] CheckpointManager &get_adaptive_cm() const {
+        return *adaptive_checkpoint_manager;
     }
 
     /**
@@ -134,6 +160,12 @@ protected:
     shared_ptr<Options> fast_options;
 
     /**
+     * A copy of the CLI Options instance, with every option required to run raxml-adaptive forcibly enabled.
+     * This instance is shared with adaptive_optimizer and local_fast_cm, but they do not own it, so we store it here.
+     */
+    shared_ptr<Options> adaptive_options;
+
+    /**
      * An instance of the kh stopping criterion used for raxml-fast. It is used in the optimizer but not owned by it,
      * so we store it here.
      */
@@ -146,10 +178,22 @@ protected:
     std::shared_ptr<Optimizer> fast_optimizer;
 
     /**
+     * Batch-local instance of the standard RAxML optimizer. This is instanced for the raxml-adaptive fallback bandit.
+     * The options passed to this optimizer are forced to perform the standard adaptive heuristic.
+     */
+    std::shared_ptr<Optimizer> adaptive_optimizer;
+
+    /**
      * Batch-local instance of the standard RAxML checkpoint manager configured for raxml-fast.
      * This is instanced for the raxml-fast fallback bandit.
      */
-    shared_ptr<CheckpointManager> fast_checkpoint_manager;
+    shared_ptr<CheckpointManager> checkpoint_manager;
+
+    /**
+     * Batch-local instance of the standard RAxML checkpoint manager configured for raxml-fast.
+     * This is instanced for the raxml-fast fallback bandit.
+     */
+    shared_ptr<CheckpointManager> adaptive_checkpoint_manager;
 };
 
 #endif //RAXML_SHAREDBATCHRESOURCES_HPP_
