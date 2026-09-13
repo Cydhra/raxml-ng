@@ -301,7 +301,11 @@ bool TunedBatch::is_compatible(const MetaParameters &new_parameters) const {
 }
 
 void TunedBatch::backup_models(ModelMap &target) const {
-    for (const auto &thread_id: this->batch_trees[0]) {
+    assert(this->get_plausible_tree_count() > 0);
+    const auto iter = std::find_if(this->p_values.begin(), this->p_values.end(), [](const double x) { return x >= 0.05; });
+    const auto idx = std::distance(p_values.begin(), iter);
+
+    for (const auto &thread_id: this->batch_trees[idx]) {
         for (size_t part_id: thread_id.value().parts_master()) {
             assign(target[part_id], thread_id.value(), part_id);
         }

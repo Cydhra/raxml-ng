@@ -104,7 +104,9 @@ TunedBatch &BatchQueue::select_next_batch(const MetaParameters &current_paramete
 
 void BatchQueue::finish_batch(TunedBatch &batch) {
     const std::lock_guard<std::mutex> lock(batch_mutex);
-    guarded_backup_batch_model(batch, *this->backup_model, lock);
+    if (batch.get_plausible_tree_count() > 0) {
+        guarded_backup_batch_model(batch, *this->backup_model, lock);
+    }
 
     if (batch.get_plausible_tree_count() > this->batch_size / 2) {
         this->finalize_batch(batch);
