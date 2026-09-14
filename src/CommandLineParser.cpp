@@ -112,9 +112,12 @@ static struct option long_options[] =
   {"au-test",            no_argument,       0, 0 },  /*  79 */
   {"treeset",            no_argument,       0, 0 },  /*  80 */
   // TODO these three arguments are placeholders since we have no autotuning yet
-  {"ts-groups",            required_argument, 0, 0 },  /*  81 */
-  {"ts-threads",            required_argument, 0, 0 },  /*  82 */
-{"ts-workers",            required_argument, 0, 0 }, /*  83 */
+  {"ts-groups",          required_argument, 0, 0 },  /*  81 */
+  {"ts-threads",         required_argument, 0, 0 },  /*  82 */
+  {"ts-workers",         required_argument, 0, 0 },  /*  83 */
+  {"ts-aggressive",      no_argument,       0, 0 },  /*  84 */
+  {"ts-target-trees",    required_argument, 0, 0 },  /*  85 */
+  {"ts-baseline-tree",   required_argument, 0, 0 },  /*  86 */
   { 0, 0, 0, 0 }
 };
 
@@ -703,6 +706,7 @@ void CommandLineParser::parse_options(int argc, char** argv, Options &opts)
   bool log_level_set = false;
   bool lh_epsilon_set = false;
   bool optarg_tree_required = false;
+  bool treeset_option_set = false;
   string optarg_tree = "";
   string optarg_bs_trees = "";
   string optarg_modeltest = "";
@@ -1649,6 +1653,24 @@ void CommandLineParser::parse_options(int argc, char** argv, Options &opts)
       case 83: /* ts-workers */
         sscanf(optarg, "%d", &opts.treeset_workers);
         break;
+      case 84: /* ts-aggressive */
+        opts.treeset_aggressive = true;
+        treeset_option_set = true;
+        break;
+      case 85: /* ts-target-trees */
+      {
+        char trailing;
+        if (optarg[0] == '-' ||
+            sscanf(optarg, "%u%c", &opts.treeset_target_trees, &trailing) != 1 ||
+            opts.treeset_target_trees == 0)
+          throw InvalidOptionValueException("Invalid treeset target tree count: " + string(optarg));
+        treeset_option_set = true;
+        break;
+      }
+      case 86: /* ts-baseline-tree */
+        opts.treeset_baseline_tree_file = optarg;
+        treeset_option_set = true;
+        break;
       default:
         throw  OptionException("Internal error in option parsing");
     }
@@ -1661,6 +1683,12 @@ void CommandLineParser::parse_options(int argc, char** argv, Options &opts)
   if (num_commands > 1)
     throw OptionException("More than one command specified");
 
+  if (treeset_option_set && opts.command != Command::treeset)
+    throw OptionException("--ts-aggressive, --ts-target-trees and --ts-baseline-tree require --treeset");
+
+  if (opts.treeset_aggressive && !opts.constraint_tree_file.empty())
+    throw OptionException("--ts-aggressive cannot be combined with --tree-constraint");
+
   parse_modeltest_options(opts, optarg_modeltest);
 
   if (optarg_tree.empty() && optarg_tree_required)
@@ -1668,6 +1696,9 @@ void CommandLineParser::parse_options(int argc, char** argv, Options &opts)
 
   if (!use_adaptive_search && opts.topology_opt_method == TopologyOptMethod::adaptive)
     opts.topology_opt_method = TopologyOptMethod::classic;
+
+  if (!opts.treeset_baseline_tree_file.empty())
+    optarg_tree = opts.treeset_baseline_tree_file;
 
   /* process start tree defaults */
   if (opts.command == Command::search || opts.command == Command::all ||
@@ -1747,6 +1778,9 @@ void CommandLineParser::print_help()
             "  --pythia                                   compute and print Pythia MSA difficulty score\n"
             "  --moose [ OPTIONS ]                        select best-fit MOdel Of Sequence Evolution (OPTIONS: see below)\n"
             "  --treeset                                  compute a plausible tree set\n"
+            "  --ts-aggressive                            enable aggressive treeset candidate strategies\n"
+            "  --ts-target-trees N                        treeset plausible-tree target (default: 300)\n"
+            "  --ts-baseline-tree FILE                    reuse supplied ML trees as treeset baseline\n"
             "\n"
             "Command shortcuts (mutually exclusive):\n"
             "  --search1                                  Alias for: --search --tree pars{1}\n"
@@ -1864,4 +1898,3 @@ void CommandLineParser::print_help()
             "\n";
 
 }
-

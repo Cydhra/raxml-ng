@@ -1,6 +1,11 @@
 #include "DynamicMAB.hpp"
 
 void DynamicMAB::register_new_arm(const std::string &name, const OuterArm &new_arm) {
+    const std::lock_guard<std::mutex> lock(state_mutex);
+    register_new_arm_unlocked(name, new_arm);
+}
+
+void DynamicMAB::register_new_arm_unlocked(const std::string &name, const OuterArm &new_arm) {
     auto id = hierarchical_mab.emplace_back(name, new_arm);
 
     for (size_t inner_id = 0; inner_id < new_arm->num_bandits(); ++inner_id) {
@@ -13,16 +18,19 @@ void DynamicMAB::register_new_arm(const std::string &name, const OuterArm &new_a
 }
 
 void DynamicMAB::register_new_successor(const unsigned int level, const std::string &&name, const OuterArm &&new_arm) {
+    const std::lock_guard<std::mutex> lock(state_mutex);
     successors.emplace_back(level, name, new_arm);
 }
 
 MetaParameters &DynamicMAB::select_next_bandit() {
+    const std::lock_guard<std::mutex> lock(state_mutex);
     const auto &mab = this->hierarchical_mab.select_next_bandit();
     const auto &current_bandit = mab.get_parameters().get()->select_next_bandit();
     return current_bandit.get_parameters();
 }
 
 void DynamicMAB::take_measurement(TunedBatch &batch) {
+    const std::lock_guard<std::mutex> lock(state_mutex);
     auto &parameters = batch.get_parameters();
 
     // let outer bandit take the measurement
@@ -34,6 +42,14 @@ void DynamicMAB::take_measurement(TunedBatch &batch) {
     bandit.get_parameters()->take_measurement(inner_bandit, batch, true);
 
     check_update();
+}
+
+bool DynamicMAB::disable(const MetaParameters &parameters) {
+    const std::lock_guard<std::mutex> lock(state_mutex);
+    const auto found = outer_mapping.find(parameters);
+    if (found == outer_mapping.end())
+        throw std::logic_error("cannot disable unregistered meta parameters");
+    return hierarchical_mab.disable_bandit(found->second);
 }
 
 void DynamicMAB::check_update() {
@@ -52,7 +68,10 @@ void DynamicMAB::check_update() {
 }
 
 void DynamicMAB::propose_more_effort() {
-    const auto current_level = hierarchical_mab.num_bandits();
+    // Successor ranks describe Cydhra's staged inference progression. Initial
+    // alternatives (including aggressive starting-tree sources) do not advance
+    // that progression.
+    const auto current_level = 1 + registered_successor_arms;
 
     // add all bandits of the current level
     for (auto it = this->successors.begin(); it != this->successors.end(); it += 1) {
@@ -60,7 +79,8 @@ void DynamicMAB::propose_more_effort() {
             if (!hierarchical_mab.has_bandit(std::get<1>(*it))) {
                 LOG_WORKER_TS(LogLevel::info) << std::endl << "Adding bandit " << std::get<1>(*it) <<
                         " to algorithm." << std::endl;
-                register_new_arm(std::get<1>(*it), std::get<2>(*it));
+                register_new_arm_unlocked(std::get<1>(*it), std::get<2>(*it));
+                ++registered_successor_arms;
                 last_mab_modification = hierarchical_mab.get_iterations_completed();
             }
         }
@@ -88,6 +108,9 @@ void DynamicMAB::propose_less_effort() {
 }
 
 MetaParameters DynamicMAB::mutate(const MetaParameters &parameters) {
+    if (parameters.accept_starting_trees)
+        return parameters;
+
     const auto elem = past_mutations.find(parameters);
     unsigned int mutation = 0;
     MetaParameters new_parameters = parameters;

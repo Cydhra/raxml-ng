@@ -2,6 +2,7 @@
 #define RAXML_TREESETOPTIMIZER_HPP_
 
 #include <vector>
+#include "AggressiveCandidateManager.hpp"
 #include "batch/BatchQueue.hpp"
 #include "batch/SharedBatchResources.hpp"
 #include "../loadbalance/LoadBalancer.hpp"
@@ -39,6 +40,8 @@ protected:
      * Reference to the user options which are required for all optimization steps
      */
     const Options &opts;
+
+    std::unique_ptr<AggressiveCandidateManager> aggressive_candidate_manager;
 
     /**
      * Manages the available batches that can be used by the bandits.
@@ -98,6 +101,8 @@ public:
                      Options &opts,
                      const std::shared_ptr<PartitionedMSA> &msa,
                      const Tree &tree,
+                     const ModelMap &initial_ml_model,
+                     TreeList initial_ml_trees,
                      IDVector &tip_msa_idmap,
                      const std::vector<std::vector<doubleVector> > &persite_loglh,
                      LoadBalancer &load_balancer,
@@ -119,11 +124,21 @@ public:
                                                                    pythia_score),
                                                                instance(instance),
                                                                opts(opts),
+                                                               aggressive_candidate_manager(
+                                                                   opts.treeset_aggressive
+                                                                       ? make_unique<AggressiveCandidateManager>(
+                                                                           instance, opts, tree,
+                                                                           std::move(initial_ml_trees),
+                                                                           target_tree_count)
+                                                                       : nullptr),
                                                                batch_queue(
                                                                    instance, opts, make_shared<IDVector>(tip_msa_idmap),
                                                                    load_balancer, msa,
                                                                    make_shared<std::vector<std::vector<
-                                                                       doubleVector> > >(persite_loglh), starting_seed,
+                                                                   doubleVector> > >(persite_loglh), initial_ml_model,
+                                                                   StartTreeHeuristicFactory(
+                                                                       aggressive_candidate_manager.get()),
+                                                                   starting_seed,
                                                                    DEFAULT_BATCH_SIZE),
                                                                pythia_score(pythia_score),
                                                                target_tree_count(target_tree_count) {

@@ -2,6 +2,7 @@
 #define RAXML_BATCHQUEUE_HPP_
 
 #include "TunedBatch.hpp"
+#include "../start/StartTreeHeuristicFactory.hpp"
 #include <atomic>
 
 // forward declaration of RaxmlInstance
@@ -19,6 +20,8 @@ public:
                LoadBalancer &load_balancer,
                const std::shared_ptr<PartitionedMSA> &msa,
                const std::shared_ptr<std::vector<std::vector<doubleVector> > > &persite_loglh,
+               const ModelMap &initial_ml_model,
+               StartTreeHeuristicFactory start_tree_factory,
                const unsigned long long seed,
                const unsigned int batch_size) : instance(instance),
                                                 opts(opts),
@@ -26,6 +29,8 @@ public:
                                                 msa(msa),
                                                 load_balancer(load_balancer),
                                                 persite_loglh(persite_loglh),
+                                                initial_ml_model(initial_ml_model),
+                                                start_tree_factory(std::move(start_tree_factory)),
                                                 batch_size(batch_size),
                                                 current_seed(seed) {
         // initialize the model map for all partitions
@@ -42,21 +47,22 @@ public:
     /**
      * Push-back `n` batches to the end of the batch vector, and infer starting trees for them.
      *
-     * @return a pointer to the array of newly generated batches. The range [return_val, return_val + n] is a valid
-     * range of TunedBatch instances.
+     * @return the newly generated batch, or nullptr if its starting-tree source is exhausted
      *
      * @param num_workers number of workers assigned to the batch
      * @param num_threads total number of threads (not per worker) assigned to the batch
      */
-    TunedBatch &generate_batch(unsigned int num_workers, unsigned int num_threads);
+    TunedBatch *generate_batch(unsigned int num_workers, unsigned int num_threads,
+                               const MetaParameters &parameters);
 
     /**
      * Select a TunedBatch instance for inference with the given parameters.
      * If a previously inferred batch has potential for more plausible trees, and the parameters
      * are compatible with the parameters used for that batch before, that batch is returned.
      * Otherwise, a new batch is generated and returned.
+     * @return a compatible batch, or nullptr if a required aggressive source is exhausted
      */
-    TunedBatch &select_next_batch(const MetaParameters &current_parameters, unsigned int num_workers,
+    TunedBatch *select_next_batch(const MetaParameters &current_parameters, unsigned int num_workers,
                                   unsigned int num_threads);
 
     /**
@@ -146,6 +152,10 @@ protected:
      * Model parameter backup to initialize batch trees with.
      */
     std::unique_ptr<ModelMap> backup_model = unique_ptr<ModelMap>(new ModelMap());
+
+    ModelMap initial_ml_model;
+
+    StartTreeHeuristicFactory start_tree_factory;
 
     /**
      * Number of plausible trees that finalized batches provide right now.

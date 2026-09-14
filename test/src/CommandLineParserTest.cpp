@@ -283,4 +283,74 @@ TEST(CommandLineParserTest, options_serialize)
   compare_opts(opts, opts2);
 }
 
+TEST(CommandLineParserTest, treeset_aggressive_options)
+{
+  CommandLineParser parser;
+  Options options;
+  string cmd = "raxml-ng --treeset --msa data.fa --model GTR --tree ignored.tre "
+      "--ts-aggressive --ts-target-trees 17 --ts-baseline-tree baseline.tre";
 
+  parse_options(cmd, parser, options, false);
+
+  EXPECT_EQ(Command::treeset, options.command);
+  EXPECT_TRUE(options.treeset_aggressive);
+  EXPECT_EQ(17U, options.treeset_target_trees);
+  EXPECT_EQ("baseline.tre", options.treeset_baseline_tree_file);
+  EXPECT_EQ("baseline.tre", options.tree_file);
+  EXPECT_EQ(1U, options.start_trees.at(StartingTree::user));
+}
+
+TEST(CommandLineParserTest, treeset_aggressive_defaults)
+{
+  CommandLineParser parser;
+  Options options;
+  string cmd = "raxml-ng --treeset --msa data.fa --model GTR";
+  parse_options(cmd, parser, options, false);
+  EXPECT_FALSE(options.treeset_aggressive);
+  EXPECT_EQ(300U, options.treeset_target_trees);
+}
+
+TEST(CommandLineParserTest, treeset_options_require_treeset)
+{
+  CommandLineParser parser;
+  Options aggressive_options;
+  string aggressive = "raxml-ng --search --msa data.fa --model GTR --ts-aggressive";
+  parse_options(aggressive, parser, aggressive_options, true);
+
+  Options target_options;
+  string target = "raxml-ng --search --msa data.fa --model GTR --ts-target-trees 17";
+  parse_options(target, parser, target_options, true);
+
+  Options baseline_options;
+  string baseline = "raxml-ng --search --msa data.fa --model GTR --ts-baseline-tree baseline.tre";
+  parse_options(baseline, parser, baseline_options, true);
+}
+
+TEST(CommandLineParserTest, treeset_target_must_be_positive)
+{
+  CommandLineParser parser;
+  Options options;
+  string cmd = "raxml-ng --treeset --msa data.fa --model GTR --ts-target-trees 0";
+  parse_options(cmd, parser, options, true);
+}
+
+TEST(CommandLineParserTest, treeset_target_rejects_negative_and_trailing_text)
+{
+  CommandLineParser parser;
+  Options negative_options;
+  string negative = "raxml-ng --treeset --msa data.fa --model GTR --ts-target-trees -1";
+  parse_options(negative, parser, negative_options, true);
+
+  Options trailing_options;
+  string trailing = "raxml-ng --treeset --msa data.fa --model GTR --ts-target-trees 12trees";
+  parse_options(trailing, parser, trailing_options, true);
+}
+
+TEST(CommandLineParserTest, aggressive_rejects_tree_constraint)
+{
+  CommandLineParser parser;
+  Options options;
+  string cmd = "raxml-ng --treeset --msa data.fa --model GTR --ts-aggressive "
+      "--tree-constraint constraint.tre";
+  parse_options(cmd, parser, options, true);
+}

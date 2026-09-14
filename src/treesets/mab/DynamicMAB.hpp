@@ -1,5 +1,7 @@
 #ifndef RAXML_NG_DYNAMICMAB_HPP
 #define RAXML_NG_DYNAMICMAB_HPP
+#include <mutex>
+
 #include "MultiArmedBandit.hpp"
 
 typedef std::shared_ptr<MultiArmedBandit<MetaParameters> > OuterArm;
@@ -42,6 +44,9 @@ public:
      */
     void take_measurement(TunedBatch &batch);
 
+    /** Disable the complete outer arm containing the supplied parameters. */
+    bool disable(const MetaParameters &parameters);
+
 protected:
     /**
      * The multi-level multi-armed bandit that is being managed and modified by this class.
@@ -72,6 +77,12 @@ protected:
 
     std::unordered_map<MetaParameters, unsigned int> past_mutations = {};
 
+    /** Number of successor arms added after the initial strategy set. */
+    unsigned int registered_successor_arms = 0;
+
+    /** Serialize selection, measurements, mutations, and source exhaustion. */
+    std::mutex state_mutex;
+
     /**
      * Check whether we should insert new arms into the MAB depending on the performance of the current bandit arm.
      * This implements a heuristic that enables exploration for new arms if they have potential to be useful within
@@ -85,6 +96,8 @@ protected:
     void propose_less_effort();
 
     MetaParameters mutate(const MetaParameters &parameters);
+
+    void register_new_arm_unlocked(const std::string &name, const OuterArm &new_arm);
 };
 
 

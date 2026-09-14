@@ -5,7 +5,6 @@
 #include "SharedBatchResources.hpp"
 #include "../../pool/Threadpool.hpp"
 #include "../inference/HeuristicFactory.hpp"
-#include "../start/Parsimony.hpp"
 
 using namespace std::placeholders;
 
@@ -139,12 +138,15 @@ void TunedBatch::perform_plausibility_check(const Options &opts, SharedBatchReso
     }
 
     const auto begin = std::chrono::steady_clock::now();
-    // forcibly optimize model parameters once. This is to have somewhat reasonable model parameters, but we
-    // dont want to invest much time. If they are required, do_final_model in meta parameters handles this
+    // Ordinary batches cheaply optimize model parameters. Aggressive starting-tree
+    // acceptance keeps the initial ML model and only optimizes branch lengths.
+    const auto params_to_optimize = meta_parameters.au_precheck == AuPrecheck::branches_only
+                                        ? CORAX_OPT_PARAM_BRANCHES_ITERATIVE
+                                        : CORAX_OPT_PARAM_ALL & ~CORAX_OPT_PARAM_BRANCHES_ITERATIVE;
     const auto &tree_ids = this->coarse_assignments->at(worker_id);
     for (const auto tree_id: tree_ids) {
         auto &tree = batch_trees[tree_id][thread_id];
-        tree->optimize_params(CORAX_OPT_PARAM_ALL & ~CORAX_OPT_PARAM_BRANCHES_ITERATIVE, AU_TEST_EPSILON);
+        tree->optimize_params(params_to_optimize, AU_TEST_EPSILON);
     }
 
     this->perform_au_test(au_test, initialized, context, worker_id, thread_id);
@@ -190,12 +192,6 @@ void TunedBatch::perform_plausibility_check(const Options &opts, SharedBatchReso
 }
 
 void TunedBatch::update_meta_parameters(const MetaParameters &new_parameters) {
-    if (!this->start_trees_generated()) {
-        // this is currently not configurable with parameters, but may be in the future
-        this->start_tree_heuristic = make_unique<Parsimony>(this->name, this->get_batch_size(), this->starting_seed,
-                                                            nullptr);
-    }
-
     if (!this->heuristic) {
         this->heuristic = HeuristicFactory::build_heuristic(new_parameters, name, get_batch_size(),
                                                             this->threads_per_worker, batch_start_trees,
@@ -212,6 +208,11 @@ void TunedBatch::update_meta_parameters(const MetaParameters &new_parameters) {
 }
 
 bool TunedBatch::is_compatible(const MetaParameters &new_parameters) const {
+    if (this->meta_parameters.uses_aggressive_starting_trees() ||
+        new_parameters.uses_aggressive_starting_trees()) {
+        return false;
+    }
+
     // a batch that already optimized with these exact parameters cannot be reused for the same parameters again
     if (this->meta_parameters == new_parameters) {
         return false;

@@ -6,5 +6,8 @@ Tree generate_tree(const RaxmlInstance &instance, StartingTree type, int random_
 
 void Parsimony::do_generate(Tree &tree, const unsigned int tree_id, const RaxmlInstance &instance, const TaskGroup &,
                             SharedBatchResources &, unsigned int, unsigned int) {
-    tree = generate_tree(instance, StartingTree::parsimony, static_cast<int>(seeds[tree_id]), false);
+    if (tree_id < reusable_trees.size())
+        tree = std::move(reusable_trees[tree_id]);
+    else
+        tree = generate_tree(instance, StartingTree::parsimony, static_cast<int>(seeds[tree_id]), false);
 }
