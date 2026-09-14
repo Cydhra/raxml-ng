@@ -151,7 +151,7 @@ protected:
     /**
      * Model parameter backup to initialize batch trees with.
      */
-    std::unique_ptr<ModelMap> backup_model = unique_ptr<ModelMap>(new ModelMap());
+    std::unique_ptr<ModelMap> backup_model = std::make_unique<ModelMap>();
 
     ModelMap initial_ml_model;
 

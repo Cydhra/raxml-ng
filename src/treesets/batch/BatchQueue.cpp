@@ -24,9 +24,8 @@ TunedBatch *BatchQueue::generate_batch(const unsigned int num_workers, const uns
     // place new batches at the end of the queue, and mark them as unfinished
     std::string batch_name = start_tree_factory.batch_name(parameters, batch_name_index);
     const auto starting_seed = generate_seed_for_trees(this->batch_size);
-    auto start_tree_heuristic = start_tree_factory.build(
-        parameters, batch_name, batch_size, starting_seed,
-        std::move(*prepared_trees));
+    auto start_tree_heuristic = start_tree_factory.build(parameters, batch_name, batch_size, starting_seed,
+                                                         std::move(*prepared_trees));
 
     this->batches.emplace_back(batch_name,
                                msa,

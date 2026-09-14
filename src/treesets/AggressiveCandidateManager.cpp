@@ -19,10 +19,12 @@
 using std::to_string;
 
 void build_parsimony_msa(RaxmlInstance &instance, bool force);
+
 Tree generate_tree(const RaxmlInstance &instance,
                    StartingTree type,
                    int random_seed,
                    bool bootstrap);
+
 Tree generate_parsimony_tree(const RaxmlInstance &instance,
                              int random_seed,
                              bool bootstrap,
@@ -38,140 +40,138 @@ public:
 
 
 namespace {
-
-const char *source_name(const StartingTreeSource source) {
-    return source == StartingTreeSource::seed_greedy
-               ? "seed_greedy"
-               : "constrained_parsimony";
-}
-
-struct CandidateSplit {
-    std::vector<corax_split_base_t> words;
-    unsigned int ml_frequency = 0;
-    unsigned int donor_frequency = 0;
-};
-
-using SplitWords = std::vector<std::vector<corax_split_base_t>>;
-
-SplitWords extract_split_words(const Tree &tree, const bool normalize) {
-    SplitWords result;
-    if (tree.empty() || tree.num_splits() == 0)
-        return result;
-
-    const auto tip_count = static_cast<unsigned int>(tree.num_tips());
-    const auto bits_per_word = static_cast<unsigned int>(sizeof(corax_split_base_t) * 8);
-    const auto words_per_split = tip_count / bits_per_word +
-                                 static_cast<unsigned int>(tip_count % bits_per_word != 0);
-    PllSplitSharedPtr splits(
-        corax_utree_split_create(&tree.pll_utree_root(), tip_count, nullptr),
-        corax_utree_split_destroy);
-    if (!splits) {
-        coraxlib_reset_error();
-        return result;
+    const char *source_name(const StartingTreeSource source) {
+        return source == StartingTreeSource::seed_greedy
+                   ? "seed_greedy"
+                   : "constrained_parsimony";
     }
 
-    if (normalize) {
-        corax_utree_split_normalize_and_sort(
-            splits.get(), tip_count,
-            static_cast<unsigned int>(tree.num_splits()), 1);
-    }
+    struct CandidateSplit {
+        std::vector<corax_split_base_t> words;
+        unsigned int ml_frequency = 0;
+        unsigned int donor_frequency = 0;
+    };
 
-    result.reserve(tree.num_splits());
-    for (std::size_t split_id = 0; split_id < tree.num_splits(); ++split_id) {
-        result.emplace_back(splits.get()[split_id],
-                            splits.get()[split_id] + words_per_split);
-    }
-    return result;
-}
+    using SplitWords = std::vector<std::vector<corax_split_base_t> >;
 
-std::vector<corax_split_base_t> topology_key(const Tree &tree) {
-    const auto split_words = extract_split_words(tree, true);
-    std::vector<corax_split_base_t> result;
-    for (const auto &split: split_words)
-        result.insert(result.end(), split.begin(), split.end());
-    return result;
-}
+    SplitWords extract_split_words(const Tree &tree, const bool normalize) {
+        SplitWords result;
+        if (tree.empty() || tree.num_splits() == 0)
+            return result;
 
-bool has_majority_split(
-    const std::vector<std::vector<corax_split_base_t>> &donor_topologies,
-    const std::vector<std::size_t> &donor_ids,
-    const std::size_t words_per_split) {
-    std::map<std::vector<corax_split_base_t>, std::size_t> frequencies;
-    for (const auto donor_id: donor_ids) {
-        const auto &topology = donor_topologies[donor_id];
-        for (std::size_t offset = 0; offset < topology.size(); offset += words_per_split) {
-            std::vector<corax_split_base_t> split(
-                topology.begin() + offset,
-                topology.begin() + offset + words_per_split);
-            ++frequencies[std::move(split)];
-        }
-    }
-    return std::any_of(frequencies.begin(), frequencies.end(),
-                       [&donor_ids](const auto &entry) {
-                           return entry.second > donor_ids.size() / 2;
-                       });
-}
-
-Tree materialize_candidate(const std::vector<CandidateSplit> &selected, const Tree &label_source) {
-    Tree result;
-    if (selected.empty() || label_source.empty()) {
-        return result;
-    }
-
-    // CORAX clones every input split during this call. Keep only a borrowed
-    // pointer view; the CandidateSplit word vectors outlive materialization.
-    std::vector<corax_split_t> split_view;
-    split_view.reserve(selected.size());
-    for (const auto &split: selected) {
-        if (split.words.empty()) {
+        const auto tip_count = static_cast<unsigned int>(tree.num_tips());
+        const auto bits_per_word = static_cast<unsigned int>(sizeof(corax_split_base_t) * 8);
+        const auto words_per_split = tip_count / bits_per_word +
+                                     static_cast<unsigned int>(tip_count % bits_per_word != 0);
+        PllSplitSharedPtr splits(
+            corax_utree_split_create(&tree.pll_utree_root(), tip_count, nullptr),
+            corax_utree_split_destroy);
+        if (!splits) {
+            coraxlib_reset_error();
             return result;
         }
 
-        split_view.push_back(const_cast<corax_split_base_t *>(split.words.data()));
-    }
+        if (normalize) {
+            corax_utree_split_normalize_and_sort(
+                splits.get(), tip_count,
+                static_cast<unsigned int>(tree.num_splits()), 1);
+        }
 
-    const auto tip_labels = label_source.tip_labels_cstr();
-
-    corax_split_system_t split_system{};
-    split_system.split_count = static_cast<unsigned int>(selected.size());
-    split_system.max_support = 1.0;
-    split_system.support = nullptr;
-    split_system.splits = split_view.data();
-
-    std::unique_ptr<corax_consensus_utree_t, decltype(&corax_utree_consensus_destroy)> materialized(
-        corax_utree_from_splits(
-            &split_system,
-            static_cast<unsigned int>(label_source.num_tips()),
-            tip_labels.data()),
-        corax_utree_consensus_destroy);
-
-    if (!materialized || !materialized->tree) {
-        coraxlib_reset_error();
+        result.reserve(tree.num_splits());
+        for (std::size_t split_id = 0; split_id < tree.num_splits(); ++split_id) {
+            result.emplace_back(splits.get()[split_id],
+                                splits.get()[split_id] + words_per_split);
+        }
         return result;
     }
 
-    result.pll_utree(static_cast<unsigned int>(label_source.num_tips()), *materialized->tree);
-
-    // The cloned nodes contain non-owning consensus-data pointers. Clear them
-    // before the temporary CORAX consensus object is destroyed.
-    auto &utree = const_cast<corax_utree_t &>(result.pll_utree());
-    for (std::size_t node_id = 0; node_id < utree.tip_count + utree.inner_count; ++node_id) {
-        auto *node = utree.nodes[node_id];
-        if (!node) {
-            continue;
-        }
-
-        auto *current = node;
-        do {
-            current->data = nullptr;
-            current = current->next;
-        } while (current && current != node);
+    std::vector<corax_split_base_t> topology_key(const Tree &tree) {
+        const auto split_words = extract_split_words(tree, true);
+        std::vector<corax_split_base_t> result;
+        for (const auto &split: split_words)
+            result.insert(result.end(), split.begin(), split.end());
+        return result;
     }
 
-    result.reset_brlens();
-    return result;
-}
+    bool has_majority_split(
+        const std::vector<std::vector<corax_split_base_t> > &donor_topologies,
+        const std::vector<std::size_t> &donor_ids,
+        const std::size_t words_per_split) {
+        std::map<std::vector<corax_split_base_t>, std::size_t> frequencies;
+        for (const auto donor_id: donor_ids) {
+            const auto &topology = donor_topologies[donor_id];
+            for (std::size_t offset = 0; offset < topology.size(); offset += words_per_split) {
+                std::vector<corax_split_base_t> split(
+                    topology.begin() + offset,
+                    topology.begin() + offset + words_per_split);
+                ++frequencies[std::move(split)];
+            }
+        }
+        return std::any_of(frequencies.begin(), frequencies.end(),
+                           [&donor_ids](const auto &entry) {
+                               return entry.second > donor_ids.size() / 2;
+                           });
+    }
 
+    Tree materialize_candidate(const std::vector<CandidateSplit> &selected, const Tree &label_source) {
+        Tree result;
+        if (selected.empty() || label_source.empty()) {
+            return result;
+        }
+
+        // CORAX clones every input split during this call. Keep only a borrowed
+        // pointer view; the CandidateSplit word vectors outlive materialization.
+        std::vector<corax_split_t> split_view;
+        split_view.reserve(selected.size());
+        for (const auto &split: selected) {
+            if (split.words.empty()) {
+                return result;
+            }
+
+            split_view.push_back(const_cast<corax_split_base_t *>(split.words.data()));
+        }
+
+        const auto tip_labels = label_source.tip_labels_cstr();
+
+        corax_split_system_t split_system{};
+        split_system.split_count = static_cast<unsigned int>(selected.size());
+        split_system.max_support = 1.0;
+        split_system.support = nullptr;
+        split_system.splits = split_view.data();
+
+        std::unique_ptr<corax_consensus_utree_t, decltype(&corax_utree_consensus_destroy)> materialized(
+            corax_utree_from_splits(
+                &split_system,
+                static_cast<unsigned int>(label_source.num_tips()),
+                tip_labels.data()),
+            corax_utree_consensus_destroy);
+
+        if (!materialized || !materialized->tree) {
+            coraxlib_reset_error();
+            return result;
+        }
+
+        result.pll_utree(static_cast<unsigned int>(label_source.num_tips()), *materialized->tree);
+
+        // The cloned nodes contain non-owning consensus-data pointers. Clear them
+        // before the temporary CORAX consensus object is destroyed.
+        auto &utree = const_cast<corax_utree_t &>(result.pll_utree());
+        for (std::size_t node_id = 0; node_id < utree.tip_count + utree.inner_count; ++node_id) {
+            auto *node = utree.nodes[node_id];
+            if (!node) {
+                continue;
+            }
+
+            auto *current = node;
+            do {
+                current->data = nullptr;
+                current = current->next;
+            } while (current && current != node);
+        }
+
+        result.reset_brlens();
+        return result;
+    }
 } // namespace
 
 AggressiveCandidateRepository::SourceState &AggressiveCandidateRepository::state(
@@ -371,16 +371,16 @@ TreeList AggressiveCandidateManager::gate_and_rank(TreeList candidates, const St
 
     if (!std::isfinite(ml_mae) || !std::isfinite(candidate_mae) || candidate_mae + mae_margin >= ml_mae) {
         LOG_WORKER_TS(LogLevel::info)
-            << "Treeset aggressive gate: source="
-            << source_name(source)
-            << ", decision=fail"
-            << ", initial_ml=" << initial_ml_trees.size()
-            << ", support_trees=" << support_tree_count
-            << ", bootstrap_support_trees="
-            << bootstrap_support_tree_count
-            << ", ml_ebg_mae=" << ml_mae
-            << ", candidate_ebg_mae=" << candidate_mae
-            << std::endl;
+                << "Treeset aggressive gate: source="
+                << source_name(source)
+                << ", decision=fail"
+                << ", initial_ml=" << initial_ml_trees.size()
+                << ", support_trees=" << support_tree_count
+                << ", bootstrap_support_trees="
+                << bootstrap_support_tree_count
+                << ", ml_ebg_mae=" << ml_mae
+                << ", candidate_ebg_mae=" << candidate_mae
+                << std::endl;
         return selected;
     }
 
@@ -458,24 +458,24 @@ TreeList AggressiveCandidateManager::gate_and_rank(TreeList candidates, const St
     }
 
     LOG_WORKER_TS(LogLevel::info)
-        << "Treeset aggressive gate: source="
-        << source_name(source)
-        << ", decision=pass"
-        << ", initial_ml=" << initial_ml_trees.size()
-        << ", support_trees=" << support_tree_count
-        << ", bootstrap_support_trees="
-        << bootstrap_support_tree_count
-        << ", ml_ebg_mae=" << ml_mae
-        << ", candidate_ebg_mae=" << candidate_mae
-        << ", selected=" << selected.size()
-        << std::endl;
+            << "Treeset aggressive gate: source="
+            << source_name(source)
+            << ", decision=pass"
+            << ", initial_ml=" << initial_ml_trees.size()
+            << ", support_trees=" << support_tree_count
+            << ", bootstrap_support_trees="
+            << bootstrap_support_tree_count
+            << ", ml_ebg_mae=" << ml_mae
+            << ", candidate_ebg_mae=" << candidate_mae
+            << ", selected=" << selected.size()
+            << std::endl;
     LOG_WORKER_TS(LogLevel::info)
-        << "Treeset aggressive ranker: source="
-        << source_name(source)
-        << ", promise_min=" << promise_min
-        << ", promise_mean=" << promise_mean
-        << ", promise_max=" << promise_max
-        << std::endl;
+            << "Treeset aggressive ranker: source="
+            << source_name(source)
+            << ", promise_min=" << promise_min
+            << ", promise_mean=" << promise_mean
+            << ", promise_max=" << promise_max
+            << std::endl;
 
     return selected;
 }
@@ -508,7 +508,7 @@ void AggressiveCandidateManager::generate_round(const unsigned int minimum_candi
         ++generated_donor_count;
     }
 
-    std::vector<std::vector<corax_split_base_t>> donor_topologies;
+    std::vector<std::vector<corax_split_base_t> > donor_topologies;
     donor_topologies.reserve(donor_pool.size());
     for (const auto &donor: donor_pool)
         donor_topologies.push_back(topology_key(donor));
@@ -564,22 +564,22 @@ void AggressiveCandidateManager::generate_round(const unsigned int minimum_candi
         std::chrono::duration_cast<std::chrono::milliseconds>(
             std::chrono::steady_clock::now() - begin).count());
     LOG_WORKER_TS(LogLevel::info) << "Treeset aggressive preparation round " << generation_round
-        << ": donors=" << donor_pool.size()
-        << ", reusable_donors=" << repository.reusable_donor_count()
-        << ", seed_greedy_candidates="
-        << (repository.candidate_count(StartingTreeSource::seed_greedy) - seed_size)
-        << ", constrained_parsimony_candidates="
-        << (repository.candidate_count(StartingTreeSource::constrained_parsimony) - constrained_size)
-        << ", generated_donors_total=" << generated_donor_count.load()
-        << ", generated_bootstrap_total=" << generated_bootstrap_count.load()
-        << ", reused_donors_total=" << reused_donor_count.load()
-        << ", preparation_ms=" << elapsed << std::endl;
+            << ": donors=" << donor_pool.size()
+            << ", reusable_donors=" << repository.reusable_donor_count()
+            << ", seed_greedy_candidates="
+            << (repository.candidate_count(StartingTreeSource::seed_greedy) - seed_size)
+            << ", constrained_parsimony_candidates="
+            << (repository.candidate_count(StartingTreeSource::constrained_parsimony) - constrained_size)
+            << ", generated_donors_total=" << generated_donor_count.load()
+            << ", generated_bootstrap_total=" << generated_bootstrap_count.load()
+            << ", reused_donors_total=" << reused_donor_count.load()
+            << ", preparation_ms=" << elapsed << std::endl;
 }
 
 
 TreeList AggressiveCandidateManager::generate_seed_greedy_candidates(
     const TreeList &donor_pool,
-    const std::vector<std::vector<corax_split_base_t>> &donor_topologies,
+    const std::vector<std::vector<corax_split_base_t> > &donor_topologies,
     const unsigned int requested_candidates,
     const unsigned long round_seed) {
     TreeList candidates;
@@ -662,7 +662,7 @@ TreeList AggressiveCandidateManager::generate_seed_greedy_candidates(
 
     const auto attempt_limit = requested_candidates * 2;
     unsigned int deduplicated_this_call = 0;
-    std::set<std::vector<corax_split_base_t>> staged_topologies;
+    std::set<std::vector<corax_split_base_t> > staged_topologies;
 
     for (unsigned int attempt = 0; attempt < attempt_limit && candidates.size() < requested_candidates; ++attempt) {
         TreeList seed_trees;
@@ -713,7 +713,9 @@ TreeList AggressiveCandidateManager::generate_seed_greedy_candidates(
 
                 for (const auto &existing: selected) {
                     if (existing.words == candidate.words ||
-                        !corax_utree_split_compatible(const_cast<corax_split_base_t *>(existing.words.data()), const_cast<corax_split_base_t *>(candidate.words.data()), words_per_split, tip_count)) {
+                        !corax_utree_split_compatible(const_cast<corax_split_base_t *>(existing.words.data()),
+                                                      const_cast<corax_split_base_t *>(candidate.words.data()),
+                                                      words_per_split, tip_count)) {
                         return;
                     }
                 }
@@ -761,25 +763,25 @@ TreeList AggressiveCandidateManager::generate_seed_greedy_candidates(
             coraxlib_reset_error();
             ++materialization_failures;
             LOG_WORKER_TS(LogLevel::info)
-                << "Treeset seed-greedy candidate skipped: attempt="
-                << attempt
-                << ", reason=" << error.what()
-                << std::endl;
+                    << "Treeset seed-greedy candidate skipped: attempt="
+                    << attempt
+                    << ", reason=" << error.what()
+                    << std::endl;
         }
     }
 
     LOG_WORKER_TS(LogLevel::info)
-        << "Treeset seed-greedy generation: initial_ml="
-        << initial_ml_trees.size()
-        << ", donors=" << donor_pool.size()
-        << ", split_pool=" << split_pool.size()
-        << ", incomplete=" << incomplete_split_systems
-        << ", materialization_failures=" << materialization_failures
-        << ", generated=" << candidates.size()
-        << ", attempts=" << attempt_limit
-        << ", deduplicated_this_call=" << deduplicated_this_call
-        << ", seen_topologies=" << repository.topology_count() + staged_topologies.size()
-        << std::endl;
+            << "Treeset seed-greedy generation: initial_ml="
+            << initial_ml_trees.size()
+            << ", donors=" << donor_pool.size()
+            << ", split_pool=" << split_pool.size()
+            << ", incomplete=" << incomplete_split_systems
+            << ", materialization_failures=" << materialization_failures
+            << ", generated=" << candidates.size()
+            << ", attempts=" << attempt_limit
+            << ", deduplicated_this_call=" << deduplicated_this_call
+            << ", seen_topologies=" << repository.topology_count() + staged_topologies.size()
+            << std::endl;
 
     return candidates;
 }
@@ -787,7 +789,7 @@ TreeList AggressiveCandidateManager::generate_seed_greedy_candidates(
 
 TreeList AggressiveCandidateManager::generate_constrained_parsimony_candidates(
     const TreeList &donor_pool,
-    const std::vector<std::vector<corax_split_base_t>> &donor_topologies,
+    const std::vector<std::vector<corax_split_base_t> > &donor_topologies,
     const unsigned int requested_candidates,
     const unsigned long round_seed) {
     TreeList candidates;
@@ -814,7 +816,7 @@ TreeList AggressiveCandidateManager::generate_constrained_parsimony_candidates(
     unsigned int deduplicated_this_call = 0;
     const auto seed_window_size = std::min<std::size_t>(8, donor_pool.size());
     const auto attempt_limit = requested_candidates * 2;
-    std::set<std::vector<corax_split_base_t>> staged_topologies;
+    std::set<std::vector<corax_split_base_t> > staged_topologies;
 
     for (unsigned int attempt = 0; attempt < attempt_limit && candidates.size() < requested_candidates; ++attempt) {
         try {
@@ -866,25 +868,25 @@ TreeList AggressiveCandidateManager::generate_constrained_parsimony_candidates(
             coraxlib_reset_error();
             ++materialization_failures;
             LOG_WORKER_TS(LogLevel::info)
-                << "Treeset constrained-parsimony candidate skipped: "
-                << "attempt=" << attempt
-                << ", reason=" << error.what()
-                << std::endl;
+                    << "Treeset constrained-parsimony candidate skipped: "
+                    << "attempt=" << attempt
+                    << ", reason=" << error.what()
+                    << std::endl;
         }
     }
 
     LOG_WORKER_TS(LogLevel::info)
-        << "Treeset constrained-parsimony generation: initial_ml="
-        << initial_ml_trees.size()
-        << ", donors=" << donor_pool.size()
-        << ", generated=" << candidates.size()
-        << ", attempts=" << attempt_limit
-        << ", materialization_failures="
-        << materialization_failures
-        << ", deduplicated_this_call="
-        << deduplicated_this_call
-        << ", seen_topologies=" << repository.topology_count() + staged_topologies.size()
-        << std::endl;
+            << "Treeset constrained-parsimony generation: initial_ml="
+            << initial_ml_trees.size()
+            << ", donors=" << donor_pool.size()
+            << ", generated=" << candidates.size()
+            << ", attempts=" << attempt_limit
+            << ", materialization_failures="
+            << materialization_failures
+            << ", deduplicated_this_call="
+            << deduplicated_this_call
+            << ", seen_topologies=" << repository.topology_count() + staged_topologies.size()
+            << std::endl;
 
     return candidates;
 }
@@ -905,11 +907,11 @@ TreeList AggressiveCandidateManager::take_batch(const StartingTreeSource source,
 
     if (repository.candidate_count(source) < batch_size) {
         LOG_WORKER_TS(LogLevel::info)
-            << "Treeset aggressive source exhausted: source="
-            << source_name(source)
-            << ", available=" << repository.candidate_count(source)
-            << ", required=" << batch_size
-            << std::endl;
+                << "Treeset aggressive source exhausted: source="
+                << source_name(source)
+                << ", available=" << repository.candidate_count(source)
+                << ", required=" << batch_size
+                << std::endl;
         return {};
     }
 
@@ -921,9 +923,9 @@ TreeList AggressiveCandidateManager::take_reusable_parsimony(const unsigned int 
     reused_donor_count.fetch_add(selected.size());
     if (!selected.empty()) {
         LOG_WORKER_TS(LogLevel::info) << "Reusing " << selected.size()
-            << " aggressive parsimony donors for an ordinary treeset batch; "
-            << repository.reusable_donor_count() << " remain ("
-            << reused_donor_count.load() << " reused total)." << std::endl;
+                << " aggressive parsimony donors for an ordinary treeset batch; "
+                << repository.reusable_donor_count() << " remain ("
+                << reused_donor_count.load() << " reused total)." << std::endl;
     }
     return selected;
 }
