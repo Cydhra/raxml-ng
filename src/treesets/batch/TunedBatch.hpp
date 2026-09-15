@@ -37,7 +37,8 @@ public:
                const unsigned int batch_size,
                const unsigned int num_threads,
                const unsigned int num_workers,
-               LoadBalancer &thread_load_balancer)
+               LoadBalancer &thread_load_balancer,
+               std::unique_ptr<StartTreeHeuristic> start_tree_heuristic)
         : name(std::move(name)),
           reference_persite_loglh(reference_persite_loglh),
           msa(msa),
@@ -45,6 +46,7 @@ public:
           batch_start_trees(new TreeList(batch_size)),
           tip_msa_idmap(tip_msa_idmap),
           batch_persite_logh(std::vector<std::vector<doubleVector> >(batch_size)),
+          start_tree_heuristic(std::move(start_tree_heuristic)),
           num_workers(num_workers),
           threads_per_worker(num_threads / num_workers) {
         for (auto &tree_slh: batch_persite_logh) {
@@ -348,7 +350,7 @@ protected:
     /**
      * Decorated generation strategy for starting trees, set when `update_meta_parameters` is called.
      */
-    std::unique_ptr<StartTreeHeuristic> start_tree_heuristic = {};
+    std::unique_ptr<StartTreeHeuristic> start_tree_heuristic;
 
     /**
      * Decorated inference strategy, set when `update_meta_parameters` is called.

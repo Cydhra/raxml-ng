@@ -7,6 +7,22 @@
 #include "../Options.hpp"
 #include "../Optimizer.hpp"
 
+enum class StartingTreeSource {
+    parsimony,
+    seed_greedy,
+    constrained_parsimony
+};
+
+enum class InitialModelSource {
+    latest_successful,
+    initial_ml
+};
+
+enum class AuPrecheck {
+    optimize_model,
+    branches_only
+};
+
 /**
  * Holds the meta-parameters of self-tuning tree inference. The parameters are held by a bandit and can
  * be applied to TunedBatches to configure the tree inference.
@@ -80,7 +96,29 @@ struct MetaParameters {
      */
     bool dynamic_spr = false;
 
+    StartingTreeSource starting_tree_source = StartingTreeSource::parsimony;
+
+    InitialModelSource initial_model_source = InitialModelSource::latest_successful;
+
+    AuPrecheck au_precheck = AuPrecheck::optimize_model;
+
     explicit MetaParameters() = default;
+
+    static MetaParameters starting_tree_acceptance() {
+        MetaParameters parameters;
+        parameters.accept_starting_trees = true;
+        parameters.do_final_model = false;
+        return parameters;
+    }
+
+    static MetaParameters aggressive_starting_tree_acceptance(
+        const StartingTreeSource source = StartingTreeSource::parsimony) {
+        auto parameters = starting_tree_acceptance();
+        parameters.starting_tree_source = source;
+        parameters.initial_model_source = InitialModelSource::initial_ml;
+        parameters.au_precheck = AuPrecheck::branches_only;
+        return parameters;
+    }
 
     MetaParameters &with_topk(const unsigned int keep_top_k_topol) {
         this->keep_top_k_topol = keep_top_k_topol;
@@ -147,6 +185,25 @@ struct MetaParameters {
         return *this;
     }
 
+    MetaParameters &with_starting_tree_source(const StartingTreeSource source) {
+        this->starting_tree_source = source;
+        return *this;
+    }
+
+    MetaParameters &with_initial_model_source(const InitialModelSource source) {
+        this->initial_model_source = source;
+        return *this;
+    }
+
+    MetaParameters &with_au_precheck(const AuPrecheck precheck) {
+        this->au_precheck = precheck;
+        return *this;
+    }
+
+    [[nodiscard]] bool uses_aggressive_starting_trees() const {
+        return starting_tree_source != StartingTreeSource::parsimony;
+    }
+
     friend bool operator==(const MetaParameters &lhs, const MetaParameters &rhs) {
         return lhs.keep_top_k_topol == rhs.keep_top_k_topol
                && lhs.do_first_model == rhs.do_first_model
@@ -159,7 +216,10 @@ struct MetaParameters {
                && lhs.constrain == rhs.constrain
                && lhs.model_override == rhs.model_override
                && lhs.fallback_fast_raxml == rhs.fallback_fast_raxml
-               && lhs.dynamic_spr == rhs.dynamic_spr;
+               && lhs.dynamic_spr == rhs.dynamic_spr
+               && lhs.starting_tree_source == rhs.starting_tree_source
+               && lhs.initial_model_source == rhs.initial_model_source
+               && lhs.au_precheck == rhs.au_precheck;
     }
 
     friend bool operator!=(const MetaParameters &lhs, const MetaParameters &rhs) {
@@ -182,6 +242,9 @@ struct MetaParameters {
                                                               : 0);
         seed ^= (seed << 6) + (seed >> 2) + 0x39D34241 + static_cast<std::size_t>(obj.fallback_fast_raxml);
         seed ^= (seed << 6) + (seed >> 2) + 0x72C16A1E + static_cast<std::size_t>(obj.dynamic_spr);
+        seed ^= (seed << 6) + (seed >> 2) + 0x50E7A8B9 + static_cast<std::size_t>(obj.starting_tree_source);
+        seed ^= (seed << 6) + (seed >> 2) + 0x38D9B7C1 + static_cast<std::size_t>(obj.initial_model_source);
+        seed ^= (seed << 6) + (seed >> 2) + 0x2228A3E7 + static_cast<std::size_t>(obj.au_precheck);
         return seed;
     }
 };

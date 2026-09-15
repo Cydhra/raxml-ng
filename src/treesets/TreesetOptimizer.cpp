@@ -5,7 +5,29 @@
 
 void TreesetOptimizer::initialize_bandits() {
     auto parsimony = make_shared<MultiArmedBandit<MetaParameters> >();
-    parsimony->emplace_back("Parsimony", MetaParameters().with_starting_trees(true));
+    parsimony->emplace_back(opts.treeset_aggressive ? "AggressiveST,Parsimony" : "Parsimony",
+                            opts.treeset_aggressive
+                                ? MetaParameters::aggressive_starting_tree_acceptance()
+                                : MetaParameters::starting_tree_acceptance());
+
+    if (opts.treeset_aggressive) {
+        // Keep the established aggressive arm order: ordinary parsimony,
+        // seed-greedy, then constrained parsimony.
+        this->mab.register_new_arm("Starting Trees", parsimony);
+
+        auto seed_greedy = make_shared<MultiArmedBandit<MetaParameters> >();
+        seed_greedy->emplace_back(
+            "Aggressive,seed_greedy,StartOnly",
+            MetaParameters::aggressive_starting_tree_acceptance(StartingTreeSource::seed_greedy));
+        this->mab.register_new_arm("Aggressive Seed Greedy", seed_greedy);
+
+        auto constrained_parsimony = make_shared<MultiArmedBandit<MetaParameters> >();
+        constrained_parsimony->emplace_back(
+            "Aggressive,constrained_parsimony,StartOnly",
+            MetaParameters::aggressive_starting_tree_acceptance(
+                StartingTreeSource::constrained_parsimony));
+        this->mab.register_new_arm("Aggressive Constrained Parsimony", constrained_parsimony);
+    }
 
     const auto adaptive_radius = pythia_score >= 0.0
                                      ? Optimizer::adaptive_radius(pythia_score)
@@ -84,7 +106,8 @@ void TreesetOptimizer::initialize_bandits() {
     this->mab.register_new_successor(7, "Fallback-Adaptive", std::move(fallback_adaptive_mab));
 
     // second-level MAB
-    this->mab.register_new_arm("Starting Trees", parsimony);
+    if (!opts.treeset_aggressive)
+        this->mab.register_new_arm("Starting Trees", parsimony);
 }
 
 void TreesetOptimizer::run_batch(
@@ -107,14 +130,22 @@ void TreesetOptimizer::run_batch(
 }
 
 BatchTask TreesetOptimizer::next_work_unit() {
-    const auto &parameters = this->mab.select_next_bandit();
-    auto &current_batch = this->batch_queue.select_next_batch(parameters, pool.workers_per_task(),
-                                                              pool.threads_per_task());
-    current_batch.update_meta_parameters(parameters);
+    TunedBatch *current_batch = nullptr;
+    MetaParameters *parameters = nullptr;
+    while (!current_batch) {
+        parameters = &this->mab.select_next_bandit();
+        current_batch = this->batch_queue.select_next_batch(*parameters, pool.workers_per_task(),
+                                                            pool.threads_per_task());
+        if (!current_batch) {
+            LOG_WORKER_TS(LogLevel::info) << "Disabling exhausted aggressive source." << std::endl;
+            this->mab.disable(*parameters);
+        }
+    }
+    current_batch->update_meta_parameters(*parameters);
 
-    BatchTask runner = [this, &current_batch](TaskGroup &context, const unsigned int worker_id,
-                                              const unsigned int thread_id) {
-        this->run_batch(current_batch, context, worker_id, thread_id);
+    BatchTask runner = [this, current_batch](TaskGroup &context, const unsigned int worker_id,
+                                             const unsigned int thread_id) {
+        this->run_batch(*current_batch, context, worker_id, thread_id);
     };
 
     return runner;

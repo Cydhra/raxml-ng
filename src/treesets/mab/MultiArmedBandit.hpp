@@ -76,6 +76,13 @@ public:
         return this->iterations_completed;
     }
 
+    /** Disable an arm by stable registration index and repair the cached best arm. */
+    bool disable_bandit(const unsigned int index) {
+        std::scoped_lock lock(*measurement_mutex, *selection_mutex);
+        bandits.at(index).participating = false;
+        return refresh_best_known_bandit_locked();
+    }
+
     /**
      * Select the next bandit according to the knowledge learned so far.
      * Bandits that are expected to be worse than the best known bandit are replaced with the best known bandit.
@@ -165,7 +172,8 @@ public:
         current_bandit.take_measurement(batch);
 
         // if the current bandit is not the best one, check if the best one has to be updated
-        if (&current_bandit.get_parameters() != &this->bandits[best_known_bandit].get_parameters() && !std::isnan(
+        if (current_bandit.participating &&
+            &current_bandit.get_parameters() != &this->bandits[best_known_bandit].get_parameters() && !std::isnan(
                 this->bandits[best_known_bandit].get_mean_throughput())) {
             if (current_bandit.get_mean_throughput() > this->bandits[best_known_bandit].get_mean_throughput()) {
                 // find which index is the current bandit. We cannot rely on the cursor since that has been advanced by
@@ -239,6 +247,28 @@ private:
     std::unique_ptr<std::mutex> measurement_mutex = make_unique<std::mutex>();
 
     std::unique_ptr<std::mutex> selection_mutex = make_unique<std::mutex>();
+
+    bool refresh_best_known_bandit_locked() {
+        bool found = false;
+        unsigned int replacement = 0;
+        for (unsigned int index = 0; index < bandits.size(); ++index) {
+            if (!bandits[index].participating)
+                continue;
+            if (!found) {
+                replacement = index;
+                found = true;
+                continue;
+            }
+            const auto candidate_mean = bandits[index].get_mean_throughput();
+            const auto replacement_mean = bandits[replacement].get_mean_throughput();
+            if (!std::isnan(candidate_mean) &&
+                (std::isnan(replacement_mean) || candidate_mean > replacement_mean))
+                replacement = index;
+        }
+        if (found)
+            best_known_bandit = replacement;
+        return found;
+    }
 };
 
 

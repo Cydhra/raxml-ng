@@ -10,8 +10,11 @@ void guarded_backup_batch_model(const TunedBatch &batch, ModelMap &backup_model,
     batch.backup_models(backup_model);
 }
 
-TunedBatch &BatchQueue::generate_batch(const unsigned int num_workers, const unsigned int num_threads) {
-    const std::string name_prefix = "Batch";
+TunedBatch *BatchQueue::generate_batch(const unsigned int num_workers, const unsigned int num_threads,
+                                       const MetaParameters &parameters) {
+    auto prepared_trees = start_tree_factory.prepare(parameters, batch_size);
+    if (!prepared_trees)
+        return nullptr;
 
     // lock the mutex for the batch queue
     const std::lock_guard<std::mutex> lock(batch_mutex);
@@ -19,16 +22,22 @@ TunedBatch &BatchQueue::generate_batch(const unsigned int num_workers, const uns
     auto batch_name_index = this->batches.size();
 
     // place new batches at the end of the queue, and mark them as unfinished
-    std::string batch_name = name_prefix + std::to_string(batch_name_index);
+    std::string batch_name = start_tree_factory.batch_name(parameters, batch_name_index);
+    const auto starting_seed = generate_seed_for_trees(this->batch_size);
+    auto start_tree_heuristic = start_tree_factory.build(
+        parameters, batch_name, batch_size, starting_seed,
+        std::move(*prepared_trees));
+
     this->batches.emplace_back(batch_name,
                                msa,
                                tip_msa_idmap,
                                persite_loglh,
-                               generate_seed_for_trees(this->batch_size),
+                               starting_seed,
                                this->batch_size,
                                num_threads,
                                num_workers,
-                               load_balancer);
+                               load_balancer,
+                               std::move(start_tree_heuristic));
 
     auto &batch = this->batches.back();
 
@@ -37,10 +46,12 @@ TunedBatch &BatchQueue::generate_batch(const unsigned int num_workers, const uns
 
     // assign the prepared model. If we have no model backed up yet, this is initialized with the default model,
     // so nothing will break. This requires that the batch mutex is locked
-    batch.assign_batch_models(*this->backup_model);
+    batch.assign_batch_models(parameters.initial_model_source == InitialModelSource::initial_ml
+                                  ? initial_ml_model
+                                  : *backup_model);
 
     // return (which drops the mutex guard)
-    return this->batches[batch_name_index];
+    return &this->batches[batch_name_index];
 }
 
 void BatchQueue::finalize_batch(TunedBatch &batch) {
@@ -60,7 +71,7 @@ void BatchQueue::finalize_batch(TunedBatch &batch) {
     this->unfinished_plausible_trees = unfinished_plausible;
 }
 
-TunedBatch &BatchQueue::select_next_batch(const MetaParameters &current_parameters, const unsigned int num_workers,
+TunedBatch *BatchQueue::select_next_batch(const MetaParameters &current_parameters, const unsigned int num_workers,
                                           const unsigned int num_threads) {
     TunedBatch *selected_batch = nullptr;
 
@@ -90,7 +101,10 @@ TunedBatch &BatchQueue::select_next_batch(const MetaParameters &current_paramete
         // unlock mutex to allow generation of batches without keeping the queue locked, and because generate_batches
         // will attempt to lock it again when the batch is added to the vector.
         batch_mutex.unlock();
-        selected_batch = &generate_batch(num_workers, num_threads);
+        selected_batch = generate_batch(num_workers, num_threads, current_parameters);
+
+        if (!selected_batch)
+            return nullptr;
 
         // relock to add batch to in-flight set
         batch_mutex.lock();
@@ -99,19 +113,20 @@ TunedBatch &BatchQueue::select_next_batch(const MetaParameters &current_paramete
     this->in_flight.emplace(selected_batch->get_name());
     batch_mutex.unlock();
 
-    return *selected_batch;
+    return selected_batch;
 }
 
 void BatchQueue::finish_batch(TunedBatch &batch) {
     const std::lock_guard<std::mutex> lock(batch_mutex);
-    if (batch.get_plausible_tree_count() > 0) {
+    if (batch.get_plausible_tree_count() > 0 &&
+        batch.get_parameters().initial_model_source == InitialModelSource::latest_successful) {
         guarded_backup_batch_model(batch, *this->backup_model, lock);
     }
 
-    if (batch.get_plausible_tree_count() > this->batch_size / 2) {
+    if (batch.get_parameters().uses_aggressive_starting_trees() ||
+        batch.get_plausible_tree_count() > this->batch_size / 2) {
         this->finalize_batch(batch);
     }
 
     this->in_flight.erase(batch.get_name());
 }
-
