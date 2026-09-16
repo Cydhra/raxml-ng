@@ -142,14 +142,6 @@ void TunedBatch::perform_plausibility_check(const Options &opts, SharedBatchReso
     }
 
     const auto begin = std::chrono::steady_clock::now();
-    // forcibly optimize model parameters once. This is to have somewhat reasonable model parameters, but we
-    // dont want to invest much time. If they are required, do_final_model in meta parameters handles this
-    const auto &tree_ids = this->coarse_assignments->at(worker_id);
-    for (const auto tree_id: tree_ids) {
-        auto &tree = batch_trees[tree_id][thread_id];
-        tree->optimize_params(CORAX_OPT_PARAM_ALL & ~CORAX_OPT_PARAM_BRANCHES_ITERATIVE, AU_TEST_EPSILON);
-    }
-
     this->perform_au_test(au_test, initialized, context, worker_id, thread_id);
 
     // no barrier required, since batch leader is the one who finishes the AU test
