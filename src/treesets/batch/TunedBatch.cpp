@@ -101,11 +101,14 @@ void TunedBatch::perform_au_test(AuTest &au_test, const bool initialized, const 
             initialized
                 ? exclusive_assignment->at(context.get_group_thread_id(worker_id, thread_id))
                 : au_assignment->at(context.get_group_thread_id(worker_id, thread_id));
-    const unsigned int slice_start = initialized
+    if (!tree_ids.empty()) {
+        const unsigned int slice_start = initialized
                                          ? *tree_ids.begin() + reference_persite_loglh->size()
                                          : *tree_ids.begin();
 
-    au_test.run_bootstrap(tree_ids.size(), slice_start);
+        au_test.run_bootstrap(tree_ids.size(), slice_start);
+    }
+
     context.enter_barrier();
 
     if (context.is_group_leader(worker_id, thread_id)) {
