@@ -149,6 +149,7 @@ struct MetaParameters {
                && lhs.constrain == rhs.constrain
                && lhs.model_override == rhs.model_override
                && lhs.fallback_fast_raxml == rhs.fallback_fast_raxml
+               && lhs.fallback_adaptive_raxml == rhs.fallback_adaptive_raxml
                && lhs.dynamic_spr == rhs.dynamic_spr;
     }
 
@@ -163,13 +164,14 @@ struct MetaParameters {
         seed ^= (seed << 6) + (seed >> 2) + 0x674CC085 + static_cast<std::size_t>(obj.do_final_model);
         seed ^= (seed << 6) + (seed >> 2) + 0x61730347 + static_cast<std::size_t>(obj.num_fast_spr);
         seed ^= (seed << 6) + (seed >> 2) + 0x49932C6A + static_cast<std::size_t>(obj.num_slow_spr);
-        seed ^= (seed << 6) + (seed >> 2) + 0x3C871EF5 + static_cast<std::size_t>(obj.max_adaptive_radius);
-        seed ^= (seed << 6) + (seed >> 2) + 0x667D39FE + static_cast<std::size_t>(obj.nni_round);
-        seed ^= (seed << 6) + (seed >> 2) + 0x72878931 + static_cast<std::size_t>(obj.constrain);
-        seed ^= (seed << 6) + (seed >> 2) + 0x5458316A + (obj.model_override.has_value()
+        seed ^= (seed << 6) + (seed >> 2) + 0x74D4612F + static_cast<std::size_t>(obj.max_adaptive_radius);
+        seed ^= (seed << 6) + (seed >> 2) + 0x3C871EF5 + static_cast<std::size_t>(obj.nni_round);
+        seed ^= (seed << 6) + (seed >> 2) + 0x667D39FE + static_cast<std::size_t>(obj.constrain);
+        seed ^= (seed << 6) + (seed >> 2) + 0x72878931 + (obj.model_override.has_value()
                                                               ? std::hash<std::string>{}(obj.model_override.value())
                                                               : 0);
-        seed ^= (seed << 6) + (seed >> 2) + 0x39D34241 + static_cast<std::size_t>(obj.fallback_fast_raxml);
+        seed ^= (seed << 6) + (seed >> 2) + 0x5458316A + static_cast<std::size_t>(obj.fallback_fast_raxml);
+        seed ^= (seed << 6) + (seed >> 2) + 0x39D34241 + static_cast<std::size_t>(obj.fallback_adaptive_raxml);
         seed ^= (seed << 6) + (seed >> 2) + 0x72C16A1E + static_cast<std::size_t>(obj.dynamic_spr);
         return seed;
     }
