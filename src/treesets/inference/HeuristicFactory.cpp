@@ -30,10 +30,6 @@ static unique_ptr<InferenceHeuristic> from_meta_parameters(const MetaParameters 
                                                            const unsigned int threads_per_worker,
                                                            shared_ptr<PartitionAssignmentList> &part_assignments,
                                                            shared_ptr<PartitionedMSA> &partitioned_msa) {
-    if (meta_parameters.accept_starting_trees) {
-        return heuristic;
-    }
-
     if (meta_parameters.do_first_model) {
         // TODO get rid of magic numbers
         heuristic = make_unique<ModelOpt>(batch_name, std::move(heuristic), num_trees, threads_per_worker, true, true,
@@ -109,14 +105,12 @@ unique_ptr<InferenceHeuristic> HeuristicFactory::extend_heuristic(const MetaPara
                                                                   shared_ptr<PartitionAssignmentList> &part_assignments,
                                                                   shared_ptr<PartitionedMSA> &partitioned_msa) {
     MetaParameters delta = new_parameters; // copy everything into the delta
-    const bool accept_anything = old_parameters.accept_starting_trees || new_parameters.fallback_fast_raxml;
-
-    assert(!new_parameters.accept_starting_trees); // replacing a heuristic with this one is pointless
+    const bool accept_anything = !old_parameters.any_rounds() || new_parameters.is_fallback();
 
     // if the new parameters arent a fallback, add whatever is remaining to the bandit, otherwise just do what the
     // parameters say. If the old parameters accepted starting trees, we also don't need to mind old parameters and simply
     // do what the new_parameters say
-    if (!new_parameters.fallback_fast_raxml && !old_parameters.accept_starting_trees) {
+    if (!new_parameters.is_fallback()) {
         assert(accept_anything || !old_parameters.do_first_model || new_parameters.do_first_model);
         assert(accept_anything || !old_parameters.do_final_model || new_parameters.do_final_model);
 

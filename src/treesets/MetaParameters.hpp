@@ -40,11 +40,6 @@ struct MetaParameters {
     unsigned int num_slow_spr = 0;
 
     /**
-     * If true, skip all model optimization and simply accept parsimony starting trees as the final resulting topology.
-     */
-    bool accept_starting_trees = false;
-
-    /**
      * Maximum SPR radius
      */
     unsigned int max_adaptive_radius = 20;
@@ -107,11 +102,6 @@ struct MetaParameters {
         return *this;
     }
 
-    MetaParameters &with_starting_trees(const bool accept_starting_trees) {
-        this->accept_starting_trees = accept_starting_trees;
-        return *this;
-    }
-
     MetaParameters &with_radius(const unsigned int max_adaptive_radius) {
         this->max_adaptive_radius = max_adaptive_radius;
         return *this;
@@ -153,7 +143,6 @@ struct MetaParameters {
                && lhs.do_final_model == rhs.do_final_model
                && lhs.num_fast_spr == rhs.num_fast_spr
                && lhs.num_slow_spr == rhs.num_slow_spr
-               && lhs.accept_starting_trees == rhs.accept_starting_trees
                && lhs.max_adaptive_radius == rhs.max_adaptive_radius
                && lhs.nni_round == rhs.nni_round
                && lhs.constrain == rhs.constrain
@@ -173,7 +162,6 @@ struct MetaParameters {
         seed ^= (seed << 6) + (seed >> 2) + 0x674CC085 + static_cast<std::size_t>(obj.do_final_model);
         seed ^= (seed << 6) + (seed >> 2) + 0x61730347 + static_cast<std::size_t>(obj.num_fast_spr);
         seed ^= (seed << 6) + (seed >> 2) + 0x49932C6A + static_cast<std::size_t>(obj.num_slow_spr);
-        seed ^= (seed << 6) + (seed >> 2) + 0x74D4612F + static_cast<std::size_t>(obj.accept_starting_trees);
         seed ^= (seed << 6) + (seed >> 2) + 0x3C871EF5 + static_cast<std::size_t>(obj.max_adaptive_radius);
         seed ^= (seed << 6) + (seed >> 2) + 0x667D39FE + static_cast<std::size_t>(obj.nni_round);
         seed ^= (seed << 6) + (seed >> 2) + 0x72878931 + static_cast<std::size_t>(obj.constrain);
@@ -183,6 +171,18 @@ struct MetaParameters {
         seed ^= (seed << 6) + (seed >> 2) + 0x39D34241 + static_cast<std::size_t>(obj.fallback_fast_raxml);
         seed ^= (seed << 6) + (seed >> 2) + 0x72C16A1E + static_cast<std::size_t>(obj.dynamic_spr);
         return seed;
+    }
+
+    bool is_fallback() const {
+        return this->fallback_fast_raxml || this->fallback_adaptive_raxml;
+    }
+
+    bool any_rounds() const {
+        return this->nni_round || this->any_spr_rounds();
+    }
+
+    bool any_spr_rounds() const {
+        return this->dynamic_spr || this->num_fast_spr > 0 || this->num_slow_spr > 0;
     }
 };
 

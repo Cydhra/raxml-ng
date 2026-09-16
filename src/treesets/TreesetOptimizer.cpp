@@ -5,7 +5,7 @@
 
 void TreesetOptimizer::initialize_bandits() {
     auto parsimony = make_shared<MultiArmedBandit<MetaParameters> >();
-    parsimony->emplace_back("Parsimony", MetaParameters().with_starting_trees(true));
+    parsimony->emplace_back("Parsimony", MetaParameters());
 
     const auto adaptive_radius = pythia_score >= 0.0
                                      ? Optimizer::adaptive_radius(pythia_score)

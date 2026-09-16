@@ -103,8 +103,8 @@ void TunedBatch::perform_au_test(AuTest &au_test, const bool initialized, const 
                 : au_assignment->at(context.get_group_thread_id(worker_id, thread_id));
     if (!tree_ids.empty()) {
         const unsigned int slice_start = initialized
-                                         ? *tree_ids.begin() + reference_persite_loglh->size()
-                                         : *tree_ids.begin();
+                                             ? *tree_ids.begin() + reference_persite_loglh->size()
+                                             : *tree_ids.begin();
 
         au_test.run_bootstrap(tree_ids.size(), slice_start);
     }
@@ -221,30 +221,17 @@ bool TunedBatch::is_compatible(const MetaParameters &new_parameters) const {
     }
 
     // never reuse trees which already failed a fallback
-    if (this->meta_parameters.fallback_fast_raxml) {
+    if (this->meta_parameters.is_fallback()) {
         return false;
     }
 
-    // if we accept a fallback anyway, we might as well reuse the trees
-    if (new_parameters.fallback_fast_raxml) {
+    // if we do a fallback strategy anyway, we might as well reuse the old trees
+    if (new_parameters.is_fallback()) {
         return true;
     }
-
-    // if the current parameters do the bare minimum, we can always continue with new parameters
-    if (this->meta_parameters.accept_starting_trees) {
-        return true;
-        // however if we already did something, the other set need not do the bare minimum.
-    } else if (new_parameters.accept_starting_trees) {
-        return false;
-    }
-
-    const auto any_spr_rounds_performed = this->meta_parameters.num_fast_spr > 0 ||
-                                          this->meta_parameters.num_slow_spr > 0
-                                          || this->meta_parameters.dynamic_spr;
-    const auto any_rounds_performed = this->meta_parameters.nni_round || any_spr_rounds_performed;
 
     // do not reuse batch if it was created with a different model
-    if (any_rounds_performed) {
+    if (meta_parameters.any_rounds()) {
         if (this->meta_parameters.nni_round != new_parameters.nni_round) {
             return false;
         }
@@ -271,7 +258,7 @@ bool TunedBatch::is_compatible(const MetaParameters &new_parameters) const {
 
     // if settings of the SPR rounds do not match, and we already completed some SPR rounds,
     // the new parameters cannot replace the current ones
-    if (any_spr_rounds_performed) {
+    if (meta_parameters.any_spr_rounds()) {
         if (this->meta_parameters.dynamic_spr != new_parameters.dynamic_spr) {
             return false;
         }
@@ -305,7 +292,8 @@ bool TunedBatch::is_compatible(const MetaParameters &new_parameters) const {
 
 void TunedBatch::backup_models(ModelMap &target) const {
     assert(this->get_plausible_tree_count() > 0);
-    const auto iter = std::find_if(this->p_values.begin(), this->p_values.end(), [](const double x) { return x >= 0.05; });
+    const auto iter = std::find_if(this->p_values.begin(), this->p_values.end(),
+                                   [](const double x) { return x >= 0.05; });
     const auto idx = std::distance(p_values.begin(), iter);
 
     for (const auto &thread_id: this->batch_trees[idx]) {
