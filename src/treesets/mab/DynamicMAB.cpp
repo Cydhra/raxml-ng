@@ -96,8 +96,6 @@ MetaParameters DynamicMAB::mutate(const MetaParameters &parameters) {
         mutation += elem->second;
     }
 
-    const bool does_any_rounds = parameters.num_fast_spr + parameters.num_slow_spr > 0 || parameters.dynamic_spr;
-
     switch (mutation) {
         case 0:
             mutation += 1;
@@ -108,21 +106,14 @@ MetaParameters DynamicMAB::mutate(const MetaParameters &parameters) {
             [[fallthrough]];
         case 1:
             mutation += 1;
-            if (does_any_rounds && parameters.keep_top_k_topol > 1) {
+            if (parameters.any_rounds() && parameters.keep_top_k_topol > 1) {
                 new_parameters.keep_top_k_topol /= 2;
                 break;
             }
             [[fallthrough]];
         case 2:
             mutation += 1;
-            if (parameters.nni_round && !parameters.constrain) {
-                new_parameters.nni_round = false;
-                break;
-            }
-            [[fallthrough]];
-        case 3:
-            mutation += 1;
-            if (does_any_rounds && parameters.max_adaptive_radius >= 6) {
+            if (parameters.any_spr_rounds() && parameters.max_adaptive_radius >= 6) {
                 new_parameters.max_adaptive_radius -= 3;
                 break;
             }
