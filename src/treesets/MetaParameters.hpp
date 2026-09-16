@@ -178,7 +178,7 @@ struct MetaParameters {
         seed ^= (seed << 6) + (seed >> 2) + 0x667D39FE + static_cast<std::size_t>(obj.nni_round);
         seed ^= (seed << 6) + (seed >> 2) + 0x72878931 + static_cast<std::size_t>(obj.constrain);
         seed ^= (seed << 6) + (seed >> 2) + 0x5458316A + (obj.model_override.has_value()
-                                                              ? std::filesystem::hash_value(obj.model_override.value())
+                                                              ? std::hash<std::string>{}(obj.model_override.value())
                                                               : 0);
         seed ^= (seed << 6) + (seed >> 2) + 0x39D34241 + static_cast<std::size_t>(obj.fallback_fast_raxml);
         seed ^= (seed << 6) + (seed >> 2) + 0x72C16A1E + static_cast<std::size_t>(obj.dynamic_spr);
