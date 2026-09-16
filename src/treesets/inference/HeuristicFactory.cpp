@@ -73,7 +73,10 @@ static unique_ptr<InferenceHeuristic> from_meta_parameters(const MetaParameters 
     if (meta_parameters.do_final_model) {
         // TODO get rid of magic numbers
         heuristic = make_unique<ModelOpt>(batch_name, std::move(heuristic), num_trees, threads_per_worker, true, true,
-                                          1.0);
+                                          0.1);
+    } else {
+        heuristic = make_unique<ModelOpt>(batch_name, std::move(heuristic), num_trees, threads_per_worker, true, true,
+                                                  1.0, false);
     }
 
     return heuristic;

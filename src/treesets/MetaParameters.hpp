@@ -25,7 +25,8 @@ struct MetaParameters {
     bool do_first_model = false;
 
     /**
-     * If true, does a final model and branch length optimization.
+     * If true, does a full final model and branch length optimization. If false, greatly abbreviates the optimization
+     * with larger epsilon and no iteration.
      */
     bool do_final_model = true;
 

@@ -12,7 +12,7 @@ void ModelOpt::do_optimize(std::optional<TreeInfo> &tree, const unsigned int tre
         double loglh = tree->optimize_params(CORAX_OPT_PARAM_ALL & ~CORAX_OPT_PARAM_BRANCHES_ITERATIVE, epsilon);
         double new_loglh = tree->optimize_params(CORAX_OPT_PARAM_BRANCHES_ITERATIVE, epsilon);
 
-        while (new_loglh - loglh > epsilon) {
+        while (iterate && new_loglh - loglh > epsilon) {
             loglh = new_loglh;
             new_loglh = tree->optimize_params(CORAX_OPT_PARAM_ALL, epsilon);
         }
@@ -24,7 +24,7 @@ void ModelOpt::do_optimize(std::optional<TreeInfo> &tree, const unsigned int tre
         double loglh = tree->loglh(true);
         double new_loglh = tree->optimize_model(epsilon);
 
-        while (new_loglh - loglh > epsilon) {
+        while (iterate && new_loglh - loglh > epsilon) {
             loglh = new_loglh;
             new_loglh = tree->optimize_model(epsilon);
         }
