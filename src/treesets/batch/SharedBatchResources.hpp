@@ -8,7 +8,9 @@
 /**
  * Shallow replication counts for a faster AU test.
  */
-const uintVector SHALLOW_REPS = {2000, 2000, 2000, 2000, 2000, 2000, 2000, 2000, 2000, 2000};
+const uintVector SHALLOW_REPS = {500, 500, 500, 500, 500, 500, 500, 500, 500, 500};
+
+constexpr unsigned int DEFAULT_FACTOR = 1;
 
 /**
  * We share AUTest instances between batches, one per TaskGroup of the threadpool, to save on resource and reuse
@@ -36,6 +38,7 @@ public:
         for (unsigned int group = 0; group < num_task_groups; ++group) {
             screening_au_tests.emplace_back(msa, reference_logh_matrix, batch_loglh_dummy, AU_DEFAULT_SCALES,
                                             SHALLOW_REPS, seed);
+            au_test_factors.emplace_back(DEFAULT_FACTOR);
             initialized.emplace_back(false);
         }
 
@@ -84,7 +87,7 @@ public:
     /**
      * @return An Optimizer instance pre-configured to run `RAxML-ng --adaptive` inference
      */
-    Optimizer &get_adaptive_optimizer() const {
+    [[nodiscard]] Optimizer &get_adaptive_optimizer() const {
         return *adaptive_optimizer;
     }
 
@@ -117,7 +120,7 @@ public:
      * the reference tree bootstrap values have been generated already.
      */
     AuTest &get_screening_test(const TaskGroup &context) {
-        return screening_au_tests[context.group_id()];
+        return screening_au_tests.at(context.group_id());
     }
 
     /**
@@ -125,8 +128,8 @@ public:
      * @param context the parallel context for the calling batch leader
      * @return true, if the AuTest instance returned for the calling thread has been initialized before.
      */
-    bool is_initialized(const TaskGroup &context) {
-        return initialized[context.group_id()];
+    [[nodiscard]] bool is_initialized(const TaskGroup &context) const {
+        return initialized.at(context.group_id());
     }
 
     /**
@@ -142,9 +145,22 @@ public:
 protected:
     /**
      * Shared AU test instances, one for each thread group. These are initialized with drastically reduced replication
-     * counts to be able to be used for pre-screening.
+     * counts to be able to be used for fast screening. If the implementation detects instability, the AU tests are
+     * made more expensive.
      */
     std::vector<AuTest> screening_au_tests;
+
+    /**
+     * Factors for the SHALLOW_REPS constants of AU test replicate counts.
+     */
+    std::vector<unsigned int> au_test_factors;
+
+    /**
+     * The target factor that the au_test_factors should have. Since thread groups are responsible with allocating
+     * and freeing their AuTest instance, this factor can be increased from the outside to make thread groups increase
+     * their AU test size at the next convenient time.
+     */
+    std::unique_ptr<atomic_uint> target_au_test_factor = make_unique<atomic_uint>(DEFAULT_FACTOR);
 
     /**
      * Whether the corresponding Au Test has been used before, initializing the bootstrap values of the reference trees.
