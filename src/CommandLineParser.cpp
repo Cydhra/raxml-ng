@@ -1687,7 +1687,7 @@ void CommandLineParser::parse_options(int argc, char** argv, Options &opts)
 
   /* process LH epsilon defaults */
   if (opts.command == Command::search || opts.command == Command::bootstrap ||
-      opts.command == Command::all)
+      opts.command == Command::all || opts.command == Command::treeset)
   {
     if (!lh_epsilon_set)
       opts.lh_epsilon = compat_ver < 120 ? DEF_LH_EPSILON_V11 : DEF_LH_EPSILON;

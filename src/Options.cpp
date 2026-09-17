@@ -681,7 +681,7 @@ std::ostream& operator<<(std::ostream& stream, const Options& opts)
   if (opts.command == Command::bootstrap || opts.command == Command::all ||
       opts.command == Command::search || opts.command == Command::evaluate ||
       opts.command == Command::parse || opts.command == Command::ancestral ||
-      opts.command == Command::modeltest)
+      opts.command == Command::modeltest || opts.command == Command::treeset)
   {
     stream << "  tip-inner: " << (opts.use_tip_inner ? "ON" : "OFF") << endl;
     stream << "  pattern compression: " << (opts.use_pattern_compression ? "ON" : "OFF") << endl;
