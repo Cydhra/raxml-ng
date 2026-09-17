@@ -25,27 +25,28 @@ public:
            const std::vector<std::vector<doubleVector> > &persite_loglh,
            const doubleVector &scales,
            const uintVector &num_replicates,
-           long seed) : AuTest(msa, make_persite_vec(persite_loglh), scales, num_replicates, seed) {
+           const long seed) : AuTest(msa, make_persite_vec(persite_loglh), scales, num_replicates, seed) {
     }
 
     AuTest(std::shared_ptr<PartitionedMSA> msa,
-           const std::vector<std::vector<doubleVector>> &reference_logh_matrix,
-           const std::vector<std::vector<doubleVector>> &comparison_logh_matrix,
+           const std::vector<std::vector<doubleVector> > &reference_logh_matrix,
+           const std::vector<std::vector<doubleVector> > &comparison_logh_matrix,
            const doubleVector &scales,
            const uintVector &num_replicates,
-           long seed) : AuTest(msa, combine_persite_vec(reference_logh_matrix, comparison_logh_matrix), scales, num_replicates, seed) {
+           const long seed) : AuTest(msa, combine_persite_vec(reference_logh_matrix, comparison_logh_matrix), scales,
+                               num_replicates, seed) {
     }
 
     AuTest(std::shared_ptr<PartitionedMSA> msa,
            std::vector<std::vector<const double *> > loglh_matrices,
-           const doubleVector &scales,
-           const uintVector &num_replicates,
-           long seed) : msa(msa), persite_loglh(std::move(loglh_matrices)),
+           doubleVector scales,
+           uintVector num_replicates,
+           const long seed) : msa(std::move(msa)), persite_loglh(std::move(loglh_matrices)),
                         test_statistics(nullptr),
                         normalized_statistics(nullptr),
                         p_values(persite_loglh.size()),
                         finished(false),
-                        scales(scales), num_replicates(num_replicates), num_trees(persite_loglh.size()),
+                        scales(std::move(scales)), num_replicates(std::move(num_replicates)), num_trees(persite_loglh.size()),
                         seed(seed) {
     }
 
@@ -62,6 +63,26 @@ public:
                                       seed(other.seed) {
         other.test_statistics = nullptr;
         other.normalized_statistics = nullptr;
+    }
+
+    AuTest &operator=(AuTest &&other) noexcept {
+        if (this == &other)
+            return *this;
+        msa = std::move(other.msa);
+        persite_loglh = std::move(other.persite_loglh);
+        test_statistics = other.test_statistics;
+        normalized_statistics = other.normalized_statistics;
+        p_values = std::move(other.p_values);
+        finished = other.finished;
+        scales = other.scales;
+        num_replicates = other.num_replicates;
+        num_trees = other.num_trees;
+        seed = other.seed;
+
+        other.test_statistics = nullptr;
+        other.normalized_statistics = nullptr;
+
+        return *this;
     }
 
 
@@ -146,7 +167,7 @@ public:
     bool is_finished() const;
 
 private:
-    const std::shared_ptr<PartitionedMSA> msa;
+    std::shared_ptr<PartitionedMSA> msa;
 
     std::vector<std::vector<const double *> > persite_loglh;
 
@@ -172,13 +193,13 @@ private:
      */
     bool finished;
 
-    const doubleVector &scales;
+    doubleVector scales;
 
-    const uintVector &num_replicates;
+    uintVector num_replicates;
 
-    const unsigned int num_trees;
+    unsigned int num_trees;
 
-    const int seed;
+    long seed;
 
     /**
      * Construct arrays of raw pointers from a persite_loglh matrix array, where each matrix gets turned into a linear
@@ -191,7 +212,7 @@ private:
      */
     static std::vector<std::vector<const double *> > make_persite_vec(
         const std::vector<std::vector<doubleVector> > &persite_loglh) {
-        std::vector<std::vector<const double *>> loglh_matrices;
+        std::vector<std::vector<const double *> > loglh_matrices;
         loglh_matrices.reserve(persite_loglh.size());
 
         append_persite_lnl_vectors(loglh_matrices, persite_loglh);
@@ -210,9 +231,9 @@ private:
      * @return a vector of double** pointers.
      */
     static std::vector<std::vector<const double *> > combine_persite_vec(
-    const std::vector<std::vector<doubleVector>> &first,
-       const std::vector<std::vector<doubleVector>> &second) {
-        std::vector<std::vector<const double *>> loglh_matrices;
+        const std::vector<std::vector<doubleVector> > &first,
+        const std::vector<std::vector<doubleVector> > &second) {
+        std::vector<std::vector<const double *> > loglh_matrices;
 
         loglh_matrices.reserve(first.size() + second.size());
 
@@ -226,9 +247,9 @@ private:
      * Append pointers to the entries in persite_loglh to the back of loglh_matrices.
      */
     static void append_persite_lnl_vectors(
-        std::vector<std::vector<const double *>> &loglh_matrices,
+        std::vector<std::vector<const double *> > &loglh_matrices,
         const std::vector<std::vector<doubleVector> > &persite_loglh
-        ) {
+    ) {
         for (auto &partitions: persite_loglh) {
             std::vector<const double *> partition_logh;
             partition_logh.reserve(partitions.size());
