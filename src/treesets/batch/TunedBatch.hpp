@@ -121,24 +121,6 @@ public:
                   unsigned int worker_id, unsigned int thread_id);
 
     /**
-     * Perform the AU test on the trees in the batch, as well as the supplied reference trees,
-     * but backup the model before, optimize the model fully, and then restore the original model.
-     *
-     * @param resources au test instance and profiling, shared between batches
-     * @param initialized if false, the au_test instance is not initialized and memory will be allocated, and the
-     *                    reference trees included in the bootstrap. Otherwise, only the batch trees are included.
-     * @param context task group context
-     * @param worker_id raxml-instance-local id of the worker. Within task groups, they need not start at 0.
-     * @param thread_id worker-local id of the thread, thread numbering start at 0 for each worker.
-     *
-     * @return The number of plausible trees.
-     */
-    void perform_plausibility_check(const Options &opts, SharedBatchResources &resources, bool initialized,
-                                    const TaskGroup &context,
-                                    unsigned int worker_id,
-                                    unsigned int thread_id);
-
-    /**
      * Update the meta heuristical parameters of the batch. This will forcibly update them, even if `is_compatible`
      * returns false.
      *
@@ -383,6 +365,24 @@ protected:
     void generate_starting_trees(const RaxmlInstance &instance, SharedBatchResources &resources,
                                  const TaskGroup &context,
                                  unsigned int worker_id, unsigned int thread_id);
+
+    /**
+     * Perform the AU test on the trees in the batch, as well as the supplied reference trees,
+     * but backup the model before, optimize the model fully, and then restore the original model.
+     *
+     * @param resources au test instance and profiling, shared between batches
+     * @param initialized if false, the au_test instance is not initialized and memory will be allocated, and the
+     *                    reference trees included in the bootstrap. Otherwise, only the batch trees are included.
+     * @param context task group context
+     * @param worker_id raxml-instance-local id of the worker. Within task groups, they need not start at 0.
+     * @param thread_id worker-local id of the thread, thread numbering start at 0 for each worker.
+     *
+     * @return The number of plausible trees.
+     */
+    void perform_plausibility_check(const Options &opts, SharedBatchResources &resources, bool initialized,
+                                    const TaskGroup &context,
+                                    unsigned int worker_id,
+                                    unsigned int thread_id);
 
     /**
      * Perform the AU test on the trees in the batch, as well as the supplied reference trees.
