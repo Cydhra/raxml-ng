@@ -121,11 +121,33 @@ void TunedBatch::perform_au_test(AuTest &au_test, const bool initialized, const 
 }
 
 void TunedBatch::perform_plausibility_check(const Options &opts, SharedBatchResources &resources,
-                                            const bool initialized,
+                                            bool initialized,
                                             const TaskGroup &context, const unsigned int worker_id,
                                             const unsigned int thread_id) {
     auto &au_test = resources.get_screening_test(context);
 
+    // check if the AU test needs to be re-build with more replicates
+    const auto rep_factor = resources.get_au_factor(context);
+    if (const auto target_factor = resources.target_au_test_factor->load(); rep_factor != target_factor) {
+        if (context.is_group_leader(worker_id, thread_id)) {
+            resources.set_au_factor(context, target_factor);
+            LOG_INFO_TS << this->name << ": Resetting AU test instance to " << (SHALLOW_REPS[0] * target_factor) <<
+                    " replicates per scale." << std::endl;
+
+            auto new_reps = std::vector<unsigned int>(SHALLOW_REPS.size());
+            for (unsigned int i = 0; i < new_reps.size(); ++i) {
+                new_reps[i] = SHALLOW_REPS[i] * target_factor;
+            }
+
+            au_test = AuTest(msa, *reference_persite_loglh, batch_persite_logh, AU_DEFAULT_SCALES, new_reps, opts.random_seed);
+        }
+
+        // we need to sychronize the new AuTest instance between threads
+        context.enter_barrier();
+        initialized = false;
+    }
+
+    // check if the AU test needs to be initialized
     if (context.is_group_leader(worker_id, thread_id)) {
         if (!initialized) {
             au_test.allocate_test_statistics(false);
@@ -134,6 +156,7 @@ void TunedBatch::perform_plausibility_check(const Options &opts, SharedBatchReso
     }
 
     // reset model to original for AU test
+    // TODO move this in specialized model opt, such that the last model is optimized on this rather than the old tree info
     if (meta_parameters.model_override) {
         for (const auto &tree_id: coarse_assignments->at(worker_id)) {
             batch_trees[tree_id][thread_id].emplace(opts, batch_trees[tree_id][thread_id]->tree(), *msa, *tip_msa_idmap,
@@ -164,6 +187,34 @@ void TunedBatch::perform_plausibility_check(const Options &opts, SharedBatchReso
             LOG_WARN <<
                     "Warning: treeset search found strictly better tree than ML search. Plausible treeset no longer plausible."
                     << std::endl;
+        }
+
+        // check if we need to update the plausible reference tree count.
+        if (resources.expected_plausible_reference_trees->load() == -1) {
+            auto default_value = -1;
+            resources.expected_plausible_reference_trees->compare_exchange_strong(default_value, reference_p_count, memory_order_acquire, memory_order_release);
+        }
+
+        if (abs(resources.expected_plausible_reference_trees->load(memory_order_acquire) - reference_p_count) > 1) {
+            LOG_WARN << this->name << ": AU Test found to be instable. Previous plausible count was " << resources.expected_plausible_reference_trees->load(memory_order_acquire) << " but we got " << reference_p_count << " trees.";
+
+            while (true) {
+                auto target_factor = resources.target_au_test_factor->load();
+
+                if (const auto new_rep_factor = min(rep_factor * 2, 20u); target_factor != new_rep_factor) {
+                    if (resources.target_au_test_factor->compare_exchange_strong(target_factor, new_rep_factor, memory_order_acquire, memory_order_release)) {
+                        LOG_WARN << " Updated to replicate factor " << new_rep_factor << std::endl;
+
+                        // reset plausible ref tree count to be reevaluated after we reset the AU test
+                        resources.expected_plausible_reference_trees->exchange(-1);
+
+                        break;
+                    }
+                } else {
+                    LOG_WARN << std::endl;
+                    break;
+                }
+            }
         }
 
         // count how many inferred trees are plausible

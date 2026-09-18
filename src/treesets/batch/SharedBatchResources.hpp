@@ -78,6 +78,18 @@ public:
     }
 
     /**
+     * The target factor that the au_test_factors should have. Since thread groups are responsible with allocating
+     * and freeing their AuTest instance, this factor can be increased from the outside to make thread groups increase
+     * their AU test size at the next convenient time.
+     */
+    std::unique_ptr<atomic_uint> target_au_test_factor = make_unique<atomic_uint>(DEFAULT_FACTOR);
+
+    /**
+     * How many of the reference trees should be plausible.
+     */
+    std::unique_ptr<atomic_int> expected_plausible_reference_trees = make_unique<atomic_int>(-1);
+
+    /**
      * @return An Optimizer instance pre-configured to run `RAxML-ng --fast` inference
      */
     [[nodiscard]] Optimizer &get_fast_optimizer() const {
@@ -142,6 +154,20 @@ public:
         this->initialized[context.group_id()] = true;
     }
 
+    /**
+     * @return the factor currently used for AU test replicates
+     */
+    [[nodiscard]] unsigned int get_au_factor(const TaskGroup &context) const {
+        return this->au_test_factors.at(context.group_id());
+    }
+
+    /**
+     * Update the current au-test factor to a new value.
+     */
+    void set_au_factor(const TaskGroup &context, const unsigned int factor) {
+        this->au_test_factors[context.group_id()] = factor;
+    }
+
 protected:
     /**
      * Shared AU test instances, one for each thread group. These are initialized with drastically reduced replication
@@ -154,13 +180,6 @@ protected:
      * Factors for the SHALLOW_REPS constants of AU test replicate counts.
      */
     std::vector<unsigned int> au_test_factors;
-
-    /**
-     * The target factor that the au_test_factors should have. Since thread groups are responsible with allocating
-     * and freeing their AuTest instance, this factor can be increased from the outside to make thread groups increase
-     * their AU test size at the next convenient time.
-     */
-    std::unique_ptr<atomic_uint> target_au_test_factor = make_unique<atomic_uint>(DEFAULT_FACTOR);
 
     /**
      * Whether the corresponding Au Test has been used before, initializing the bootstrap values of the reference trees.
