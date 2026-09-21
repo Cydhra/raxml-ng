@@ -236,6 +236,11 @@ void TunedBatch::perform_plausibility_check(const Options &opts, SharedBatchReso
 }
 
 void TunedBatch::update_meta_parameters(const MetaParameters &new_parameters) {
+    // do not inherit model if we optimize it anyway to avoid bias
+    if (new_parameters.do_first_model || new_parameters.is_fallback()) {
+        this->initial_model = make_shared<ModelMap>();
+    }
+
     if (!this->start_trees_generated()) {
         // this is currently not configurable with parameters, but may be in the future
         this->start_tree_heuristic = make_unique<Parsimony>(this->name, this->get_batch_size(), this->starting_seed,
