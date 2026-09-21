@@ -21,15 +21,15 @@ void TreesetOptimizer::initialize_bandits() {
 
     auto light_mab = make_shared<MultiArmedBandit<MetaParameters> >();
     light_mab->emplace_back("Greedy,DoModel,2spr",
-                            MetaParameters().with_topk(1).with_first_model(false).with_fast_rounds(2).with_radius(
-                                adaptive_radius));
-    light_mab->emplace_back("Greedy,NoModel,2spr",
                             MetaParameters().with_topk(1).with_first_model(true).with_fast_rounds(2).with_radius(
                                 adaptive_radius));
-    light_mab->emplace_back("Greedy,DoModel,2spr",
-                            MetaParameters().with_first_model(false).with_fast_rounds(2).with_radius(adaptive_radius));
     light_mab->emplace_back("Greedy,NoModel,2spr",
+                            MetaParameters().with_topk(1).with_first_model(false).with_fast_rounds(2).with_radius(
+                                adaptive_radius));
+    light_mab->emplace_back("Greedy,DoModel,2spr",
                             MetaParameters().with_first_model(true).with_fast_rounds(2).with_radius(adaptive_radius));
+    light_mab->emplace_back("Greedy,NoModel,2spr",
+                            MetaParameters().with_first_model(false).with_fast_rounds(2).with_radius(adaptive_radius));
     this->mab.register_new_successor(4, "Light", std::move(light_mab));
 
     // low radius heuristics
