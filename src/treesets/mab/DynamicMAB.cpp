@@ -1,15 +1,29 @@
 #include "DynamicMAB.hpp"
 
+void register_mapping(std::unordered_map<MetaParameters, size_t> &outer_mapping,
+                      std::unordered_map<MetaParameters, size_t> &inner_mapping,
+                      MetaParameters &parameters,
+                      size_t outer_id,
+                      size_t inner_id) {
+    assert(outer_mapping.find(parameters) == outer_mapping.end());
+
+    outer_mapping.insert({parameters, outer_id});
+    inner_mapping.insert({parameters, inner_id});
+}
+
 void DynamicMAB::register_new_arm(const std::string &name, const OuterArm &new_arm) {
     auto id = hierarchical_mab.emplace_back(name, new_arm);
 
     for (size_t inner_id = 0; inner_id < new_arm->num_bandits(); ++inner_id) {
         auto &parameters = new_arm->get_bandit(inner_id).get_parameters();
-        assert(outer_mapping.find(parameters) == outer_mapping.end());
-
-        outer_mapping.insert({parameters, id});
-        inner_mapping.insert({parameters, inner_id});
+        register_mapping(outer_mapping, inner_mapping, parameters, id, inner_id);
     }
+}
+
+void DynamicMAB::add_bandit_to_arm(const Bandit<OuterArm> &arm, const size_t outer_id, MetaParameters &new_parameters,
+                                   const std::string &name) {
+    const auto inner_id = arm.get_parameters()->emplace_back(name, new_parameters);
+    register_mapping(outer_mapping, inner_mapping, new_parameters, outer_id, inner_id);
 }
 
 void DynamicMAB::register_new_successor(const unsigned int level, const std::string &&name, const OuterArm &&new_arm) {
@@ -54,6 +68,7 @@ void DynamicMAB::check_update() {
 void DynamicMAB::propose_more_effort() {
     const auto current_level = hierarchical_mab.num_bandits();
 
+
     // add all bandits of the current level
     for (auto it = this->successors.begin(); it != this->successors.end(); it += 1) {
         if (std::get<0>(*it) <= current_level) {
@@ -76,12 +91,7 @@ void DynamicMAB::propose_less_effort() {
         LOG_WORKER_TS(LogLevel::info) << std::endl << "Mutating bandit " << inner_bandit.get_name() <<
                 "." << std::endl;
 
-        auto outer_id = outer_mapping[parameters];
-        auto inner_id = bandit.get_parameters()->emplace_back(inner_bandit.get_name() + ",mut", new_parameters);
-
-        // TOdo move this behavior into dedicated method
-        outer_mapping.insert({new_parameters, outer_id});
-        inner_mapping.insert({new_parameters, inner_id});
+        this->add_bandit_to_arm(bandit, outer_mapping[parameters], new_parameters, inner_bandit.get_name() + ",mut");
 
         last_mab_modification = hierarchical_mab.get_iterations_completed();
     }

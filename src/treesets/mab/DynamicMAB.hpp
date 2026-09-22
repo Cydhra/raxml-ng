@@ -22,6 +22,8 @@ public:
      */
     void register_new_arm(const std::string &name, const OuterArm &new_arm);
 
+    void add_bandit_to_arm(const Bandit<OuterArm> &arm, const size_t outer_id, MetaParameters &new_parameters, const std::string &name);
+
     void register_new_successor(unsigned int level, const std::string &&name, const OuterArm &&new_arm);
 
     /**
