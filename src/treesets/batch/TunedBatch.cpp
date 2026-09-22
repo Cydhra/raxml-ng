@@ -155,15 +155,6 @@ void TunedBatch::perform_plausibility_check(const Options &opts, SharedBatchReso
         au_test.replace_persite_loglh(reference_persite_loglh->size(), batch_persite_logh);
     }
 
-    // reset model to original for AU test
-    // TODO move this in specialized model opt, such that the last model is optimized on this rather than the old tree info
-    if (meta_parameters.model_override) {
-        for (const auto &tree_id: coarse_assignments->at(worker_id)) {
-            batch_trees[tree_id][thread_id].emplace(opts, batch_trees[tree_id][thread_id]->tree(), *msa, *tip_msa_idmap,
-                                                    part_assignments->at(thread_id));
-        }
-    }
-
     const auto begin = std::chrono::steady_clock::now();
     this->perform_au_test(au_test, initialized, context, worker_id, thread_id);
 
@@ -255,8 +246,11 @@ void TunedBatch::update_meta_parameters(const MetaParameters &new_parameters) {
                                                             msa, tip_msa_idmap);
     } else {
         this->heuristic = HeuristicFactory::extend_heuristic(new_parameters, this->meta_parameters,
-                                                             std::move(this->heuristic), name, get_batch_size(),
-                                                             this->threads_per_worker, part_assignments, msa);
+        std::move(this->heuristic), name, get_batch_size(),
+       this->threads_per_worker, batch_start_trees,
+       part_assignments,
+       initial_model,
+       msa, tip_msa_idmap);
     }
 
     this->meta_parameters = new_parameters;
