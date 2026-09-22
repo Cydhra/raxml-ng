@@ -51,9 +51,6 @@ void DynamicMAB::take_measurement(TunedBatch &batch) {
 }
 
 void DynamicMAB::check_update() {
-    // TODO implement a proper heuristic here. For now, we check if the current arm exceeds 75% success per batch,
-    //  and if not, we add arms according to a pre-defined mapping.
-
     // check if we have more than a trivial amount of data, if the success rate is low, and we had at least 4 batches since the last modification
     if (last_mab_modification + MIN_PAUSE_BETWEEN_MODIFICATIONS < hierarchical_mab.get_iterations_completed() &&
         hierarchical_mab.get_best_bandit().num_samples() >= 4) {
@@ -68,17 +65,31 @@ void DynamicMAB::check_update() {
 void DynamicMAB::propose_more_effort() {
     const auto current_level = hierarchical_mab.num_bandits();
 
+    const auto &bandit = hierarchical_mab.get_best_bandit();
+    const auto &name = bandit.get_name();
 
-    // add all bandits of the current level
-    for (auto it = this->successors.begin(); it != this->successors.end(); it += 1) {
-        if (std::get<0>(*it) <= current_level) {
-            if (!hierarchical_mab.has_bandit(std::get<1>(*it))) {
-                LOG_WORKER_TS(LogLevel::info) << std::endl << "Adding bandit " << std::get<1>(*it) <<
-                        " to algorithm." << std::endl;
-                register_new_arm(std::get<1>(*it), std::get<2>(*it));
-                last_mab_modification = hierarchical_mab.get_iterations_completed();
+    const auto previous_successors_spawned = past_increases.find(name);
+    unsigned int previous_modifications = 0;
+    if (previous_successors_spawned != past_increases.end()) {
+        previous_modifications += previous_successors_spawned->second;
+    }
+
+    // dont add expensive bandits if that didnt work before and we are already getting trees
+    if (previous_modifications < 2 || bandit.get_expected_tree_rate() < 0.1) {
+        // add all bandits of the current level
+        for (auto it = this->successors.begin(); it != this->successors.end(); it += 1) {
+            if (std::get<0>(*it) <= current_level) {
+                if (!hierarchical_mab.has_bandit(std::get<1>(*it))) {
+                    LOG_WORKER_TS(LogLevel::info) << std::endl << "Adding bandit " << std::get<1>(*it) <<
+                            " to algorithm." << std::endl;
+                    register_new_arm(std::get<1>(*it), std::get<2>(*it));
+                    last_mab_modification = hierarchical_mab.get_iterations_completed();
+                }
             }
         }
+
+        previous_modifications++;
+        past_increases[name] = previous_modifications;
     }
 }
 

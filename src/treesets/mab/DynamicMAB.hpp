@@ -72,6 +72,11 @@ protected:
     // TODO get rid of this heuristic
     unsigned int last_mab_modification = 0;
 
+    /**
+     * How often
+     */
+    std::unordered_map<std::string, unsigned int> past_increases = {};
+
     std::unordered_map<MetaParameters, unsigned int> past_mutations = {};
 
     /**
