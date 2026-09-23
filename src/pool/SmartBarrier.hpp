@@ -17,7 +17,7 @@ public:
             pthread_barrier_destroy(b);
             delete b;
         }
-    }) {
+    }), num_threads(num_threads) {
         pthread_barrier_init(this->get(), nullptr, num_threads);
     }
 
@@ -28,6 +28,13 @@ public:
     void enter() const noexcept {
         pthread_barrier_wait(this->get());
     }
+
+    unsigned int threads_required() const noexcept {
+        return num_threads;
+    }
+
+protected:
+    unsigned int num_threads;
 };
 
 #endif //RAXML_SMARTBARRIER_HPP_
