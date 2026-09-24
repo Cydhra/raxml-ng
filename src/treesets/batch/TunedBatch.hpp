@@ -12,7 +12,7 @@
 #include "../../au/AuTest.hpp"
 #include "../../Checkpoint.hpp"
 #include "../../Optimizer.hpp"
-#include "../start/StartTreeHeuristic.hpp"
+#include "../start/TreeSource.hpp"
 
 // forward declaration to avoid cyclic header inclusion
 class SharedBatchResources;
@@ -33,7 +33,6 @@ public:
                const std::shared_ptr<PartitionedMSA> &msa,
                const std::shared_ptr<IDVector> &tip_msa_idmap,
                const std::shared_ptr<std::vector<std::vector<doubleVector> > > &reference_persite_loglh,
-               const unsigned int starting_seed,
                const unsigned int batch_size,
                const unsigned int num_threads,
                const unsigned int num_workers,
@@ -41,10 +40,10 @@ public:
         : name(std::move(name)),
           reference_persite_loglh(reference_persite_loglh),
           msa(msa),
-          starting_seed(starting_seed),
-          batch_start_trees(new TreeList(batch_size)),
+          batch_start_trees(make_shared<TreeList>(batch_size)),
           tip_msa_idmap(tip_msa_idmap),
           batch_persite_logh(std::vector<std::vector<doubleVector> >(batch_size)),
+          batch_size(batch_size),
           num_workers(num_workers),
           threads_per_worker(num_threads / num_workers) {
         for (auto &tree_slh: batch_persite_logh) {
@@ -225,12 +224,6 @@ protected:
     shared_ptr<PartitionedMSA> msa;
 
     /**
-     * The starting seed (starting from 0) for this batch. Batches infer starting trees with ascending seeds, so this
-     * number is the number of starting trees in previous batches.
-     */
-    unsigned int starting_seed;
-
-    /**
      * The meta-heuristic parameters for inferring trees. These are not the model parameters, but settings of the
      * inference heuristics which are being optimized for plausible tree throughput during tree set inference.
      */
@@ -299,6 +292,9 @@ protected:
      */
     unsigned int plausible_tree_count{0};
 
+    // TODO placeholder until tree source is dynamic
+    double tree_time{0.0};
+
     /**
      * Time spent in AU test. This has to be considered for the total wall time, because the amortized cost of AU test
      * increases if less trees become plausible. But it cannot be added directly on top of the wall time, because
@@ -328,14 +324,11 @@ protected:
     doubleVector p_values;
 
     /**
-     * Decorated generation strategy for starting trees, set when `update_meta_parameters` is called.
-     */
-    std::unique_ptr<StartTreeHeuristic> start_tree_heuristic = {};
-
-    /**
      * Decorated inference strategy, set when `update_meta_parameters` is called.
      */
     std::unique_ptr<InferenceHeuristic> heuristic = {};
+
+    unsigned int batch_size;
 
     /**
      * How many workers work on this batch

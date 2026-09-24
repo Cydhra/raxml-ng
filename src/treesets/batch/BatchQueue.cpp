@@ -24,7 +24,6 @@ TunedBatch &BatchQueue::generate_batch(const unsigned int num_workers, const uns
                                msa,
                                tip_msa_idmap,
                                persite_loglh,
-                               generate_seed_for_trees(this->batch_size),
                                this->batch_size,
                                num_threads,
                                num_workers,
@@ -114,4 +113,3 @@ void BatchQueue::finish_batch(TunedBatch &batch) {
 
     this->in_flight.erase(batch.get_name());
 }
-

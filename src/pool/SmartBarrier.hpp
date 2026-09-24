@@ -1,6 +1,7 @@
 #ifndef RAXML_SMARTBARRIER_HPP_
 #define RAXML_SMARTBARRIER_HPP_
 
+#include <functional>
 #include <pthread.h>
 
 /**

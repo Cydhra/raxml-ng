@@ -4,6 +4,7 @@
 #include "../../pool/Threadpool.hpp"
 #include "../../au/AuTest.hpp"
 #include "../../Optimizer.hpp"
+#include "../start/ParsimonySource.hpp"
 
 /**
  * Shallow replication counts for a faster AU test.
@@ -27,7 +28,7 @@ public:
                          const std::vector<std::vector<doubleVector> > &reference_logh_matrix,
                          const unsigned int batch_size,
                          long seed,
-                         const double pythia_score) {
+                         const double pythia_score) : parsimony_source(seed) {
         // prepare a dummy matrix with empty vectors to correctly initialize the AU-Test. These dummy vectors
         // will be replaced by the TunedBatch instance before the AU test is called.
         std::vector<std::vector<doubleVector> > batch_loglh_dummy(batch_size);
@@ -168,6 +169,10 @@ public:
         this->au_test_factors[context.group_id()] = factor;
     }
 
+    ParsimonySource &get_parsimony() {
+        return parsimony_source;
+    }
+
 protected:
     /**
      * Shared AU test instances, one for each thread group. These are initialized with drastically reduced replication
@@ -229,6 +234,11 @@ protected:
      * This is instanced for the raxml-fast fallback bandit.
      */
     shared_ptr<CheckpointManager> adaptive_checkpoint_manager;
+
+    /**
+     * Global source of parsimony trees, such that trees can be reused for heuristics other than ML.
+     */
+    ParsimonySource parsimony_source;
 };
 
 #endif //RAXML_SHAREDBATCHRESOURCES_HPP_
