@@ -42,7 +42,7 @@ public:
      * @param thread_id the local (within worker) thread id of the current thread
      * @return true, if the current thread is the leader of the task group
      */
-    bool is_group_leader(const unsigned int worker_id, const unsigned int thread_id) const {
+    [[nodiscard]] bool is_group_leader(const unsigned int worker_id, const unsigned int thread_id) const {
         return thread_id == 0 && (worker_id % num_workers) == 0;
     }
 
@@ -54,7 +54,7 @@ public:
      * @param worker_id global (rank local) worker id
      * @return thread id of contiguous ids in the TaskGroup
      */
-    unsigned int get_group_worker_id(const unsigned int worker_id) const {
+    [[nodiscard]] unsigned int get_group_worker_id(const unsigned int worker_id) const {
         return worker_id % num_workers;
     }
 
@@ -67,7 +67,7 @@ public:
      * @param thread_id local (worker local) thread id
      * @return thread id of contiguous ids in the TaskGroup
      */
-    unsigned int get_group_thread_id(const unsigned int worker_id, const unsigned int thread_id) const {
+    [[nodiscard]] unsigned int get_group_thread_id(const unsigned int worker_id, const unsigned int thread_id) const {
         return (worker_id % num_workers) * (num_threads / num_workers) + thread_id;
     }
 
@@ -84,7 +84,7 @@ public:
     /**
      * Get a reference to the task currently assigned to the task group.
      */
-    BatchTask &get_task() const {
+    [[nodiscard]] BatchTask &get_task() const {
         return *current_task;
     }
 
@@ -95,10 +95,14 @@ public:
         this->task_barrier.enter();
     }
 
+    [[nodiscard]] const SmartBarrier &get_barrier() const {
+        return this->task_barrier;
+    }
+
     /**
      * @return the rank-local group id of this TaskGroup
      */
-    unsigned int group_id() const {
+    [[nodiscard]] unsigned int group_id() const {
         return task_group_id;
     }
 
