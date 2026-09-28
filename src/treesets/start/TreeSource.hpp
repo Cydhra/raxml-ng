@@ -26,17 +26,45 @@ public:
      * Obtain `num_trees` tree topology from the source with multiple threads at once.
      * If not enough trees are present, some threads may generate new ones.
      */
-    virtual std::tuple<unsigned int, unsigned int> consume_batch(const RaxmlInstance &instance, const SmartBarrier &barrier, unsigned int threads_per_worker, unsigned int worker_id, unsigned int thread_id, unsigned int num_trees) = 0;
+    virtual std::tuple<unsigned int, unsigned int> consume_batch(const RaxmlInstance &instance, const SmartBarrier &barrier, unsigned int threads_per_worker, unsigned int worker_id, unsigned int thread_id, unsigned int num_trees);
 
     /**
      * Copy the tree at the given tree id to the target reference
      */
-    virtual void copy_tree(Tree &target, unsigned int tree_id) const = 0;
+    virtual void copy_tree(Tree &target, unsigned int tree_id) const;
 
     /**
      * @return mean estimate of time spent per tree on parsimony
      */
     [[nodiscard]] virtual double amortized_time(unsigned int batch_size) const = 0;
+
+    /**
+     * The master thread of the current cohort (i.e. thread where worker_id and thread_id is 0) locks the mutex for
+     * the reserve counter, and every other thread waits for them.
+     *
+     * @param barrier a barrier for all threads involved in the modification of the reserve counter
+     * @param worker_id the worker-id of the local thread, exactly one worker (potentially multiple threads) must have worker id 0
+     * @param thread_id the worker-local thread id of the local thread, exactly one thread in each worker must have id 0
+     */
+    unsigned int acquire_reservation(const SmartBarrier &barrier, unsigned int worker_id, unsigned int thread_id, unsigned int num_trees);
+
+protected:
+    /**
+     * A list of (pre-generated) tree topologies. The topologies can be used as starting trees (consuming them) or in
+     * heuristics that do not use them as a starting tree for inference, in which case consumption is not necessary,
+     * and ML heuristics can reuse those trees.
+     */
+    std::deque<Tree> tree_list = {};
+
+    /**
+     * Cursor within the treelist to demarc the boundary of yet-unconsumed tree topologies.
+     */
+    unsigned int tree_cursor = 0;
+
+    /**
+     * A mutex that the master-thread must hold during modification of the tree list cursor
+     */
+    std::unique_ptr<std::mutex> tree_reserve_mutex = std::make_unique<std::mutex>();
 };
 
 

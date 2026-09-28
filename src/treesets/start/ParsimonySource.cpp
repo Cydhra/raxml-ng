@@ -52,16 +52,6 @@ void ParsimonySource::ensure(const RaxmlInstance &instance, const SmartBarrier &
     }
 }
 
-std::tuple<unsigned int, unsigned int> ParsimonySource::consume_batch(const RaxmlInstance &instance, const SmartBarrier &barrier, const unsigned int threads_per_worker, unsigned int worker_id, unsigned int thread_id, unsigned int num_trees) {
-    const auto start_index = acquire_reservation(barrier, worker_id, thread_id, num_trees);
-    this->ensure(instance, barrier, threads_per_worker, worker_id, thread_id, start_index + num_trees);
-    return {start_index, start_index + num_trees};
-}
-
-void ParsimonySource::copy_tree(Tree &target, const unsigned int tree_id) const {
-    target = tree_list.at(tree_id);
-}
-
 double ParsimonySource::amortized_time(unsigned int batch_size) const {
     // not thread-safe but we stay silly
     return static_cast<double>(*cumulative_wall_time) / static_cast<double>(*trees_generated) * static_cast<double>(batch_size);
