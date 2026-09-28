@@ -18,8 +18,8 @@ unsigned int TreeSource::acquire_reservation(const SmartBarrier &barrier, const 
     const auto start_index = this->tree_cursor;
     barrier.enter();
 
-    this->tree_cursor += num_trees;
     if (worker_id + thread_id == 0) {
+        this->tree_cursor += num_trees;
         tree_reserve_mutex->unlock();
     }
 
