@@ -189,7 +189,7 @@ void TunedBatch::perform_plausibility_check(const Options &opts, SharedBatchReso
         if (resources.expected_plausible_reference_trees->load() == -1) {
             auto default_value = -1;
             resources.expected_plausible_reference_trees->compare_exchange_strong(
-                default_value, reference_p_count, memory_order_acquire, memory_order_release);
+                default_value, reference_p_count, memory_order_acq_rel, memory_order_acquire);
         }
 
         if (abs(resources.expected_plausible_reference_trees->load(memory_order_acquire) - reference_p_count) > 1) {
@@ -202,7 +202,7 @@ void TunedBatch::perform_plausibility_check(const Options &opts, SharedBatchReso
 
                 if (const auto new_rep_factor = min(rep_factor * 2, 20u); target_factor != new_rep_factor) {
                     if (resources.target_au_test_factor->compare_exchange_strong(
-                        target_factor, new_rep_factor, memory_order_acquire, memory_order_release)) {
+                        target_factor, new_rep_factor, memory_order_acq_rel, memory_order_acquire)) {
                         LOG_WARN << " Updated to replicate factor " << new_rep_factor << std::endl;
 
                         // reset plausible ref tree count to be reevaluated after we reset the AU test
