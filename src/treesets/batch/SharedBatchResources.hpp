@@ -23,7 +23,6 @@ public:
     SharedBatchResources(const unsigned int num_task_groups,
                          const unsigned int workers_per_group,
                          const unsigned int total_threads,
-                         const RaxmlInstance &instance,
                          const Options &opts,
                          TreeList initial_ml_trees,
                          Tree baseline_tree,
@@ -34,7 +33,7 @@ public:
                          long seed,
                          const double pythia_score) : parsimony_source(make_shared<ParsimonySource>(seed)),
                                                       aggressive_source(
-                                                          make_shared<AggressiveSource>(parsimony_source, seed, instance, opts, initial_ml_trees, baseline_tree)) {
+                                                          make_shared<AggressiveSource>(parsimony_source, seed, opts, initial_ml_trees, baseline_tree)) {
         // prepare a dummy matrix with empty vectors to correctly initialize the AU-Test. These dummy vectors
         // will be replaced by the TunedBatch instance before the AU test is called.
         std::vector<std::vector<doubleVector> > batch_loglh_dummy(batch_size);

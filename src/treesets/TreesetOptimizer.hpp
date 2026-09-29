@@ -114,7 +114,7 @@ public:
                                                                    opts.treeset_groups,
                                                                    opts.treeset_workers,
                                                                    opts.treeset_threads,
-                                                                   instance, opts,
+                                                                   opts,
                                                                    initial_ml_trees,
                                                                    baseline_tree,
                                                                    msa, tree,
