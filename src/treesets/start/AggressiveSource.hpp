@@ -1,11 +1,12 @@
 #ifndef RAXML_NG_AGGRESSIVESOURCE_HPP
 #define RAXML_NG_AGGRESSIVESOURCE_HPP
 
+#include <utility>
+
 #include "ParsimonySource.hpp"
 #include "TreeRepository.hpp"
 #include "TreeSource.hpp"
 #include "../../bootstrap/SplitsTree.hpp"
-#include "../../bootstrap/ConsensusTree.hpp"
 #include "../../bootstrap/EbgSupportTree.hpp"
 
 using namespace std;
@@ -32,9 +33,9 @@ struct RaxmlInstance;
 class AggressiveSource : public TreeSource {
 public:
     explicit AggressiveSource(const std::shared_ptr<ParsimonySource> &donor, const int seed,
-                              const TreeList &initial_ml_trees, const Tree &baseline_tree) : baseline_tree(baseline_tree),
-        initial_ml_trees(initial_ml_trees),
-        donor(donor), seed(seed) {
+                              TreeList initial_ml_trees, Tree baseline_tree) : baseline_tree(std::move(baseline_tree)),
+        initial_ml_trees(std::move(initial_ml_trees)),
+        donor_tree_source(donor), seed(seed) {
     }
 
     void ensure(const RaxmlInstance &instance, const SmartBarrier &barrier, unsigned int threads_per_worker,
@@ -71,7 +72,7 @@ protected:
 
     TreeList generate_seed_greedy_candidates(
         const ConstTreeRange &donor_pool,
-        const std::vector<std::vector<corax_split_base_t> > &donor_topologies,
+        const std::vector<std::vector<corax_split_base_t> > &donor_splits,
         unsigned int requested_candidates,
         unsigned long round_seed);
 
@@ -85,9 +86,9 @@ protected:
         unsigned long round_seed);
 
 
-    Tree materialize_candidate(const std::vector<CandidateSplit> &selected, const Tree &label_source);
+    Tree materialize_candidate(const std::vector<CandidateSplit> &selected);
 
-    std::shared_ptr<ParsimonySource> donor;
+    std::shared_ptr<ParsimonySource> donor_tree_source;
 
     TreeList bootstrap_support_trees;
 

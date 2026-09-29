@@ -1,4 +1,5 @@
 #include "AggressiveSource.hpp"
+#include "../../bootstrap/ConsensusTree.hpp"
 
 constexpr size_t NUM_DONOR_TREE = 300;
 
@@ -6,11 +7,11 @@ constexpr size_t NUM_DONOR_TREE = 300;
 static constexpr unsigned int BOOTSTRAP_SUPPORT_COUNT = 200;
 
 /** A vector of bit-vectors (stored as a vector of corax_split_base_t). Each bit vector is one split from the tree. */
-using AllSplits = std::vector<std::vector<corax_split_base_t> >;
+using SplitList = std::vector<std::vector<corax_split_base_t> >;
 
 // extract splits from tree, encoded as bit vectors
-static AllSplits extract_splits(const Tree &tree, const bool normalize) {
-    AllSplits result;
+static SplitList extract_splits(const Tree &tree, const bool normalize) {
+    SplitList result;
     if (tree.empty() || tree.num_splits() == 0)
         return result;
 
@@ -18,11 +19,9 @@ static AllSplits extract_splits(const Tree &tree, const bool normalize) {
     const auto bits_per_word = static_cast<unsigned int>(sizeof(corax_split_base_t) * 8);
     const auto words_per_split = tip_count / bits_per_word +
                                  static_cast<unsigned int>(tip_count % bits_per_word != 0);
-    PllSplitSharedPtr splits(
-        corax_utree_split_create(&tree.pll_utree_root(), tip_count, nullptr),
-        corax_utree_split_destroy);
+    const PllSplitSharedPtr splits(corax_utree_split_create(&tree.pll_utree_root(), tip_count, nullptr),
+                                   corax_utree_split_destroy);
     if (!splits) {
-        coraxlib_reset_error();
         return result;
     }
 
@@ -69,24 +68,24 @@ static bool has_majority_split(
 }
 
 void AggressiveSource::ensure(const RaxmlInstance &instance, const SmartBarrier &barrier,
-                              unsigned int threads_per_worker, unsigned int worker_id, unsigned int thread_id,
-                              unsigned int num_trees) {
+                              const unsigned int threads_per_worker, const unsigned int worker_id,
+                              const unsigned int thread_id,
+                              const unsigned int num_trees) {
     const auto begin = std::chrono::steady_clock::now();
     // build_parsimony_msa(instance, false); // TODO initialize in main.cpp in case of checkpoint
 
     const auto requested_candidates = num_trees;
 
-    donor->ensure(instance, barrier, threads_per_worker, worker_id, thread_id, NUM_DONOR_TREE); // TODO magic value
+    donor_tree_source->ensure(instance, barrier, threads_per_worker, worker_id, thread_id, NUM_DONOR_TREE);
 
     // TODO change start position if the source was exhausted before
-    const auto donors = donor->range(0, NUM_DONOR_TREE);
+    const auto donors = donor_tree_source->range(0, NUM_DONOR_TREE);
 
     // move parsimony trees into duplicate checker
-    //
-    std::vector<std::vector<corax_split_base_t> > donor_topologies;
-    donor_topologies.reserve(NUM_DONOR_TREE);
+    SplitList donor_splits;
+    donor_splits.reserve(NUM_DONOR_TREE);
     for (const auto &tree: donors)
-        donor_topologies.push_back(topology_key(tree));
+        donor_splits.push_back(topology_key(tree));
 
     if (reference_splits.empty() && bootstrap_support_trees.empty()) {
         bootstrap_support_trees.reserve(BOOTSTRAP_SUPPORT_COUNT);
@@ -99,11 +98,10 @@ void AggressiveSource::ensure(const RaxmlInstance &instance, const SmartBarrier 
     const auto seed_size = seed_greedy_repository.candidate_count();
     const auto constrained_size = constrained_parsimony_repository.candidate_count();
 
-    // Fixed ordering makes global cross-source deduplication reproducible.
     if (!seed_greedy_exhausted) {
         auto generated = gate_and_rank(
             generate_seed_greedy_candidates(
-                donors, donor_topologies, requested_candidates, seed));
+                donors, donor_splits, requested_candidates, seed));
         for (auto &candidate: generated) {
             if (remember_topology(candidate))
                 seed_greedy_repository.append_candidate(std::move(candidate));
@@ -115,7 +113,7 @@ void AggressiveSource::ensure(const RaxmlInstance &instance, const SmartBarrier 
     if (!constrained_parsimony_exhausted) {
         auto generated = gate_and_rank(
             generate_constrained_parsimony_candidates(instance,
-                                                      donors, donor_topologies, requested_candidates, seed));
+                                                      donors, donor_splits, requested_candidates, seed));
         for (auto &candidate: generated) {
             if (remember_topology(candidate))
                 constrained_parsimony_repository.append_candidate(std::move(candidate));
@@ -302,7 +300,7 @@ bool AggressiveSource::prepare_gate() {
     support_trees.reserve(NUM_DONOR_TREE);
 
     // we have to copy because EBG needs a list
-    for (auto &tree : donor->range(0, NUM_DONOR_TREE)) {
+    for (auto &tree: donor_tree_source->range(0, NUM_DONOR_TREE)) {
         support_trees.emplace_back(tree);
     }
 
@@ -361,8 +359,8 @@ bool AggressiveSource::prepare_gate() {
 }
 
 TreeList AggressiveSource::generate_seed_greedy_candidates(const ConstTreeRange &donor_pool,
-                                                           const std::vector<std::vector<corax_split_base_t> > &
-                                                           donor_topologies, const unsigned int requested_candidates,
+                                                           const SplitList &donor_splits,
+                                                           const unsigned int requested_candidates,
                                                            const unsigned long round_seed) {
     TreeList candidates;
 
@@ -435,17 +433,18 @@ TreeList AggressiveSource::generate_seed_greedy_candidates(const ConstTreeRange 
         }
 
         try {
-            if (!has_majority_split(donor_topologies, seed_ids, words_per_split)) {
+            if (!has_majority_split(donor_splits, seed_ids, words_per_split)) {
                 ++incomplete_split_systems;
                 continue;
             }
-            ConsensusTree seed(seed_trees, ConsenseCutoff::MR);
-            seed.compute_support();
+
+            ConsensusTree seed_tree(seed_trees, ConsenseCutoff::MR);
+            seed_tree.compute_support();
 
             std::vector<CandidateSplit> selected;
             selected.reserve(max_splits);
 
-            auto seed_splits = extract_splits(seed, false);
+            auto seed_splits = extract_splits(seed_tree, false);
             if (seed_splits.empty()) {
                 ++materialization_failures;
                 continue;
@@ -501,18 +500,17 @@ TreeList AggressiveSource::generate_seed_greedy_candidates(const ConstTreeRange 
                 continue;
             }
 
-            Tree candidate = materialize_candidate(selected, baseline_tree);
+            Tree candidate = materialize_candidate(selected);
             if (candidate.empty() ||
                 !candidate.binary() ||
-                !seed.compatible(candidate)) {
+                !seed_tree.compatible(candidate)) {
                 coraxlib_reset_error();
                 ++materialization_failures;
                 continue;
             }
 
-            auto topology = topology_key(candidate);
-            if (topology.empty() || seen_topologies.find(topology) != seen_topologies.end() ||
-                !staged_topologies.insert(std::move(topology)).second) {
+            if (auto topology = topology_key(candidate); topology.empty() || seen_topologies.find(topology) != seen_topologies.end() ||
+                                                         !staged_topologies.insert(std::move(topology)).second) {
                 ++deduplicated_this_call;
                 continue;
             }
@@ -563,7 +561,7 @@ TreeList AggressiveSource::generate_constrained_parsimony_candidates(const Raxml
     coraxlib_reset_error();
 
     const auto tip_count = static_cast<unsigned int>(baseline_tree.num_tips());
-    const auto bits_per_word = static_cast<unsigned int>(sizeof(corax_split_base_t) * 8);
+    constexpr auto bits_per_word = static_cast<unsigned int>(sizeof(corax_split_base_t) * 8);
     const auto words_per_split = tip_count / bits_per_word +
                                  static_cast<unsigned int>(tip_count % bits_per_word != 0);
     if (tip_count <= 3 || words_per_split == 0) {
@@ -650,11 +648,9 @@ TreeList AggressiveSource::generate_constrained_parsimony_candidates(const Raxml
     return candidates;
 }
 
-Tree AggressiveSource::materialize_candidate(const std::vector<CandidateSplit> &selected, const Tree &label_source) {
+Tree AggressiveSource::materialize_candidate(const std::vector<CandidateSplit> &selected) {
     Tree result;
-    if (selected.empty() || label_source.empty()) {
-        return result;
-    }
+    assert(!selected.empty());
 
     // CORAX clones every input split during this call. Keep only a borrowed
     // pointer view; the CandidateSplit word vectors outlive materialization.
@@ -668,7 +664,7 @@ Tree AggressiveSource::materialize_candidate(const std::vector<CandidateSplit> &
         split_view.push_back(const_cast<corax_split_base_t *>(split.words.data()));
     }
 
-    const auto tip_labels = label_source.tip_labels_cstr();
+    const auto tip_labels = baseline_tree.tip_labels_cstr();
 
     corax_split_system_t split_system{};
     split_system.split_count = static_cast<unsigned int>(selected.size());
@@ -679,7 +675,7 @@ Tree AggressiveSource::materialize_candidate(const std::vector<CandidateSplit> &
     std::unique_ptr<corax_consensus_utree_t, decltype(&corax_utree_consensus_destroy)> materialized(
         corax_utree_from_splits(
             &split_system,
-            static_cast<unsigned int>(label_source.num_tips()),
+            static_cast<unsigned int>(baseline_tree.num_tips()),
             tip_labels.data()),
         corax_utree_consensus_destroy);
 
@@ -688,7 +684,7 @@ Tree AggressiveSource::materialize_candidate(const std::vector<CandidateSplit> &
         return result;
     }
 
-    result.pll_utree(static_cast<unsigned int>(label_source.num_tips()), *materialized->tree);
+    result.pll_utree(static_cast<unsigned int>(baseline_tree.num_tips()), *materialized->tree);
 
     // The cloned nodes contain non-owning consensus-data pointers. Clear them
     // before the temporary CORAX consensus object is destroyed.
