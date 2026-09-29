@@ -383,9 +383,7 @@ TreeList AggressiveSource::generate_seed_greedy_candidates(const TreeList &donor
     std::vector<CandidateSplit> split_pool;
 
     auto collect_tree_splits = [&](const Tree &tree, const bool from_ml) {
-        if (tree.empty() || tree.num_tips() != tip_count) {
-            return;
-        }
+        assert(!tree.empty() && tree.num_tips() == tip_count);
 
         for (auto &words: extract_splits(tree, false)) {
             auto existing = std::find_if(
@@ -408,9 +406,8 @@ TreeList AggressiveSource::generate_seed_greedy_candidates(const TreeList &donor
         }
     };
 
-    const auto promise_reference_count = std::min<std::size_t>(3, initial_ml_trees.size());
-    for (std::size_t tree_id = 0; tree_id < promise_reference_count; ++tree_id) {
-        collect_tree_splits(initial_ml_trees[tree_id], true);
+    for (const auto & initial_ml_tree : initial_ml_trees) {
+        collect_tree_splits(initial_ml_tree, true);
     }
     for (const auto &tree: donor_pool) {
         collect_tree_splits(tree, false);
