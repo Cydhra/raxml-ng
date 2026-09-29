@@ -70,7 +70,7 @@ protected:
     bool prepare_gate();
 
     TreeList generate_seed_greedy_candidates(
-        const TreeList &donor_pool,
+        const ConstTreeRange &donor_pool,
         const std::vector<std::vector<corax_split_base_t> > &donor_topologies,
         unsigned int requested_candidates,
         unsigned long round_seed);
@@ -79,7 +79,7 @@ protected:
 
     TreeList generate_constrained_parsimony_candidates(
         const RaxmlInstance &instance,
-        const TreeList &donor_pool,
+        const ConstTreeRange &donor_pool,
         const std::vector<std::vector<corax_split_base_t> > &donor_topologies,
         unsigned int requested_candidates,
         unsigned long round_seed);

@@ -4,6 +4,8 @@
 #include "../../pool/SmartBarrier.hpp"
 #include "../../Tree.hpp"
 
+class ConstTreeRange;
+
 // forward declaration of RaxmlInstance
 struct RaxmlInstance;
 
@@ -48,6 +50,17 @@ public:
      */
     unsigned int acquire_reservation(const SmartBarrier &barrier, unsigned int worker_id, unsigned int thread_id, unsigned int num_trees);
 
+    [[nodiscard]] std::deque<Tree>::const_iterator begin() const;
+
+    [[nodiscard]] std::deque<Tree>::const_iterator end() const;
+
+    [[nodiscard]] ConstTreeRange range(size_t start, size_t end) const;
+
+    /**
+     * @return Number of all trees, reserved or not, in the tree source.
+     */
+    [[nodiscard]] size_t total_trees() const;
+
 protected:
     /**
      * A list of (pre-generated) tree topologies. The topologies can be used as starting trees (consuming them) or in
@@ -67,5 +80,25 @@ protected:
     std::unique_ptr<std::mutex> tree_reserve_mutex = std::make_unique<std::mutex>();
 };
 
+class ConstTreeRange {
+
+public:
+    ConstTreeRange(TreeSource const &source, const size_t start_index, const size_t end_index): source(source), start_index(start_index), end_index(end_index) {
+        assert(start_index <= end_index);
+    }
+
+    [[nodiscard]] std::deque<Tree>::const_iterator begin() const;
+
+    [[nodiscard]] std::deque<Tree>::const_iterator end() const;
+
+    [[nodiscard]] size_t size() const;
+
+    Tree const &operator[](size_t index) const;
+
+protected:
+    TreeSource const &source;
+    size_t start_index;
+    size_t end_index;
+};
 
 #endif //RAXML_NG_TREESOURCE_HPP

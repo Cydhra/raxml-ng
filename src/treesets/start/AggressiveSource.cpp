@@ -49,9 +49,9 @@ static std::vector<corax_split_base_t> topology_key(const Tree &tree) {
 }
 
 static bool has_majority_split(
-        const std::vector<std::vector<corax_split_base_t> > &donor_topologies,
-        const std::vector<std::size_t> &donor_ids,
-        const std::size_t words_per_split) {
+    const std::vector<std::vector<corax_split_base_t> > &donor_topologies,
+    const std::vector<std::size_t> &donor_ids,
+    const std::size_t words_per_split) {
     std::map<std::vector<corax_split_base_t>, std::size_t> frequencies;
     for (const auto donor_id: donor_ids) {
         const auto &topology = donor_topologies[donor_id];
@@ -78,17 +78,14 @@ void AggressiveSource::ensure(const RaxmlInstance &instance, const SmartBarrier 
 
     donor->ensure(instance, barrier, threads_per_worker, worker_id, thread_id, NUM_DONOR_TREE); // TODO magic value
 
-    // TODO dont copy
-    auto donor_list = TreeList(NUM_DONOR_TREE);
-    for (int i = 0; i < NUM_DONOR_TREE; ++i) {
-        donor->copy_tree(donor_list[i], i);
-    }
+    // TODO change start position if the source was exhausted before
+    const auto donors = donor->range(0, NUM_DONOR_TREE);
 
     // move parsimony trees into duplicate checker
     //
-    std::vector<std::vector<corax_split_base_t>> donor_topologies;
+    std::vector<std::vector<corax_split_base_t> > donor_topologies;
     donor_topologies.reserve(NUM_DONOR_TREE);
-    for (const auto &tree: donor_list)
+    for (const auto &tree: donors)
         donor_topologies.push_back(topology_key(tree));
 
     if (reference_splits.empty() && bootstrap_support_trees.empty()) {
@@ -106,7 +103,7 @@ void AggressiveSource::ensure(const RaxmlInstance &instance, const SmartBarrier 
     if (!seed_greedy_exhausted) {
         auto generated = gate_and_rank(
             generate_seed_greedy_candidates(
-                donor_list, donor_topologies, requested_candidates, seed));
+                donors, donor_topologies, requested_candidates, seed));
         for (auto &candidate: generated) {
             if (remember_topology(candidate))
                 seed_greedy_repository.append_candidate(std::move(candidate));
@@ -118,7 +115,7 @@ void AggressiveSource::ensure(const RaxmlInstance &instance, const SmartBarrier 
     if (!constrained_parsimony_exhausted) {
         auto generated = gate_and_rank(
             generate_constrained_parsimony_candidates(instance,
-                donor_list, donor_topologies, requested_candidates, seed));
+                                                      donors, donor_topologies, requested_candidates, seed));
         for (auto &candidate: generated) {
             if (remember_topology(candidate))
                 constrained_parsimony_repository.append_candidate(std::move(candidate));
@@ -128,13 +125,14 @@ void AggressiveSource::ensure(const RaxmlInstance &instance, const SmartBarrier 
     }
 
     // TODO this indirection is kinda useless, split both repositories in separate TreeSources, while sharing the common gating logic and resources (bootstrap parsimony trees and donor parsimony trees)
-    auto list = constrained_parsimony_repository.take_candidate_batch(constrained_parsimony_repository.candidate_count());
-    for (auto &tree : list) {
+    auto list = constrained_parsimony_repository.take_candidate_batch(
+        constrained_parsimony_repository.candidate_count());
+    for (auto &tree: list) {
         tree_list.push_back(tree);
     }
 
     list = seed_greedy_repository.take_candidate_batch(seed_greedy_repository.candidate_count());
-    for (auto &tree : list) {
+    for (auto &tree: list) {
         tree_list.push_back(tree);
     }
 }
@@ -299,10 +297,13 @@ bool AggressiveSource::prepare_gate() {
     if (!reference_splits.empty())
         return true;
 
-    // TODO dont copy, reuse donors
-    auto support_trees = TreeList(300);
-    for (int i = 0; i < 300; ++i) {
-        donor->copy_tree(support_trees[i], i);
+    // TODO move start index after source exhaustion
+    auto support_trees = TreeList();
+    support_trees.reserve(NUM_DONOR_TREE);
+
+    // we have to copy because EBG needs a list
+    for (auto &tree : donor->range(0, NUM_DONOR_TREE)) {
+        support_trees.emplace_back(tree);
     }
 
     CandidateEbgSupportTree support_tree(baseline_tree, support_trees, bootstrap_support_trees);
@@ -359,14 +360,11 @@ bool AggressiveSource::prepare_gate() {
     return true;
 }
 
-TreeList AggressiveSource::generate_seed_greedy_candidates(const TreeList &donor_pool,
-    const std::vector<std::vector<corax_split_base_t>> &donor_topologies, const unsigned int requested_candidates,
-    const unsigned long round_seed) {
+TreeList AggressiveSource::generate_seed_greedy_candidates(const ConstTreeRange &donor_pool,
+                                                           const std::vector<std::vector<corax_split_base_t> > &
+                                                           donor_topologies, const unsigned int requested_candidates,
+                                                           const unsigned long round_seed) {
     TreeList candidates;
-
-    if (donor_pool.empty() || baseline_tree.empty() || initial_ml_trees.empty()) {
-        return candidates;
-    }
 
     coraxlib_reset_error();
 
@@ -406,14 +404,12 @@ TreeList AggressiveSource::generate_seed_greedy_candidates(const TreeList &donor
         }
     };
 
-    for (const auto & initial_ml_tree : initial_ml_trees) {
+    for (const auto &initial_ml_tree: initial_ml_trees) {
         collect_tree_splits(initial_ml_tree, true);
     }
     for (const auto &tree: donor_pool) {
         collect_tree_splits(tree, false);
     }
-
-    assert(!donor_pool.empty());
 
     candidates.reserve(donor_pool.size());
     unsigned int incomplete_split_systems = 0;
@@ -556,16 +552,13 @@ bool AggressiveSource::remember_topology(const Tree &candidate) {
     return !topology.empty() && seen_topologies.insert(std::move(topology)).second;
 }
 
-TreeList AggressiveSource::generate_constrained_parsimony_candidates(const RaxmlInstance &instance, const TreeList &donor_pool,
-    const std::vector<std::vector<corax_split_base_t>> &donor_topologies, const unsigned int requested_candidates,
-    const unsigned long round_seed) {
+TreeList AggressiveSource::generate_constrained_parsimony_candidates(const RaxmlInstance &instance,
+                                                                     const ConstTreeRange &donor_pool,
+                                                                     const std::vector<std::vector<corax_split_base_t> >
+                                                                     &donor_topologies,
+                                                                     const unsigned int requested_candidates,
+                                                                     const unsigned long round_seed) {
     TreeList candidates;
-
-    if (donor_pool.empty() ||
-        baseline_tree.empty() ||
-        initial_ml_trees.empty()) {
-        return candidates;
-    }
 
     coraxlib_reset_error();
 
