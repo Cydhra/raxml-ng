@@ -43,12 +43,14 @@ void ParsimonySource::ensure(const RaxmlInstance &instance, const SmartBarrier &
         }
 
         barrier.enter();
-
-        // update starting tree for next method call and unlock mutex
         if (worker_id + thread_id == 0) {
             this->starting_seed += static_cast<int>(new_trees);
-            tree_list_mutex->unlock();
         }
+    }
+
+    // update starting tree for next method call and unlock mutex
+    if (worker_id + thread_id == 0) {
+        tree_list_mutex->unlock();
     }
 }
 
