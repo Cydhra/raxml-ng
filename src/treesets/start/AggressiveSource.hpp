@@ -31,11 +31,10 @@ struct RaxmlInstance;
 
 class AggressiveSource : public TreeSource {
 public:
-    explicit AggressiveSource(const std::shared_ptr<ParsimonySource> &donor, int seed,
-                              const Options &opts, TreeList &initial_ml_trees,
-                              Tree &baseline_tree) : opts(opts),
-                                                     baseline_tree(baseline_tree), initial_ml_trees(initial_ml_trees),
-                                                     donor(donor), seed(seed) {
+    explicit AggressiveSource(const std::shared_ptr<ParsimonySource> &donor, const int seed,
+                              const TreeList &initial_ml_trees, const Tree &baseline_tree) : baseline_tree(baseline_tree),
+        initial_ml_trees(initial_ml_trees),
+        donor(donor), seed(seed) {
     }
 
     void ensure(const RaxmlInstance &instance, const SmartBarrier &barrier, unsigned int threads_per_worker,
@@ -44,7 +43,6 @@ public:
     [[nodiscard]] double amortized_time(unsigned int batch_size) const override;
 
 protected:
-    const Options &opts;
     const Tree baseline_tree;
     const TreeList initial_ml_trees;
 
