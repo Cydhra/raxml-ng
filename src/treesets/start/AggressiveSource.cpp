@@ -413,22 +413,7 @@ TreeList AggressiveSource::generate_seed_greedy_candidates(const TreeList &donor
         collect_tree_splits(tree, false);
     }
 
-    std::sort(
-        split_pool.begin(),
-        split_pool.end(),
-        [](const CandidateSplit &lhs, const CandidateSplit &rhs) {
-            if (lhs.ml_frequency != rhs.ml_frequency) {
-                return lhs.ml_frequency > rhs.ml_frequency;
-            }
-            if (lhs.donor_frequency != rhs.donor_frequency) {
-                return lhs.donor_frequency > rhs.donor_frequency;
-            }
-            return lhs.words < rhs.words;
-        });
-
-    if (split_pool.empty()) {
-        return candidates;
-    }
+    assert(!donor_pool.empty());
 
     candidates.reserve(donor_pool.size());
     unsigned int incomplete_split_systems = 0;
