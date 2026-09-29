@@ -1576,6 +1576,46 @@ Tree generate_tree(const RaxmlInstance& instance, StartingTree type, int random_
   return tree;
 }
 
+Tree generate_parsimony_tree(const RaxmlInstance& instance,
+                             int random_seed,
+                             bool bootstrap,
+                             const Tree& constraint_tree)
+{
+  assert(instance.parted_msa_parsimony || bootstrap);
+
+  unsigned int score;
+  unique_ptr<ParsimonyMSA> bs_pmsa;
+
+  if (bootstrap)
+  {
+    BootstrapGenerator bg;
+    auto bsrep = bg.generate(*instance.parted_msa, random_seed);
+    bs_pmsa.reset(new ParsimonyMSA(instance.parted_msa, instance.opts.simd_arch,
+                                   false, false, bsrep.site_weights));
+  }
+
+  const ParsimonyMSA& pars_msa = bs_pmsa ? *bs_pmsa : *instance.parted_msa_parsimony;
+  Tree tree = Tree::buildParsimonyConstrained(pars_msa, random_seed,
+                                              instance.pars_spr_enabled, &score,
+                                              constraint_tree, instance.tip_msa_idmap);
+
+  const double avg_pars_brlen = static_cast<double>(score) /
+                                tree.num_branches() /
+                                pars_msa.part_msa().total_sites();
+
+  if (instance.opts.use_pars_brlen)
+    tree.reset_brlens(avg_pars_brlen);
+
+  LOG_WORKER_TS(LogLevel::verbose) << "Generated a PARSIMONY tree, seed: " << random_seed <<
+      ", constraint_splits: " << constraint_tree.num_splits() <<
+      ", score: " << score << ", avg_brlen: " << FMT_BL(avg_pars_brlen) << endl;
+
+  assert(!tree.empty());
+  prepare_tree(instance, tree);
+  return tree;
+}
+
+
 void load_start_trees(RaxmlInstance& instance, bool assert_count = false)
 {
   const auto& opts = instance.opts;
@@ -2411,14 +2451,6 @@ void autoselect_models(RaxmlInstance& instance, CheckpointManager &cm)
 
   /* save updated RBA with best-fit model */
   write_binary_msa_file(instance, true);
-}
-
-void init_treeset_optimizer(RaxmlInstance &instance, CheckpointManager &cm) {
-  auto& opts = instance.opts;
-  if (opts.command != Command::treeset)
-    return;
-
-   instance.treeset_optimizer.reset(new TreesetOptimizer(instance, opts, instance.parted_msa, instance.random_tree, instance.tip_msa_idmap, instance.persite_loglh, *instance.load_balancer, cm.pythia_score(), 300, opts.random_seed + 1));
 }
 
 unsigned int read_newick_trees_custom(SplitsTree& ref_tree, const std::string& fname,
@@ -4241,7 +4273,18 @@ void master_main(RaxmlInstance& instance, CheckpointManager& cm)
   // heuristics
   if (opts.command == Command::treeset) {
     /* initialize treeset optimizer here, after the persite lnl are already calculated */
-    init_treeset_optimizer(instance, cm);
+    const auto &checkpoint = cm.checkp_file();
+    const auto best_tree = checkpoint.best_tree().tree;
+    TreeList initial_ml_trees{};
+
+    for (auto& topol: checkpoint.ml_trees)
+    {
+      Tree ml_tree = checkpoint.tree();
+      ml_tree.topology(topol.second.second);
+      initial_ml_trees.push_back(ml_tree);
+    }
+
+    instance.treeset_optimizer = std::make_unique<TreesetOptimizer>(instance, instance.opts, instance.parted_msa, instance.random_tree, initial_ml_trees, best_tree, instance.tip_msa_idmap, instance.persite_loglh, *instance.load_balancer, cm.pythia_score(), 300, opts.random_seed + 1);
 
     ParallelContext::finalize_threads();
     instance.treeset_optimizer->run();
