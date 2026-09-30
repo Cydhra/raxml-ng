@@ -2,6 +2,7 @@
 #define RAXML_NG_AGGRESSIVESOURCE_HPP
 
 #include <utility>
+#include <memory>
 
 #include "ParsimonySource.hpp"
 #include "TreeRepository.hpp"
@@ -11,10 +12,10 @@
 
 using namespace std;
 
-enum StartingTreeSource {
-    seed_greedy,
-    constrained_parsimony,
-};
+/** A vector of bit-vectors (stored as a vector of corax_split_base_t). Each bit vector is one split from the tree. */
+using Split = std::vector<corax_split_base_t>;
+
+using SplitList = std::vector<Split>;
 
 Tree generate_parsimony_tree(const RaxmlInstance &instance,
                              int random_seed,
@@ -30,9 +31,9 @@ public:
 
 struct RaxmlInstance;
 
-class AggressiveSource : public TreeSource {
+class SplitSamplerSource : public TreeSource {
 public:
-    explicit AggressiveSource(const std::shared_ptr<ParsimonySource> &donor, const int seed,
+    explicit SplitSamplerSource(const std::shared_ptr<ParsimonySource> &donor, const int seed,
                               TreeList initial_ml_trees, Tree baseline_tree) : baseline_tree(std::move(baseline_tree)),
         initial_ml_trees(std::move(initial_ml_trees)),
         donor_tree_source(donor), seed(seed) {
@@ -70,23 +71,25 @@ protected:
 
     bool prepare_gate();
 
-    TreeList generate_seed_greedy_candidates(
-        const ConstTreeRange &donor_pool,
-        const std::vector<std::vector<corax_split_base_t> > &donor_splits,
-        unsigned int requested_candidates,
-        unsigned long round_seed);
-
     bool remember_topology(const Tree &candidate);
 
-    TreeList generate_constrained_parsimony_candidates(
+    static Split topology_key(const Tree &tree);
+
+    static bool has_majority_split(
+        const SplitList &donor_topologies,
+        const std::vector<std::size_t> &donor_ids,
+        std::size_t words_per_split);
+
+    static SplitList extract_splits(const Tree &tree, const bool normalize);
+
+    virtual TreeList generate_candidates(
         const RaxmlInstance &instance,
         const ConstTreeRange &donor_pool,
-        const std::vector<std::vector<corax_split_base_t> > &donor_topologies,
+        const SplitList &donor_splits,
         unsigned int requested_candidates,
-        unsigned long round_seed);
+        unsigned long round_seed) = 0;
 
-
-    Tree materialize_candidate(const std::vector<CandidateSplit> &selected);
+    Tree materialize_candidate(const std::vector<CandidateSplit> &selected) const;
 
     std::shared_ptr<ParsimonySource> donor_tree_source;
 
@@ -94,17 +97,13 @@ protected:
 
     int seed;
 
-    bool seed_greedy_exhausted = false;
-
-    bool constrained_parsimony_exhausted = false;
-
     std::unique_ptr<std::mutex> mutex = std::make_unique<std::mutex>();
 
-    std::set<std::vector<corax_split_base_t> > seen_topologies;
+    std::set<Split> seen_topologies;
 
-    TreeRepository seed_greedy_repository = {};
+    TreeRepository candidate_repository = {};
 
-    TreeRepository constrained_parsimony_repository = {};
+    bool exhausted = false;
 };
 
 

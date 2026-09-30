@@ -5,8 +5,7 @@
 #include "../../au/AuTest.hpp"
 #include "../../Optimizer.hpp"
 #include "../start/ParsimonySource.hpp"
-#include "../start/AggressiveSource.hpp"
-
+#include "../start/ParsimonySamplerSource.hpp"
 /**
  * Shallow replication counts for a faster AU test.
  */
@@ -33,7 +32,7 @@ public:
                          long seed,
                          const double pythia_score) : parsimony_source(make_shared<ParsimonySource>(seed)),
                                                       aggressive_source(
-                                                          make_shared<AggressiveSource>(parsimony_source, seed, initial_ml_trees, baseline_tree)) {
+                                                          make_shared<ParsimonySamplerSource>(parsimony_source, seed, initial_ml_trees, baseline_tree)) {
         // prepare a dummy matrix with empty vectors to correctly initialize the AU-Test. These dummy vectors
         // will be replaced by the TunedBatch instance before the AU test is called.
         std::vector<std::vector<doubleVector> > batch_loglh_dummy(batch_size);
@@ -245,7 +244,7 @@ protected:
      */
     shared_ptr<ParsimonySource> parsimony_source;
 
-    shared_ptr<AggressiveSource> aggressive_source;
+    shared_ptr<ParsimonySamplerSource> aggressive_source;
 };
 
 #endif //RAXML_SHAREDBATCHRESOURCES_HPP_
