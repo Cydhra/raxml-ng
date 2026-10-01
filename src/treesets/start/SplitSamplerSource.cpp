@@ -62,7 +62,7 @@ bool SplitSamplerSource::has_majority_split(
                        });
 }
 
-void SplitSamplerSource::ensure(const RaxmlInstance &instance, const SmartBarrier &barrier,
+bool SplitSamplerSource::ensure(const RaxmlInstance &instance, const SmartBarrier &barrier,
                                 const unsigned int threads_per_worker, const unsigned int worker_id,
                                 const unsigned int thread_id,
                                 const unsigned int required_trees) {
@@ -84,13 +84,19 @@ void SplitSamplerSource::ensure(const RaxmlInstance &instance, const SmartBarrie
             donor_splits.push_back(topology_key(tree));
 
         const auto generated = gate->gate_and_rank(generate_candidates(instance, donors, donor_splits, NUM_SAMPLE_ATTEMPTS, seed));
+
         for (auto &candidate: generated) {
             if (remember_topology(candidate))
                 tree_list.push_back(candidate);
         }
-
         sampled_batches += 1;
+
+        if (old_list_size + generated.size() < required_trees) {
+            return false;
+        }
     }
+
+    return true;
 }
 
 double SplitSamplerSource::amortized_time(unsigned int batch_size) const {

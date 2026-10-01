@@ -1,6 +1,7 @@
 #ifndef RAXML_NG_TREESOURCE_HPP
 #define RAXML_NG_TREESOURCE_HPP
 
+#include <optional>
 #include "../../pool/SmartBarrier.hpp"
 #include "../../Tree.hpp"
 
@@ -14,21 +15,24 @@ public:
     virtual ~TreeSource() = default;
 
     /**
-     * Ensure that at least `num_trees` trees are available in the tree source
+     * Ensure that at least `required_trees` trees are available in the tree source, including reserved trees.
      *
      * @param instance the static raxml instance required for tree generation
      * @param barrier a barrier for all threads involved in the tree generation
      * @param threads_per_worker how many threads are assigned to each worker
      * @param worker_id the barrier-local worker id. One worker must have id 0
      * @param thread_id the worker-local thread id. One thread per worker must have id 0.
+     * @param required_trees the number of trees that must be available in the tree list at minimum.
      */
-    virtual void ensure(const RaxmlInstance &instance, const SmartBarrier &barrier, unsigned int threads_per_worker, unsigned int worker_id, unsigned int thread_id, unsigned int num_trees) = 0;
+    virtual bool ensure(const RaxmlInstance &instance, const SmartBarrier &barrier, unsigned int threads_per_worker, unsigned int worker_id, unsigned int thread_id, unsigned int required_trees) = 0;
 
     /**
      * Obtain `num_trees` tree topology from the source with multiple threads at once.
      * If not enough trees are present, some threads may generate new ones.
      */
-    virtual std::tuple<unsigned int, unsigned int> consume_batch(const RaxmlInstance &instance, const SmartBarrier &barrier, unsigned int threads_per_worker, unsigned int worker_id, unsigned int thread_id, unsigned int num_trees);
+    virtual std::optional<std::tuple<unsigned int, unsigned int>> consume_batch(
+        const RaxmlInstance &instance, const SmartBarrier &barrier, unsigned int threads_per_worker,
+        unsigned int worker_id, unsigned int thread_id, unsigned int num_trees);
 
     /**
      * Copy the tree at the given tree id to the target reference

@@ -29,7 +29,7 @@ public:
                                                       donor_tree_source(donor), seed(seed) {
     }
 
-    void ensure(const RaxmlInstance &instance, const SmartBarrier &barrier, unsigned int threads_per_worker,
+    bool ensure(const RaxmlInstance &instance, const SmartBarrier &barrier, unsigned int threads_per_worker,
                 unsigned int worker_id, unsigned int thread_id, unsigned int required_trees) override;
 
     [[nodiscard]] double amortized_time(unsigned int batch_size) const override;

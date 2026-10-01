@@ -16,7 +16,7 @@ class ParsimonySource : public TreeSource {
 public:
     explicit ParsimonySource(const int starting_seed) : starting_seed(starting_seed) {}
 
-    void ensure(const RaxmlInstance &instance, const SmartBarrier &barrier, unsigned int threads_per_worker, unsigned int worker_id, unsigned int thread_id, unsigned int num_trees) override;
+    bool ensure(const RaxmlInstance &instance, const SmartBarrier &barrier, unsigned int threads_per_worker, unsigned int worker_id, unsigned int thread_id, unsigned int num_trees) override;
 
     /**
      * @return mean estimate of time spent per tree on parsimony

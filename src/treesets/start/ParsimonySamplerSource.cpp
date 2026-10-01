@@ -3,7 +3,8 @@
 #include "../../bootstrap/ConsensusTree.hpp"
 
 TreeList ParsimonySamplerSource::generate_candidates(const RaxmlInstance &instance, const ConstTreeRange &donor_pool,
-    const SplitList &donor_splits, unsigned int requested_candidates, unsigned long round_seed) {
+                                                     const SplitList &donor_splits, unsigned int requested_candidates,
+                                                     unsigned long round_seed) {
     TreeList candidates;
 
     coraxlib_reset_error();
@@ -47,10 +48,8 @@ TreeList ParsimonySamplerSource::generate_candidates(const RaxmlInstance &instan
                 continue;
             }
 
-            Tree candidate = generate_parsimony_tree(
-                instance,
-                // todo magic number support tree count
-                static_cast<int>(round_seed + requested_candidates + 2 * 300 + attempt), false, constraint);
+            Tree candidate = generate_parsimony_tree(instance, static_cast<int>(round_seed + attempt), false,
+                                                     constraint);
 
             if (candidate.empty() ||
                 candidate.num_tips() != tip_count ||

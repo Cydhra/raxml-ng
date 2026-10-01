@@ -18,12 +18,19 @@ void TunedBatch::generate_starting_trees(const RaxmlInstance &instance, SharedBa
                                          const TaskGroup &context,
                                          const unsigned int worker_id, const unsigned int thread_id) {
     auto &tree_source = resources.get_parsimony();
-    auto [start, end] = tree_source.consume_batch(instance, context.get_barrier(), this->threads_per_worker,
+    auto reservation = tree_source.consume_batch(instance, context.get_barrier(), this->threads_per_worker,
                                                   worker_id, thread_id, this->batch_size);
-    context.enter_barrier();
-    for (const auto id: this->exclusive_assignment->at(context.get_group_thread_id(worker_id, thread_id))) {
-        tree_source.copy_tree(this->batch_start_trees->at(id), start + id);
-        this->num_trees_generated->fetch_add(1);
+
+    if (reservation) {
+        auto [start, end] = *reservation;
+        context.enter_barrier();
+        for (const auto id: this->exclusive_assignment->at(context.get_group_thread_id(worker_id, thread_id))) {
+            tree_source.copy_tree(this->batch_start_trees->at(id), start + id);
+            this->num_trees_generated->fetch_add(1);
+        }
+    } else {
+        LOG_WARN << "Tree source exhausted. Aborting bandit." << std::endl;
+        // TODO abort bandit
     }
 }
 
