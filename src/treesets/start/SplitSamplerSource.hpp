@@ -40,7 +40,7 @@ public:
     }
 
     void ensure(const RaxmlInstance &instance, const SmartBarrier &barrier, unsigned int threads_per_worker,
-                unsigned int worker_id, unsigned int thread_id, unsigned int num_trees) override;
+                unsigned int worker_id, unsigned int thread_id, unsigned int required_trees) override;
 
     [[nodiscard]] double amortized_time(unsigned int batch_size) const override;
 
@@ -102,8 +102,6 @@ protected:
     std::set<Split> seen_topologies;
 
     TreeRepository candidate_repository = {};
-
-    bool exhausted = false;
 };
 
 

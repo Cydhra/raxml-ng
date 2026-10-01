@@ -2,6 +2,8 @@
 
 constexpr size_t NUM_DONOR_TREE = 300;
 
+constexpr size_t NUM_SAMPLE_ATTEMPTS = 300;
+
 // TODO this can probably be made lower
 static constexpr unsigned int BOOTSTRAP_SUPPORT_COUNT = 200;
 
@@ -66,49 +68,37 @@ bool SplitSamplerSource::has_majority_split(
 void SplitSamplerSource::ensure(const RaxmlInstance &instance, const SmartBarrier &barrier,
                                 const unsigned int threads_per_worker, const unsigned int worker_id,
                                 const unsigned int thread_id,
-                                const unsigned int num_trees) {
+                                const unsigned int required_trees) {
     const auto begin = std::chrono::steady_clock::now();
     // build_parsimony_msa(instance, false); // TODO initialize in main.cpp in case of checkpoint
 
-    const auto requested_candidates = num_trees;
+    const auto old_list_size = tree_list.size();
 
-    donor_tree_source->ensure(instance, barrier, threads_per_worker, worker_id, thread_id, NUM_DONOR_TREE);
+    if (required_trees > old_list_size) {
+        donor_tree_source->ensure(instance, barrier, threads_per_worker, worker_id, thread_id, NUM_DONOR_TREE);
 
-    // TODO change start position if the source was exhausted before
-    const auto donors = donor_tree_source->range(0, NUM_DONOR_TREE);
+        // TODO change start position if the source was exhausted before
+        const auto donors = donor_tree_source->range(0, NUM_DONOR_TREE);
 
-    // move parsimony trees into duplicate checker
-    SplitList donor_splits;
-    donor_splits.reserve(NUM_DONOR_TREE);
-    for (const auto &tree: donors)
-        donor_splits.push_back(topology_key(tree));
+        // generate splits from donor trees
+        SplitList donor_splits;
+        donor_splits.reserve(NUM_DONOR_TREE);
+        for (const auto &tree: donors)
+            donor_splits.push_back(topology_key(tree));
 
-    if (reference_splits.empty() && bootstrap_support_trees.empty()) {
-        bootstrap_support_trees.reserve(BOOTSTRAP_SUPPORT_COUNT);
-        while (bootstrap_support_trees.size() < BOOTSTRAP_SUPPORT_COUNT) {
-            bootstrap_support_trees.emplace_back(generate_tree(
-                instance, StartingTree::parsimony, seed + 1234567, true));
+        if (reference_splits.empty() && bootstrap_support_trees.empty()) {
+            bootstrap_support_trees.reserve(BOOTSTRAP_SUPPORT_COUNT);
+            while (bootstrap_support_trees.size() < BOOTSTRAP_SUPPORT_COUNT) {
+                bootstrap_support_trees.emplace_back(generate_tree(
+                    instance, StartingTree::parsimony, seed + 1234567, true));
+            }
         }
-    }
 
-    const auto constrained_size = candidate_repository.candidate_count();
-
-    if (!exhausted) {
-        auto generated = gate_and_rank(
-            generate_candidates(instance, donors, donor_splits, requested_candidates, seed));
+        const auto generated = gate_and_rank(generate_candidates(instance, donors, donor_splits, NUM_SAMPLE_ATTEMPTS, seed));
         for (auto &candidate: generated) {
             if (remember_topology(candidate))
-                candidate_repository.append_candidate(std::move(candidate));
+                tree_list.push_back(candidate);
         }
-        if (candidate_repository.candidate_count() == constrained_size)
-            exhausted = true;
-    }
-
-    // TODO this indirection is kinda useless, split both repositories in separate TreeSources, while sharing the common gating logic and resources (bootstrap parsimony trees and donor parsimony trees)
-    auto list = candidate_repository.take_candidate_batch(
-        candidate_repository.candidate_count());
-    for (auto &tree: list) {
-        tree_list.push_back(tree);
     }
 }
 
@@ -294,7 +284,7 @@ bool SplitSamplerSource::prepare_gate() {
 
     const auto tip_count = static_cast<unsigned int>(baseline_tree.num_tips());
     const auto bits_per_word = static_cast<unsigned int>(sizeof(corax_split_base_t) * 8);
-    const auto words_per_split  = tip_count / bits_per_word +
+    const auto words_per_split = tip_count / bits_per_word +
                                  static_cast<unsigned int>(tip_count % bits_per_word != 0);
 
     ebg_support = support_tree.support();
