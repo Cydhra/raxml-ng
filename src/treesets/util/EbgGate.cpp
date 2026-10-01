@@ -3,7 +3,7 @@
 // TODO this can probably be made lower
 static constexpr unsigned int BOOTSTRAP_SUPPORT_COUNT = 200;
 
-bool EbgGate::reset_gate(const RaxmlInstance &instance, const ConstTreeRange &support_trees) {
+void EbgGate::reset_gate(const RaxmlInstance &instance, const ConstTreeRange &support_trees) {
     reference_splits.clear();
 
     if (bootstrap_support_trees.empty()) {
@@ -22,15 +22,11 @@ bool EbgGate::reset_gate(const RaxmlInstance &instance, const ConstTreeRange &su
     }
 
     CandidateEbgSupportTree support_tree(baseline_tree, parsimony_trees, bootstrap_support_trees);
-    if (!support_tree.compute()) {
-        coraxlib_reset_error();
-        return false;
-    }
+    support_tree.compute();
+    coraxlib_check_error("Could not calculate EBG tree support during gate initialization.");
 
     const auto split_count = support_tree.num_splits();
     const auto *splits = support_tree.reference_splits();
-    if (split_count == 0 || support_tree.support().size() != split_count || !splits)
-        return false;
 
     const auto tip_count = static_cast<unsigned int>(baseline_tree.num_tips());
     const auto bits_per_word = static_cast<unsigned int>(sizeof(corax_split_base_t) * 8);
@@ -51,13 +47,8 @@ bool EbgGate::reset_gate(const RaxmlInstance &instance, const ConstTreeRange &su
             corax_utree_split_create(&initial_ml_tree.pll_utree_root(),
                                      initial_ml_tree.num_tips(), nullptr),
             corax_utree_split_destroy);
-        if (!initial_splits) {
-            coraxlib_reset_error();
-            reference_splits.clear();
-            ebg_support.clear();
-            ml_frequency.clear();
-            return false;
-        }
+        coraxlib_check_error("Could not create split during EbgGate initialization");
+
         for (std::size_t split_id = 0; split_id < split_count; ++split_id) {
             if (corax_utree_split_find(initial_splits.get(), reference_splits[split_id].data(), tip_count) >= 0)
                 ml_frequency[split_id] += 1.0;
@@ -65,8 +56,6 @@ bool EbgGate::reset_gate(const RaxmlInstance &instance, const ConstTreeRange &su
     }
     for (auto &frequency: ml_frequency)
         frequency /= static_cast<double>(initial_ml_trees.size());
-
-    return true;
 }
 
 TreeList EbgGate::gate_and_rank(TreeList candidates) {
@@ -75,8 +64,10 @@ TreeList EbgGate::gate_and_rank(TreeList candidates) {
         return selected;
     }
 
+    corax_reset_error();
     const auto split_count = reference_splits.size();
 
+    // count frequency of splits among candidate trees
     std::vector candidate_frequency(split_count, 0.0);
     for (const auto &candidate: candidates) {
         PllSplitSharedPtr candidate_splits(
@@ -84,10 +75,7 @@ TreeList EbgGate::gate_and_rank(TreeList candidates) {
                                      candidate.num_tips(),
                                      nullptr),
             corax_utree_split_destroy);
-        if (!candidate_splits) {
-            coraxlib_reset_error();
-            return TreeList{};
-        }
+        coraxlib_check_error("Could not create split during EbgGate");
 
         for (std::size_t split_id = 0; split_id < split_count; ++split_id) {
             if (corax_utree_split_find(candidate_splits.get(),
@@ -102,6 +90,7 @@ TreeList EbgGate::gate_and_rank(TreeList candidates) {
         support /= static_cast<double>(candidates.size());
     }
 
+    // calculate error of EBG expectation and observed split frequency
     double ml_mae = 0.0;
     double candidate_mae = 0.0;
     for (std::size_t split_id = 0; split_id < split_count; ++split_id) {
@@ -112,20 +101,15 @@ TreeList EbgGate::gate_and_rank(TreeList candidates) {
     candidate_mae /= static_cast<double>(split_count);
 
     if (!std::isfinite(ml_mae) || !std::isfinite(candidate_mae) || candidate_mae + mae_margin >= ml_mae) {
-        // LOG_WORKER_TS(LogLevel::info)
-        //         << "Treeset aggressive gate: source="
-        //         << "split-sampler (either)"
-        //         << ", decision=fail"
-        //         << ", initial_ml=" << initial_ml_trees.size()
-        //         << ", support_trees=" << NUM_DONOR_TREE
-        //         << ", bootstrap_support_trees="
-        //         << bootstrap_support_trees.size()
-        //         << ", ml_ebg_mae=" << ml_mae
-        //         << ", candidate_ebg_mae=" << candidate_mae
-        //         << std::endl;
+        LOG_INFO
+                << "EBG-Gate failed: "
+                << "ml_ebg_mae=" << ml_mae
+                << ", candidate_ebg_mae=" << candidate_mae
+                << std::endl;
         return selected;
     }
 
+    // rank splits using the promise score of splits (i.e. splits with higher frequency are chosen preferentially)
     const auto promise_reference_count = std::min<std::size_t>(3, initial_ml_trees.size());
     std::vector<PllSplitSharedPtr> promise_splits;
     promise_splits.reserve(promise_reference_count);
@@ -136,15 +120,13 @@ TreeList EbgGate::gate_and_rank(TreeList candidates) {
                                      reference.num_tips(),
                                      nullptr),
             corax_utree_split_destroy);
+        coraxlib_check_error("Could not create split during EbgGate");
         if (splits) {
             promise_splits.push_back(std::move(splits));
         }
     }
 
     std::deque<RankedCandidate> ranked_candidates;
-    unsigned int promise_min = std::numeric_limits<unsigned int>::max();
-    unsigned int promise_max = 0;
-    unsigned int promise_sum = 0;
 
     for (auto &candidate: candidates) {
         PllSplitSharedPtr candidate_splits(
@@ -173,12 +155,10 @@ TreeList EbgGate::gate_and_rank(TreeList candidates) {
             }
         }
 
-        promise_min = std::min(promise_min, promise_score);
-        promise_max = std::max(promise_max, promise_score);
-        promise_sum += promise_score;
-        ranked_candidates.push_back({std::move(candidate), promise_score});
+        ranked_candidates.push_back({.tree = std::move(candidate), .promise_score = promise_score});
     }
 
+    // sort candidates by promise of splits
     std::stable_sort(
         ranked_candidates.begin(),
         ranked_candidates.end(),
@@ -187,37 +167,9 @@ TreeList EbgGate::gate_and_rank(TreeList candidates) {
         });
 
     selected.reserve(ranked_candidates.size());
-    for (auto &candidate: ranked_candidates) {
-        selected.push_back(std::move(candidate.tree));
+    for (auto &[tree, _]: ranked_candidates) {
+        selected.push_back(std::move(tree));
     }
-
-    const double promise_mean = ranked_candidates.empty()
-                                    ? 0.0
-                                    : static_cast<double>(promise_sum) /
-                                      ranked_candidates.size();
-    if (ranked_candidates.empty()) {
-        promise_min = 0;
-    }
-
-    // LOG_WORKER_TS(LogLevel::info)
-    //         << "Treeset aggressive gate: source="
-    //         << source_name(source)
-    //         << ", decision=pass"
-    //         << ", initial_ml=" << initial_ml_trees.size()
-    //         << ", support_trees=" << support_tree_count
-    //         << ", bootstrap_support_trees="
-    //         << bootstrap_support_tree_count
-    //         << ", ml_ebg_mae=" << ml_mae
-    //         << ", candidate_ebg_mae=" << candidate_mae
-    //         << ", selected=" << selected.size()
-    //         << std::endl;
-    // LOG_WORKER_TS(LogLevel::info)
-    //         << "Treeset aggressive ranker: source="
-    //         << source_name(source)
-    //         << ", promise_min=" << promise_min
-    //         << ", promise_mean=" << promise_mean
-    //         << ", promise_max=" << promise_max
-    //         << std::endl;
 
     return selected;
 }
