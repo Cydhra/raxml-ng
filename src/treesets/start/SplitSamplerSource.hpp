@@ -99,6 +99,8 @@ protected:
     std::unique_ptr<std::mutex> mutex = std::make_unique<std::mutex>();
 
     std::set<Split> seen_topologies;
+
+    int sampled_batches = 0;
 };
 
 

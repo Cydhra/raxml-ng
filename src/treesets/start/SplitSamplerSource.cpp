@@ -75,9 +75,8 @@ void SplitSamplerSource::ensure(const RaxmlInstance &instance, const SmartBarrie
     const auto old_list_size = tree_list.size();
 
     if (required_trees > old_list_size) {
-        // TODO change start position if the source was exhausted before
-        donor_tree_source->ensure(instance, barrier, threads_per_worker, worker_id, thread_id, NUM_DONOR_TREE);
-        const auto donors = donor_tree_source->range(0, NUM_DONOR_TREE);
+        donor_tree_source->ensure(instance, barrier, threads_per_worker, worker_id, thread_id, (sampled_batches + 1) * NUM_DONOR_TREE);
+        const auto donors = donor_tree_source->range(sampled_batches * NUM_DONOR_TREE, (sampled_batches + 1) * NUM_DONOR_TREE);
 
         // generate splits from donor trees
         SplitList donor_splits;
@@ -98,6 +97,8 @@ void SplitSamplerSource::ensure(const RaxmlInstance &instance, const SmartBarrie
             if (remember_topology(candidate))
                 tree_list.push_back(candidate);
         }
+
+        sampled_batches += 1;
     }
 }
 
@@ -261,12 +262,11 @@ bool SplitSamplerSource::prepare_filter() {
     if (!reference_splits.empty())
         return true;
 
-    // TODO move start index after source exhaustion
     auto support_trees = TreeList();
     support_trees.reserve(NUM_DONOR_TREE);
 
     // we have to copy because EBG needs a list
-    for (auto &tree: donor_tree_source->range(0, NUM_DONOR_TREE)) {
+    for (auto &tree: donor_tree_source->range(sampled_batches * NUM_DONOR_TREE, (sampled_batches + 1) * NUM_DONOR_TREE)) {
         support_trees.emplace_back(tree);
     }
 
