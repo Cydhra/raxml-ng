@@ -19,9 +19,11 @@ struct RaxmlInstance;
 
 class SplitSamplerSource : public TreeSource {
 public:
-    explicit SplitSamplerSource(const std::shared_ptr<ParsimonySource> &donor, const int seed,
+    explicit SplitSamplerSource(const std::shared_ptr<ParsimonySource> &donor,
+                                const std::shared_ptr<EbgGate> &gate,
+                                const int seed,
                                 TreeList initial_ml_trees,
-                                Tree baseline_tree) : gate(EbgGate(baseline_tree, initial_ml_trees)),
+                                Tree baseline_tree) : gate(gate),
                                                       baseline_tree(std::move(baseline_tree)),
                                                       initial_ml_trees(std::move(initial_ml_trees)),
                                                       donor_tree_source(donor), seed(seed) {
@@ -33,10 +35,7 @@ public:
     [[nodiscard]] double amortized_time(unsigned int batch_size) const override;
 
 protected:
-    /**
-     * EBG gate to reject this source if the generated trees do not approximate the expected distribution of splits.
-     */
-    EbgGate gate;
+    shared_ptr<EbgGate> gate;
 
     /**
      * Best ML tree from reference set to use for labels

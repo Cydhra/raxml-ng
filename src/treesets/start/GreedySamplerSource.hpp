@@ -15,9 +15,9 @@ struct CandidateSplit {
 
 class GreedySamplerSource : public SplitSamplerSource {
 public:
-    GreedySamplerSource(const std::shared_ptr<ParsimonySource> &donor, const int seed, const TreeList &initial_ml_trees,
-        const Tree &baseline_tree)
-        : SplitSamplerSource(donor, seed, initial_ml_trees, baseline_tree) {
+    GreedySamplerSource(const std::shared_ptr<ParsimonySource> &donor, const std::shared_ptr<EbgGate> &gate,
+        const int seed, const TreeList &initial_ml_trees, const Tree &baseline_tree)
+        : SplitSamplerSource(donor, gate, seed, initial_ml_trees, baseline_tree) {
     }
 
 protected:

@@ -30,9 +30,12 @@ public:
                          const std::vector<std::vector<doubleVector> > &reference_logh_matrix,
                          const unsigned int batch_size,
                          long seed,
-                         const double pythia_score) : parsimony_source(make_shared<ParsimonySource>(seed)),
+                         const double pythia_score) : gate(make_shared<EbgGate>(baseline_tree, initial_ml_trees)),
+                                                      parsimony_source(make_shared<ParsimonySource>(seed)),
                                                       aggressive_source(
-                                                          make_shared<ParsimonySamplerSource>(parsimony_source, seed, initial_ml_trees, baseline_tree)) {
+                                                          make_shared<ParsimonySamplerSource>(
+                                                              parsimony_source, gate, seed, initial_ml_trees,
+                                                              baseline_tree)) {
         // prepare a dummy matrix with empty vectors to correctly initialize the AU-Test. These dummy vectors
         // will be replaced by the TunedBatch instance before the AU test is called.
         std::vector<std::vector<doubleVector> > batch_loglh_dummy(batch_size);
@@ -238,6 +241,11 @@ protected:
      * This is instanced for the raxml-fast fallback bandit.
      */
     shared_ptr<CheckpointManager> adaptive_checkpoint_manager;
+
+    /**
+     * EBG gate to reject this source if the generated trees do not approximate the expected distribution of splits.
+     */
+    shared_ptr<EbgGate> gate;
 
     /**
      * Global source of parsimony trees, such that trees can be reused for heuristics other than ML.
