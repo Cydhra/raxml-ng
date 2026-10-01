@@ -6,36 +6,25 @@
 
 #include "ParsimonySource.hpp"
 #include "TreeSource.hpp"
-#include "../../bootstrap/SplitsTree.hpp"
-#include "../../bootstrap/EbgSupportTree.hpp"
+#include "../util/EbgFilter.hpp"
 
 using namespace std;
-
-/** A vector of bit-vectors (stored as a vector of corax_split_base_t). Each bit vector is one split from the tree. */
-using Split = std::vector<corax_split_base_t>;
-
-using SplitList = std::vector<Split>;
 
 Tree generate_parsimony_tree(const RaxmlInstance &instance,
                              int random_seed,
                              bool bootstrap,
                              const Tree &constraint_tree);
 
-class CandidateEbgSupportTree : public EbgSupportTree {
-public:
-    using EbgSupportTree::EbgSupportTree;
-    bool compute() { return compute_support(); }
-    const corax_split_t *reference_splits() const { return _ref_splits.get(); }
-};
-
 struct RaxmlInstance;
 
 class SplitSamplerSource : public TreeSource {
 public:
     explicit SplitSamplerSource(const std::shared_ptr<ParsimonySource> &donor, const int seed,
-                              TreeList initial_ml_trees, Tree baseline_tree) : baseline_tree(std::move(baseline_tree)),
-        initial_ml_trees(std::move(initial_ml_trees)),
-        donor_tree_source(donor), seed(seed) {
+                                TreeList initial_ml_trees,
+                                Tree baseline_tree) : filter(EbgFilter(baseline_tree, initial_ml_trees)),
+                                                      baseline_tree(std::move(baseline_tree)),
+                                                      initial_ml_trees(std::move(initial_ml_trees)),
+                                                      donor_tree_source(donor), seed(seed) {
     }
 
     void ensure(const RaxmlInstance &instance, const SmartBarrier &barrier, unsigned int threads_per_worker,
@@ -44,13 +33,14 @@ public:
     [[nodiscard]] double amortized_time(unsigned int batch_size) const override;
 
 protected:
+    EbgFilter filter;
+
+    /**
+     * Best ML tree from reference set to use for labels
+     */
     const Tree baseline_tree;
     const TreeList initial_ml_trees;
 
-    struct RankedCandidate {
-        Tree tree;
-        unsigned int promise_score = 0;
-    };
 
     // build trees from these
     struct CandidateSplit {
@@ -58,17 +48,6 @@ protected:
         unsigned int ml_frequency = 0;
         unsigned int donor_frequency = 0;
     };
-
-    std::vector<std::vector<corax_split_base_t> > reference_splits;
-
-    std::vector<double> ebg_support;
-    std::vector<double> ml_frequency;
-
-    static constexpr double mae_margin = 0.0;
-
-    TreeList filter_and_rank(TreeList candidates);
-
-    bool prepare_filter();
 
     bool remember_topology(const Tree &candidate);
 
@@ -79,7 +58,7 @@ protected:
         const std::vector<std::size_t> &donor_ids,
         std::size_t words_per_split);
 
-    static SplitList extract_splits(const Tree &tree, const bool normalize);
+    static SplitList extract_splits(const Tree &tree, bool normalize);
 
     virtual TreeList generate_candidates(
         const RaxmlInstance &instance,
@@ -91,8 +70,6 @@ protected:
     Tree materialize_candidate(const std::vector<CandidateSplit> &selected) const;
 
     std::shared_ptr<ParsimonySource> donor_tree_source;
-
-    TreeList bootstrap_support_trees;
 
     int seed;
 
