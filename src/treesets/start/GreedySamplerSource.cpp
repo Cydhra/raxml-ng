@@ -186,3 +186,61 @@ TreeList GreedySamplerSource::generate_candidates(const RaxmlInstance &, const C
 
     return candidates;
 }
+
+Tree GreedySamplerSource::materialize_candidate(const std::vector<CandidateSplit> &selected) const {
+    Tree result;
+    assert(!selected.empty());
+
+    // CORAX clones every input split during this call. Keep only a borrowed
+    // pointer view; the CandidateSplit word vectors outlive materialization.
+    std::vector<corax_split_t> split_view;
+    split_view.reserve(selected.size());
+    for (const auto &split: selected) {
+        if (split.words.empty()) {
+            return result;
+        }
+
+        split_view.push_back(const_cast<corax_split_base_t *>(split.words.data()));
+    }
+
+    const auto tip_labels = baseline_tree.tip_labels_cstr();
+
+    corax_split_system_t split_system{};
+    split_system.split_count = static_cast<unsigned int>(selected.size());
+    split_system.max_support = 1.0;
+    split_system.support = nullptr;
+    split_system.splits = split_view.data();
+
+    std::unique_ptr<corax_consensus_utree_t, decltype(&corax_utree_consensus_destroy)> materialized(
+        corax_utree_from_splits(
+            &split_system,
+            static_cast<unsigned int>(baseline_tree.num_tips()),
+            tip_labels.data()),
+        corax_utree_consensus_destroy);
+
+    if (!materialized || !materialized->tree) {
+        coraxlib_reset_error();
+        return result;
+    }
+
+    result.pll_utree(static_cast<unsigned int>(baseline_tree.num_tips()), *materialized->tree);
+
+    // The cloned nodes contain non-owning consensus-data pointers. Clear them
+    // before the temporary CORAX consensus object is destroyed.
+    auto &utree = const_cast<corax_utree_t &>(result.pll_utree());
+    for (std::size_t node_id = 0; node_id < utree.tip_count + utree.inner_count; ++node_id) {
+        auto *node = utree.nodes[node_id];
+        if (!node) {
+            continue;
+        }
+
+        auto *current = node;
+        do {
+            current->data = nullptr;
+            current = current->next;
+        } while (current && current != node);
+    }
+
+    result.reset_brlens();
+    return result;
+}

@@ -4,6 +4,15 @@
 #include <memory>
 #include "SplitSamplerSource.hpp"
 
+/**
+ * A split extracted from the donor pool, ranked by its frequency
+ */
+struct CandidateSplit {
+    Split words;
+    unsigned int ml_frequency = 0;
+    unsigned int donor_frequency = 0;
+};
+
 class GreedySamplerSource : public SplitSamplerSource {
 public:
     GreedySamplerSource(const std::shared_ptr<ParsimonySource> &donor, const int seed, const TreeList &initial_ml_trees,
@@ -18,6 +27,8 @@ protected:
         const SplitList &donor_splits,
         unsigned int requested_candidates,
         unsigned long round_seed) override;
+
+    Tree materialize_candidate(const std::vector<CandidateSplit> &selected) const;
 };
 
 

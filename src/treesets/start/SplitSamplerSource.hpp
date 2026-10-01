@@ -48,14 +48,6 @@ protected:
      */
     const TreeList initial_ml_trees;
 
-
-    // build trees from these
-    struct CandidateSplit {
-        std::vector<corax_split_base_t> words;
-        unsigned int ml_frequency = 0;
-        unsigned int donor_frequency = 0;
-    };
-
     bool remember_topology(const Tree &candidate);
 
     static Split topology_key(const Tree &tree);
@@ -73,8 +65,6 @@ protected:
         const SplitList &donor_splits,
         unsigned int requested_candidates,
         unsigned long round_seed) = 0;
-
-    Tree materialize_candidate(const std::vector<CandidateSplit> &selected) const;
 
     std::shared_ptr<ParsimonySource> donor_tree_source;
 
