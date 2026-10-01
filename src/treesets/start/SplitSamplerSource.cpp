@@ -34,7 +34,7 @@ SplitList SplitSamplerSource::extract_splits(const Tree &tree, const bool normal
     return result;
 }
 
-Split SplitSamplerSource::topology_key(const Tree &tree) {
+std::vector<corax_split_base_t> SplitSamplerSource::topology_key(const Tree &tree) {
     const auto split_words = extract_splits(tree, true);
     Split result;
     for (const auto &split: split_words)
@@ -87,7 +87,7 @@ bool SplitSamplerSource::ensure(const RaxmlInstance &instance, const SmartBarrie
         const auto generated = gate->gate_and_rank(generate_candidates(instance, donors, donor_splits, NUM_SAMPLE_ATTEMPTS, seed));
 
         for (auto &candidate: generated) {
-            if (remember_topology(candidate))
+            if (is_unique(candidate))
                 tree_list.push_back(candidate);
         }
         sampled_batches += 1;
@@ -109,9 +109,9 @@ double SplitSamplerSource::amortized_time(unsigned int batch_size) const {
     return static_cast<double>(*cumulative_wall_time) / static_cast<double>(tree_list.size()) * static_cast<double>(batch_size);
 }
 
-bool SplitSamplerSource::remember_topology(const Tree &candidate) {
+bool SplitSamplerSource::is_unique(const Tree &candidate) {
     auto topology = topology_key(candidate);
 
     std::lock_guard lock(*duplicate_filter_mutex);
-    return !topology.empty() && seen_topologies.insert(std::move(topology)).second;
+    return seen_topologies.insert(std::move(topology)).second;
 }

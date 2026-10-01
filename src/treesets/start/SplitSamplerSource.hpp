@@ -81,9 +81,14 @@ protected:
      */
     std::unique_ptr<std::atomic_uint> cumulative_wall_time = std::make_unique<std::atomic_uint>(0);
 
-    bool remember_topology(const Tree &candidate);
+    bool is_unique(const Tree &candidate);
 
-    static Split topology_key(const Tree &tree);
+    /**
+     * Get a hash key for a topology.
+     * @param tree tree topology
+     * @return a bitvector consisting of all appended splits in the given tree, serving as a hash key
+     */
+    static std::vector<corax_split_base_t> topology_key(const Tree &tree);
 
     static bool has_majority_split(
         const SplitList &donor_topologies,
