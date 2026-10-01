@@ -66,12 +66,13 @@ bool SplitSamplerSource::ensure(const RaxmlInstance &instance, const SmartBarrie
                                 const unsigned int threads_per_worker, const unsigned int worker_id,
                                 const unsigned int thread_id,
                                 const unsigned int required_trees) {
-    const auto begin = std::chrono::steady_clock::now();
     // build_parsimony_msa(instance, false); // TODO initialize in main.cpp in case of checkpoint
 
     const auto old_list_size = tree_list.size();
 
     if (required_trees > old_list_size) {
+        const auto begin = std::chrono::steady_clock::now();
+
         donor_tree_source->ensure(instance, barrier, threads_per_worker, worker_id, thread_id, (sampled_batches + 1) * NUM_DONOR_TREE);
         const auto donors = donor_tree_source->range(sampled_batches * NUM_DONOR_TREE, (sampled_batches + 1) * NUM_DONOR_TREE);
 
@@ -94,18 +95,23 @@ bool SplitSamplerSource::ensure(const RaxmlInstance &instance, const SmartBarrie
         if (old_list_size + generated.size() < required_trees) {
             return false;
         }
+
+        const auto end = std::chrono::steady_clock::now();
+        const unsigned int elapsed = static_cast<unsigned int>(std::chrono::duration_cast<std::chrono::milliseconds>(end - begin).count());
+        cumulative_wall_time->fetch_add(elapsed);
     }
 
     return true;
 }
 
 double SplitSamplerSource::amortized_time(unsigned int batch_size) const {
-    return 0.0; // TODO
+    // not thread-safe but we stay silly
+    return static_cast<double>(*cumulative_wall_time) / static_cast<double>(tree_list.size()) * static_cast<double>(batch_size);
 }
 
 bool SplitSamplerSource::remember_topology(const Tree &candidate) {
     auto topology = topology_key(candidate);
 
-    std::lock_guard lock(*mutex);
+    std::lock_guard lock(*duplicate_filter_mutex);
     return !topology.empty() && seen_topologies.insert(std::move(topology)).second;
 }
