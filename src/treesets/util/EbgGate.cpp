@@ -1,9 +1,9 @@
-#include "EbgFilter.hpp"
+#include "EbgGate.hpp"
 
 // TODO this can probably be made lower
 static constexpr unsigned int BOOTSTRAP_SUPPORT_COUNT = 200;
 
-bool EbgFilter::reset_filter(const RaxmlInstance &instance, const ConstTreeRange &support_trees) {
+bool EbgGate::reset_gate(const RaxmlInstance &instance, const ConstTreeRange &support_trees) {
     reference_splits.clear();
 
     if (bootstrap_support_trees.empty()) {
@@ -69,7 +69,7 @@ bool EbgFilter::reset_filter(const RaxmlInstance &instance, const ConstTreeRange
     return true;
 }
 
-TreeList EbgFilter::filter_and_rank(TreeList candidates) {
+TreeList EbgGate::gate_and_rank(TreeList candidates) {
     TreeList selected;
     if (candidates.empty()) {
         return selected;

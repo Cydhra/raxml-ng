@@ -33,16 +33,21 @@ struct RankedCandidate {
     unsigned int promise_score = 0;
 };
 
-class EbgFilter {
+/**
+ * Verifies that a list of candidate trees approximates the per-split bootstrap distribution estimated by EBG.
+ * This serves to avoid using TreeSources which generate a strongly biased selection of trees which does not reflect
+ * the expected distribution of splits.
+ */
+class EbgGate {
 public:
-    EbgFilter(const Tree &baseline_tree, const TreeList &initial_ml_trees)
-        : baseline_tree(baseline_tree),
-          initial_ml_trees(initial_ml_trees) {
+    EbgGate(Tree baseline_tree, TreeList initial_ml_trees)
+        : baseline_tree(std::move(baseline_tree)),
+          initial_ml_trees(std::move(initial_ml_trees)) {
     }
 
-    bool reset_filter(const RaxmlInstance &instance, const ConstTreeRange & support_trees);
+    bool reset_gate(const RaxmlInstance &instance, const ConstTreeRange & support_trees);
 
-    TreeList filter_and_rank(TreeList candidates);
+    TreeList gate_and_rank(TreeList candidates);
 
 protected:
     /**

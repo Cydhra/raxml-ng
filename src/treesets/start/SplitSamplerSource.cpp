@@ -75,7 +75,7 @@ void SplitSamplerSource::ensure(const RaxmlInstance &instance, const SmartBarrie
         donor_tree_source->ensure(instance, barrier, threads_per_worker, worker_id, thread_id, (sampled_batches + 1) * NUM_DONOR_TREE);
         const auto donors = donor_tree_source->range(sampled_batches * NUM_DONOR_TREE, (sampled_batches + 1) * NUM_DONOR_TREE);
 
-        filter.reset_filter(instance, donors);
+        gate.reset_gate(instance, donors);
 
         // generate splits from donor trees
         SplitList donor_splits;
@@ -83,7 +83,7 @@ void SplitSamplerSource::ensure(const RaxmlInstance &instance, const SmartBarrie
         for (const auto &tree: donors)
             donor_splits.push_back(topology_key(tree));
 
-        const auto generated = filter.filter_and_rank(generate_candidates(instance, donors, donor_splits, NUM_SAMPLE_ATTEMPTS, seed));
+        const auto generated = gate.gate_and_rank(generate_candidates(instance, donors, donor_splits, NUM_SAMPLE_ATTEMPTS, seed));
         for (auto &candidate: generated) {
             if (remember_topology(candidate))
                 tree_list.push_back(candidate);
