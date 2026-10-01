@@ -5,7 +5,6 @@
 #include <memory>
 
 #include "ParsimonySource.hpp"
-#include "TreeRepository.hpp"
 #include "TreeSource.hpp"
 #include "../../bootstrap/SplitsTree.hpp"
 #include "../../bootstrap/EbgSupportTree.hpp"
@@ -67,9 +66,9 @@ protected:
 
     static constexpr double mae_margin = 0.0;
 
-    TreeList gate_and_rank(TreeList candidates);
+    TreeList filter_and_rank(TreeList candidates);
 
-    bool prepare_gate();
+    bool prepare_filter();
 
     bool remember_topology(const Tree &candidate);
 
@@ -100,8 +99,6 @@ protected:
     std::unique_ptr<std::mutex> mutex = std::make_unique<std::mutex>();
 
     std::set<Split> seen_topologies;
-
-    TreeRepository candidate_repository = {};
 };
 
 

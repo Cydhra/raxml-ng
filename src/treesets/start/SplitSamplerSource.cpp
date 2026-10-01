@@ -75,9 +75,8 @@ void SplitSamplerSource::ensure(const RaxmlInstance &instance, const SmartBarrie
     const auto old_list_size = tree_list.size();
 
     if (required_trees > old_list_size) {
-        donor_tree_source->ensure(instance, barrier, threads_per_worker, worker_id, thread_id, NUM_DONOR_TREE);
-
         // TODO change start position if the source was exhausted before
+        donor_tree_source->ensure(instance, barrier, threads_per_worker, worker_id, thread_id, NUM_DONOR_TREE);
         const auto donors = donor_tree_source->range(0, NUM_DONOR_TREE);
 
         // generate splits from donor trees
@@ -94,7 +93,7 @@ void SplitSamplerSource::ensure(const RaxmlInstance &instance, const SmartBarrie
             }
         }
 
-        const auto generated = gate_and_rank(generate_candidates(instance, donors, donor_splits, NUM_SAMPLE_ATTEMPTS, seed));
+        const auto generated = filter_and_rank(generate_candidates(instance, donors, donor_splits, NUM_SAMPLE_ATTEMPTS, seed));
         for (auto &candidate: generated) {
             if (remember_topology(candidate))
                 tree_list.push_back(candidate);
@@ -106,9 +105,9 @@ double SplitSamplerSource::amortized_time(unsigned int batch_size) const {
     return 0.0; // TODO
 }
 
-TreeList SplitSamplerSource::gate_and_rank(TreeList candidates) {
+TreeList SplitSamplerSource::filter_and_rank(TreeList candidates) {
     TreeList selected;
-    if (candidates.empty() || !prepare_gate()) {
+    if (candidates.empty() || !prepare_filter()) {
         return selected;
     }
     const auto split_count = reference_splits.size();
@@ -258,7 +257,7 @@ TreeList SplitSamplerSource::gate_and_rank(TreeList candidates) {
     return selected;
 }
 
-bool SplitSamplerSource::prepare_gate() {
+bool SplitSamplerSource::prepare_filter() {
     if (!reference_splits.empty())
         return true;
 
