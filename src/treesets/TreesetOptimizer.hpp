@@ -58,6 +58,11 @@ protected:
     DynamicMAB mab = {};
 
     /**
+     * Initialize resources that require multithreading, such as pre-filling tree sources.
+     */
+    void initialize_resources(const SmartBarrier &global_barrier);
+
+    /**
      * Initialize the bandit algorithms we use during the inference. These depend on the parameters derivded from initial
      * starting tree inference in `prepare_initial_batches()`
      */
@@ -68,8 +73,7 @@ protected:
      * This method runs one batch and then handles the updates to the MABs.
      * If the batch fails, it returns false so the bandit can be disabled.
      */
-    bool run_batch(
-        TunedBatch &batch, const TaskGroup &context, unsigned int worker_id, unsigned int thread_id);
+    bool run_batch(TunedBatch &batch, const TaskGroup &context, unsigned int worker_id, unsigned int thread_id);
 
     /**
      * Select a unit of work of the current state of the optimizer algorithm.

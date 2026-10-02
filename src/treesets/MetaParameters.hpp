@@ -7,11 +7,17 @@
 #include "../Options.hpp"
 #include "../Optimizer.hpp"
 
+enum TreeSourceType {
+    Parsimony, SplitParsimony, SplitGreedy
+};
+
 /**
  * Holds the meta-parameters of self-tuning tree inference. The parameters are held by a bandit and can
  * be applied to TunedBatches to configure the tree inference.
  */
 struct MetaParameters {
+    TreeSourceType treeSource = TreeSourceType::Parsimony;
+
     /**
      * Number of top topologies to keep during SPR rounds. If lower, the SPR rounds perform substantially less
      * branch-length optimizations. On datasets where most trees are plausible, this saves time because the K top
@@ -78,6 +84,11 @@ struct MetaParameters {
 
     explicit MetaParameters() = default;
 
+    MetaParameters &with_treesource(const TreeSourceType treeSource) {
+        this->treeSource = treeSource;
+        return *this;
+    }
+
     MetaParameters &with_topk(const unsigned int keep_top_k_topol) {
         this->keep_top_k_topol = keep_top_k_topol;
         return *this;
@@ -139,7 +150,8 @@ struct MetaParameters {
     }
 
     friend bool operator==(const MetaParameters &lhs, const MetaParameters &rhs) {
-        return lhs.keep_top_k_topol == rhs.keep_top_k_topol
+        return lhs.treeSource == rhs.treeSource
+               && lhs.keep_top_k_topol == rhs.keep_top_k_topol
                && lhs.do_first_model == rhs.do_first_model
                && lhs.do_final_model == rhs.do_final_model
                && lhs.num_fast_spr == rhs.num_fast_spr
@@ -159,6 +171,7 @@ struct MetaParameters {
 
     friend std::size_t hash_value(const MetaParameters &obj) {
         std::size_t seed = 0x148BCA29;
+        seed ^= (seed << 6) + (seed >> 2) + 0x33BF1ABA + static_cast<std::size_t>(obj.treeSource);
         seed ^= (seed << 6) + (seed >> 2) + 0x26C25243 + static_cast<std::size_t>(obj.keep_top_k_topol);
         seed ^= (seed << 6) + (seed >> 2) + 0x0341DCC9 + static_cast<std::size_t>(obj.do_first_model);
         seed ^= (seed << 6) + (seed >> 2) + 0x674CC085 + static_cast<std::size_t>(obj.do_final_model);

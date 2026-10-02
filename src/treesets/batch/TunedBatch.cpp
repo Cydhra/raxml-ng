@@ -17,15 +17,29 @@ unsigned int TunedBatch::get_batch_size() const {
 void TunedBatch::generate_starting_trees(const RaxmlInstance &instance, SharedBatchResources &resources,
                                          const TaskGroup &context,
                                          const unsigned int worker_id, const unsigned int thread_id) {
-    auto &tree_source = resources.get_parsimony();
-    auto reservation = tree_source.consume_batch(instance, context.get_barrier(), this->threads_per_worker,
+    TreeSource *tree_source;
+    switch (this->meta_parameters.treeSource) {
+        case Parsimony:
+            tree_source = &resources.get_parsimony();
+            break;
+        case SplitParsimony:
+            tree_source = &resources.get_parsimony_split_source();
+            break;
+        case SplitGreedy:
+            tree_source = &resources.get_greedy_split_source();
+            break;
+        default:
+            throw RaxmlException("TreeSourceType not implemented");
+    }
+
+    auto reservation = tree_source->consume_batch(instance, context.get_barrier(), this->threads_per_worker,
                                                   worker_id, thread_id, this->batch_size);
 
     if (reservation) {
         auto [start, end] = *reservation;
         context.enter_barrier();
         for (const auto id: this->exclusive_assignment->at(context.get_group_thread_id(worker_id, thread_id))) {
-            tree_source.copy_tree(this->batch_start_trees->at(id), start + id);
+            tree_source->copy_tree(this->batch_start_trees->at(id), start + id);
             this->num_trees_generated->fetch_add(1);
         }
     } else {

@@ -4,6 +4,7 @@
 #include "../../pool/Threadpool.hpp"
 #include "../../au/AuTest.hpp"
 #include "../../Optimizer.hpp"
+#include "../start/GreedySamplerSource.hpp"
 #include "../start/ParsimonySource.hpp"
 #include "../start/ParsimonySamplerSource.hpp"
 /**
@@ -23,17 +24,21 @@ public:
                          const unsigned int workers_per_group,
                          const unsigned int total_threads,
                          const Options &opts,
-                         TreeList initial_ml_trees,
-                         Tree baseline_tree,
-                         std::shared_ptr<PartitionedMSA> msa,
+                         const TreeList& initial_ml_trees,
+                         const Tree& baseline_tree,
+                         const std::shared_ptr<PartitionedMSA>& msa,
                          const Tree &tree,
                          const std::vector<std::vector<doubleVector> > &reference_logh_matrix,
                          const unsigned int batch_size,
                          long seed,
                          const double pythia_score) : gate(make_shared<EbgGate>(baseline_tree, initial_ml_trees)),
                                                       parsimony_source(make_shared<ParsimonySource>(seed)),
-                                                      aggressive_source(
+                                                      parsimony_split_sampling(
                                                           make_shared<ParsimonySamplerSource>(
+                                                              parsimony_source, gate, seed, initial_ml_trees,
+                                                              baseline_tree)),
+                                                      greedy_split_sampling(
+                                                          make_shared<GreedySamplerSource>(
                                                               parsimony_source, gate, seed, initial_ml_trees,
                                                               baseline_tree)) {
         // prepare a dummy matrix with empty vectors to correctly initialize the AU-Test. These dummy vectors
@@ -176,8 +181,16 @@ public:
         this->au_test_factors[context.group_id()] = factor;
     }
 
-    TreeSource &get_parsimony() {
-        return *aggressive_source;
+    [[nodiscard]] TreeSource &get_parsimony() const {
+        return *parsimony_source;
+    }
+
+    [[nodiscard]] SplitSamplerSource &get_parsimony_split_source() const {
+        return *parsimony_split_sampling;
+    }
+
+    [[nodiscard]] SplitSamplerSource &get_greedy_split_source() const {
+        return *greedy_split_sampling;
     }
 
 protected:
@@ -252,7 +265,9 @@ protected:
      */
     shared_ptr<ParsimonySource> parsimony_source;
 
-    shared_ptr<ParsimonySamplerSource> aggressive_source;
+    shared_ptr<ParsimonySamplerSource> parsimony_split_sampling;
+
+    shared_ptr<GreedySamplerSource> greedy_split_sampling;
 };
 
 #endif //RAXML_SHAREDBATCHRESOURCES_HPP_
