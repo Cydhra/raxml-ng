@@ -87,10 +87,16 @@ void TreesetOptimizer::initialize_bandits() {
     this->mab.register_new_arm("Starting Trees", parsimony);
 }
 
-void TreesetOptimizer::run_batch(
-    TunedBatch &batch, TaskGroup &context, unsigned int worker_id,
-    unsigned int thread_id) {
-    batch.optimize(instance, opts, shared_batch_resources, context, worker_id, thread_id);
+bool TreesetOptimizer::run_batch(TunedBatch &batch, const TaskGroup &context, const unsigned int worker_id,
+                                 const unsigned int thread_id) {
+    try {
+        batch.optimize(instance, opts, shared_batch_resources, context, worker_id, thread_id);
+    } catch (BanditFailedException &e) {
+        LOG_INFO << "Batch " << batch.get_name() << " failed because: " << e.message() << ". Disabling bandit." <<
+                std::endl;
+        return false;
+    }
+
 
     if (context.is_group_leader(worker_id, thread_id)) {
         // inform the mab about the results
@@ -104,6 +110,8 @@ void TreesetOptimizer::run_batch(
             pool.shutdown();
         }
     }
+
+    return true;
 }
 
 BatchTask TreesetOptimizer::next_work_unit() {
@@ -112,9 +120,11 @@ BatchTask TreesetOptimizer::next_work_unit() {
                                                               pool.threads_per_task());
     current_batch.update_meta_parameters(parameters);
 
-    BatchTask runner = [this, &current_batch](TaskGroup &context, const unsigned int worker_id,
+    BatchTask runner = [this, &current_batch, &parameters](TaskGroup &context, const unsigned int worker_id,
                                               const unsigned int thread_id) {
-        this->run_batch(current_batch, context, worker_id, thread_id);
+        if (!this->run_batch(current_batch, context, worker_id, thread_id)) {
+            this->mab.disable_bandit(parameters);
+        }
     };
 
     return runner;

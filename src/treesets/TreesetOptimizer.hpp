@@ -66,10 +66,10 @@ protected:
     /**
      * Main method for the threadpool workers.
      * This method runs one batch and then handles the updates to the MABs.
-     * It is bound into a BatchTask by next_work_unit.
+     * If the batch fails, it returns false so the bandit can be disabled.
      */
-    void run_batch(
-        TunedBatch &batch, TaskGroup &context, unsigned int worker_id, unsigned int thread_id);
+    bool run_batch(
+        TunedBatch &batch, const TaskGroup &context, unsigned int worker_id, unsigned int thread_id);
 
     /**
      * Select a unit of work of the current state of the optimizer algorithm.

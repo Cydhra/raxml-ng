@@ -39,9 +39,9 @@ set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_EXTENSIONS OFF)
 
 # set these flags globally for all subprojects (libpll etc.)
-set(CMAKE_CXX_FLAGS_DEBUG "-O3 -ggdb" CACHE INTERNAL "")
+set(CMAKE_CXX_FLAGS_DEBUG "-O3 -ggdb -fno-omit-frame-pointer -fno-inline" CACHE INTERNAL "")
 set (CMAKE_CXX_FLAGS_RELEASE  "-O3"    CACHE INTERNAL "")
-set(CMAKE_C_FLAGS_DEBUG "-O3 -ggdb" CACHE INTERNAL "")
+set(CMAKE_C_FLAGS_DEBUG "-O3 -ggdb -fno-omit-frame-pointer -fno-inline" CACHE INTERNAL "")
 set (CMAKE_C_FLAGS_RELEASE  "-O3"    CACHE INTERNAL "")
 
 option(DEBUG_INFO "Compile with debug info" OFF)

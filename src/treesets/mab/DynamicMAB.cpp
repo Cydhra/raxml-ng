@@ -1,10 +1,10 @@
 #include "DynamicMAB.hpp"
 
-void register_mapping(std::unordered_map<MetaParameters, size_t> &outer_mapping,
-                      std::unordered_map<MetaParameters, size_t> &inner_mapping,
-                      MetaParameters &parameters,
-                      size_t outer_id,
-                      size_t inner_id) {
+static void register_mapping(std::unordered_map<MetaParameters, size_t> &outer_mapping,
+                             std::unordered_map<MetaParameters, size_t> &inner_mapping,
+                             MetaParameters &parameters,
+                             size_t outer_id,
+                             size_t inner_id) {
     assert(outer_mapping.find(parameters) == outer_mapping.end());
 
     outer_mapping.insert({parameters, outer_id});
@@ -36,7 +36,7 @@ MetaParameters &DynamicMAB::select_next_bandit() {
     return current_bandit.get_parameters();
 }
 
-void DynamicMAB::take_measurement(TunedBatch &batch) {
+void DynamicMAB::take_measurement(const TunedBatch &batch) {
     auto &parameters = batch.get_parameters();
 
     // let outer bandit take the measurement
@@ -48,6 +48,19 @@ void DynamicMAB::take_measurement(TunedBatch &batch) {
     bandit.get_parameters()->take_measurement(inner_bandit, batch, true);
 
     check_update();
+}
+
+void DynamicMAB::disable_bandit(const MetaParameters &parameters) {
+    const auto outer_bandit_id = this->outer_mapping[parameters];
+    const auto &outer_bandit = this->hierarchical_mab.get_bandit(outer_bandit_id);
+
+    const auto inner_bandit_id = this->inner_mapping[parameters];
+
+    if (!outer_bandit.get_parameters()->disable_bandit(inner_bandit_id)) {
+        if (!this->hierarchical_mab.disable_bandit(outer_bandit_id)) {
+            add_next_successor();
+        }
+    }
 }
 
 void DynamicMAB::check_update() {
@@ -63,10 +76,9 @@ void DynamicMAB::check_update() {
 }
 
 void DynamicMAB::propose_more_effort() {
-    const auto current_level = hierarchical_mab.num_bandits();
-
     const auto &bandit = hierarchical_mab.get_best_bandit();
     const auto &name = bandit.get_name();
+    const auto current_level = hierarchical_mab.num_bandits();
 
     const auto previous_successors_spawned = past_increases.find(name);
     unsigned int previous_modifications = 0;
@@ -76,18 +88,7 @@ void DynamicMAB::propose_more_effort() {
 
     // dont add expensive bandits if that didnt work before and we are already getting trees
     if (previous_modifications < 2 || bandit.get_expected_tree_rate() < 0.1) {
-        // add all bandits of the current level
-        for (auto it = this->successors.begin(); it != this->successors.end(); it += 1) {
-            if (std::get<0>(*it) <= current_level) {
-                if (!hierarchical_mab.has_bandit(std::get<1>(*it))) {
-                    LOG_WORKER_TS(LogLevel::info) << std::endl << "Adding bandit " << std::get<1>(*it) <<
-                            " to algorithm." << std::endl;
-                    register_new_arm(std::get<1>(*it), std::get<2>(*it));
-                    last_mab_modification = hierarchical_mab.get_iterations_completed();
-                }
-            }
-        }
-
+        add_next_successor();
         previous_modifications++;
         past_increases[name] = previous_modifications;
     }
@@ -105,6 +106,21 @@ void DynamicMAB::propose_less_effort() {
         this->add_bandit_to_arm(bandit, outer_mapping[parameters], new_parameters, inner_bandit.get_name() + ",mut");
 
         last_mab_modification = hierarchical_mab.get_iterations_completed();
+    }
+}
+
+void DynamicMAB::add_next_successor() {
+    const auto current_level = hierarchical_mab.num_bandits();
+
+    for (auto it = this->successors.begin(); it != this->successors.end(); it += 1) {
+        if (std::get<0>(*it) <= current_level) {
+            if (!hierarchical_mab.has_bandit(std::get<1>(*it))) {
+                LOG_WORKER_TS(LogLevel::info) << std::endl << "Adding bandit " << std::get<1>(*it) <<
+                        " to algorithm." << std::endl;
+                register_new_arm(std::get<1>(*it), std::get<2>(*it));
+                last_mab_modification = hierarchical_mab.get_iterations_completed();
+            }
+        }
     }
 }
 

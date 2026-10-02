@@ -39,7 +39,7 @@ public:
                                                                          parameters)) {
     }
 
-    // grant MAB access to protected members, specifically "take_measurement"
+    // grant MAB access to protected members, specifically "take_measurement" and "disable"
     template<class H>
     friend class MultiArmedBandit;
 
@@ -278,6 +278,11 @@ protected:
                     1000.0)
                 << " trees per second." << std::endl;
         this->samples.emplace_back(batch.elapsed_wall_time(), batch.get_plausible_tree_count(), batch.get_batch_size());
+    }
+
+    void disable() {
+        this->participating = false;
+        LOG_INFO << "Disabled bandit " << this->name << std::endl;
     }
 };
 

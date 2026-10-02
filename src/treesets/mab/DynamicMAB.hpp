@@ -22,7 +22,8 @@ public:
      */
     void register_new_arm(const std::string &name, const OuterArm &new_arm);
 
-    void add_bandit_to_arm(const Bandit<OuterArm> &arm, const size_t outer_id, MetaParameters &new_parameters, const std::string &name);
+    void add_bandit_to_arm(const Bandit<OuterArm> &arm, const size_t outer_id, MetaParameters &new_parameters,
+                           const std::string &name);
 
     void register_new_successor(unsigned int level, const std::string &&name, const OuterArm &&new_arm);
 
@@ -42,7 +43,14 @@ public:
      *
      * @param batch a batch of trees inferred with parameters taken from this MAB
      */
-    void take_measurement(TunedBatch &batch);
+    void take_measurement(const TunedBatch &batch);
+
+    /**
+     * Disable the bandit that handles these parameters.
+     *
+     * @param parameters bandit parameters
+     */
+    void disable_bandit(const MetaParameters &parameters);
 
 protected:
     /**
@@ -87,9 +95,21 @@ protected:
      */
     void check_update();
 
+    /**
+     * Add a bandit to the MAB that tries to infer trees with more effort spent than the current best bandit
+     */
     void propose_more_effort();
 
+    /**
+     * Add a bandit to the MAB that tries to infer trees with less effort spent than the current best bandit
+     */
     void propose_less_effort();
+
+    /**
+     * Add a bandit to the MAB that is the next in the line of successor bandits. Used when proposing more effort,
+     * or if all current bandits are deactivated.
+     */
+    void add_next_successor();
 
     MetaParameters mutate(const MetaParameters &parameters);
 };

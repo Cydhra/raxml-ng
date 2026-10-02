@@ -29,8 +29,7 @@ void TunedBatch::generate_starting_trees(const RaxmlInstance &instance, SharedBa
             this->num_trees_generated->fetch_add(1);
         }
     } else {
-        LOG_WARN << "Tree source exhausted. Aborting bandit." << std::endl;
-        // TODO abort bandit
+        throw BanditFailedException("tree source exhausted.");
     }
 }
 
