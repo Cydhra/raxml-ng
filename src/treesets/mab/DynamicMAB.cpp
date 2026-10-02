@@ -78,7 +78,6 @@ void DynamicMAB::check_update() {
 void DynamicMAB::propose_more_effort() {
     const auto &bandit = hierarchical_mab.get_best_bandit();
     const auto &name = bandit.get_name();
-    const auto current_level = hierarchical_mab.num_bandits();
 
     const auto previous_successors_spawned = past_increases.find(name);
     unsigned int previous_modifications = 0;
