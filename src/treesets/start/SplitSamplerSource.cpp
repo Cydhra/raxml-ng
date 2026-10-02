@@ -1,7 +1,5 @@
 #include "SplitSamplerSource.hpp"
 
-constexpr size_t NUM_DONOR_TREE = 300;
-
 constexpr size_t NUM_SAMPLE_ATTEMPTS = 300;
 
 // extract splits from tree, encoded as bit vectors
@@ -62,49 +60,50 @@ bool SplitSamplerSource::has_majority_split(
                        });
 }
 
-bool SplitSamplerSource::ensure(const RaxmlInstance &instance, const SmartBarrier &barrier,
-                                const unsigned int threads_per_worker, const unsigned int worker_id,
-                                const unsigned int thread_id,
+bool SplitSamplerSource::ensure(const RaxmlInstance &, const SmartBarrier &,
+                                const unsigned int, const unsigned int,
+                                const unsigned int,
                                 const unsigned int required_trees) {
     // build_parsimony_msa(instance, false); // TODO initialize in main.cpp in case of checkpoint
 
     const auto old_list_size = tree_list.size();
 
     if (required_trees > old_list_size) {
-        const auto begin = std::chrono::steady_clock::now();
-
-        donor_tree_source->ensure(instance, barrier, threads_per_worker, worker_id, thread_id, (sampled_batches + 1) * NUM_DONOR_TREE);
-        const auto donors = donor_tree_source->range(sampled_batches * NUM_DONOR_TREE, (sampled_batches + 1) * NUM_DONOR_TREE);
-
-        gate->reset_gate(instance, donors);
-
-        // generate splits from donor trees
-        SplitList donor_splits;
-        donor_splits.reserve(NUM_DONOR_TREE);
-        for (const auto &tree: donors)
-            donor_splits.push_back(topology_key(tree));
-
-        const auto generated = gate->gate_and_rank(generate_candidates(instance, donors, donor_splits, NUM_SAMPLE_ATTEMPTS, seed));
-
-        for (auto &candidate: generated) {
-            if (is_unique(candidate))
-                tree_list.push_back(candidate);
-        }
-        sampled_batches += 1;
-
-        if (old_list_size + generated.size() < required_trees) {
-            return false;
-        }
-
-        const auto end = std::chrono::steady_clock::now();
-        const unsigned int elapsed = static_cast<unsigned int>(std::chrono::duration_cast<std::chrono::milliseconds>(end - begin).count());
-        cumulative_wall_time->fetch_add(elapsed);
+        return false;
     }
 
     return true;
 }
 
-double SplitSamplerSource::amortized_time(unsigned int batch_size) const {
+void SplitSamplerSource::generate(const RaxmlInstance &instance, const SmartBarrier &barrier,
+    const unsigned int threads_per_worker, const unsigned int worker_id, const unsigned int thread_id, const unsigned int num_trees) {
+    const auto begin = std::chrono::steady_clock::now();
+
+    donor_tree_source->ensure(instance, barrier, threads_per_worker, worker_id, thread_id, (sampled_batches + 1) * NUM_DONOR_TREE);
+    const auto donors = donor_tree_source->range(sampled_batches * NUM_DONOR_TREE, (sampled_batches + 1) * NUM_DONOR_TREE);
+
+    gate->reset_gate(instance, donors);
+
+    // generate splits from donor trees
+    SplitList donor_splits;
+    donor_splits.reserve(NUM_DONOR_TREE);
+    for (const auto &tree: donors)
+        donor_splits.push_back(topology_key(tree));
+
+    const auto generated = gate->gate_and_rank(generate_candidates(instance, donors, donor_splits, num_trees, seed));
+
+    for (auto &candidate: generated) {
+        if (is_unique(candidate))
+            tree_list.push_back(candidate);
+    }
+    sampled_batches += 1;
+
+    const auto end = std::chrono::steady_clock::now();
+    const unsigned int elapsed = static_cast<unsigned int>(std::chrono::duration_cast<std::chrono::milliseconds>(end - begin).count());
+    cumulative_wall_time->fetch_add(elapsed);
+}
+
+double SplitSamplerSource::amortized_time(const unsigned int batch_size) const {
     // not thread-safe but we stay silly
     return static_cast<double>(*cumulative_wall_time) / static_cast<double>(tree_list.size()) * static_cast<double>(batch_size);
 }

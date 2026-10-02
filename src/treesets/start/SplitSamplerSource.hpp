@@ -17,6 +17,8 @@ Tree generate_parsimony_tree(const RaxmlInstance &instance,
 
 struct RaxmlInstance;
 
+constexpr size_t NUM_DONOR_TREE = 300;
+
 class SplitSamplerSource : public TreeSource {
 public:
     explicit SplitSamplerSource(const std::shared_ptr<ParsimonySource> &donor,
@@ -31,6 +33,12 @@ public:
 
     bool ensure(const RaxmlInstance &instance, const SmartBarrier &barrier, unsigned int threads_per_worker,
                 unsigned int worker_id, unsigned int thread_id, unsigned int required_trees) override;
+
+    /**
+     * Generate trees in the source. This is not implemented in `ensure` to avoid refilling it.
+     */
+    void generate(const RaxmlInstance &instance, const SmartBarrier &barrier, unsigned int threads_per_worker,
+                  unsigned int worker_id, unsigned int thread_id, unsigned int num_trees);
 
     [[nodiscard]] double amortized_time(unsigned int batch_size) const override;
 
