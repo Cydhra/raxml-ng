@@ -96,6 +96,10 @@ bool TreesetOptimizer::run_batch(TunedBatch &batch, const TaskGroup &context, co
     } catch (BanditFailedException &e) {
         LOG_INFO << "Batch " << batch.get_name() << " failed because: " << e.message() << ". Disabling bandit." <<
                 std::endl;
+
+        // inform the batch queue that the batch has been inferred
+        this->batch_queue.finish_batch(batch);
+
         return false;
     }
 

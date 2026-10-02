@@ -280,6 +280,11 @@ void TunedBatch::update_meta_parameters(const MetaParameters &new_parameters) {
 }
 
 bool TunedBatch::is_compatible(const MetaParameters &new_parameters) const {
+    // if nothing has been inferred so far, we can just do that
+    if (this->tree_topologies.empty()) {
+        return true;
+    }
+
     // a batch that already optimized with these exact parameters cannot be reused for the same parameters again
     if (this->meta_parameters == new_parameters) {
         return false;
