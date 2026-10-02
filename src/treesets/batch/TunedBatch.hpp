@@ -175,6 +175,11 @@ public:
     void finalize();
 
     /**
+     * @return true, if trees have been inferred for this batch, false if no trees have been inferred ever.
+     */
+    bool has_trees() const;
+
+    /**
      * @return the number of trees that are inferred in this batch.
      */
     [[nodiscard]] unsigned int get_batch_size() const;

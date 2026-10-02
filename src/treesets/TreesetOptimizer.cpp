@@ -179,8 +179,10 @@ std::vector<Tree> TreesetOptimizer::get_all_trees() const {
     auto full_set = std::vector<Tree>();
 
     for (auto &batch: batch_queue.view_batches()) {
-        for (unsigned int tree_id = 0; tree_id < batch.get_batch_size(); ++tree_id) {
-            full_set.push_back(batch.get_tree(tree_id));
+        if (batch.has_trees()) {
+            for (unsigned int tree_id = 0; tree_id < batch.get_batch_size(); ++tree_id) {
+                full_set.push_back(batch.get_tree(tree_id));
+            }
         }
     }
 
@@ -192,7 +194,9 @@ std::vector<Tree> TreesetOptimizer::get_plausible_trees() const {
     auto plausible_set = std::vector<Tree>();
 
     for (auto &batch: batch_queue.view_batches()) {
-        batch.get_plausible_trees(plausible_set);
+        if (batch.has_trees()) {
+            batch.get_plausible_trees(plausible_set);
+        }
     }
 
     return plausible_set;

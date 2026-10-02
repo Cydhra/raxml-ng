@@ -384,6 +384,11 @@ void TunedBatch::finalize() {
     this->batch_trees.clear();
 }
 
+bool TunedBatch::has_trees() const {
+    auto guard = std::lock_guard(*this->topology_access);
+    return !this->tree_topologies.empty();
+}
+
 unsigned int TunedBatch::elapsed_wall_time() const {
     return (this->tree_time + this->heuristic->get_total_wall_time()) / (
                num_workers * threads_per_worker) + this->au_wall_time;
