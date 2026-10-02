@@ -7,15 +7,10 @@ TreeList ParsimonySamplerSource::generate_candidates(const RaxmlInstance &instan
                                                      unsigned long round_seed) {
     TreeList candidates;
 
-    coraxlib_reset_error();
-
     const auto tip_count = static_cast<unsigned int>(baseline_tree.num_tips());
     constexpr auto bits_per_word = static_cast<unsigned int>(sizeof(corax_split_base_t) * 8);
     const auto words_per_split = tip_count / bits_per_word +
                                  static_cast<unsigned int>(tip_count % bits_per_word != 0);
-    if (tip_count <= 3 || words_per_split == 0) {
-        return candidates;
-    }
 
     candidates.reserve(requested_candidates);
 
@@ -55,7 +50,6 @@ TreeList ParsimonySamplerSource::generate_candidates(const RaxmlInstance &instan
                 candidate.num_tips() != tip_count ||
                 !candidate.binary() ||
                 !constraint.compatible(candidate)) {
-                coraxlib_reset_error();
                 ++materialization_failures;
                 continue;
             }
@@ -69,7 +63,6 @@ TreeList ParsimonySamplerSource::generate_candidates(const RaxmlInstance &instan
 
             candidates.push_back(std::move(candidate));
         } catch (const std::exception &error) {
-            coraxlib_reset_error();
             ++materialization_failures;
             LOG_WORKER_TS(LogLevel::info)
                     << "Treeset constrained-parsimony candidate skipped: "
