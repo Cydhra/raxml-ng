@@ -28,10 +28,6 @@ public:
                                                 persite_loglh(persite_loglh),
                                                 batch_size(batch_size),
                                                 current_seed(seed) {
-        // initialize the model map for all partitions
-        for (unsigned int part_id = 0; part_id < msa->part_count(); ++part_id) {
-            (*this->backup_model)[part_id] = Model(msa->part_info(part_id).model().to_string());
-        }
     }
 
     /**
@@ -141,11 +137,6 @@ protected:
      * When a worker is done, the batch has to be removed from the in-flight map.
      */
     std::unordered_set<std::string> in_flight = {};
-
-    /**
-     * Model parameter backup to initialize batch trees with.
-     */
-    std::unique_ptr<ModelMap> backup_model = unique_ptr<ModelMap>(new ModelMap());
 
     /**
      * Number of plausible trees that finalized batches provide right now.

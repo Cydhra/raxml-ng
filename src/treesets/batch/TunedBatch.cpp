@@ -237,9 +237,7 @@ void TunedBatch::perform_plausibility_check(const Options &opts, SharedBatchReso
 
 void TunedBatch::update_meta_parameters(const MetaParameters &new_parameters) {
     // do not inherit model if we optimize it anyway to avoid bias
-    if (new_parameters.do_first_model || new_parameters.is_fallback()) {
-        this->initial_model = make_shared<ModelMap>();
-    }
+    auto initial_model = make_shared<ModelMap>();
 
     if (!this->heuristic) {
         this->heuristic = HeuristicFactory::build_heuristic(new_parameters, name, get_batch_size(),
@@ -333,23 +331,6 @@ bool TunedBatch::is_compatible(const MetaParameters &new_parameters) const {
     }
 
     return true;
-}
-
-void TunedBatch::backup_models(ModelMap &target) const {
-    assert(this->get_plausible_tree_count() > 0);
-    const auto iter = std::find_if(this->p_values.begin(), this->p_values.end(),
-                                   [](const double x) { return x >= 0.05; });
-    const auto idx = std::distance(p_values.begin(), iter);
-
-    for (const auto &thread_id: this->batch_trees[idx]) {
-        for (size_t part_id: thread_id.value().parts_master()) {
-            assign(target[part_id], thread_id.value(), part_id);
-        }
-    }
-}
-
-void TunedBatch::assign_batch_models(const ModelMap &other) {
-    initial_model = make_shared<ModelMap>(other);
 }
 
 void TunedBatch::finalize() {

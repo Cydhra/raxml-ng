@@ -1,15 +1,5 @@
 #include "BatchQueue.hpp"
 
-/**
- * Backup a model from the given batch, iff a lock guard is provided.
- *
- * @param batch a tuned batch with a model that should be backed up
- * @param backup_model the target reference where to store the backup
- */
-void guarded_backup_batch_model(const TunedBatch &batch, ModelMap &backup_model, std::lock_guard<std::mutex> const &) {
-    batch.backup_models(backup_model);
-}
-
 TunedBatch &BatchQueue::generate_batch(const unsigned int num_workers, const unsigned int num_threads) {
     const std::string name_prefix = "Batch";
 
@@ -33,10 +23,6 @@ TunedBatch &BatchQueue::generate_batch(const unsigned int num_workers, const uns
 
     // mark the batch as unfinished
     this->unfinished.emplace(batch.get_name());
-
-    // assign the prepared model. If we have no model backed up yet, this is initialized with the default model,
-    // so nothing will break. This requires that the batch mutex is locked
-    batch.assign_batch_models(*this->backup_model);
 
     // return (which drops the mutex guard)
     return this->batches[batch_name_index];
@@ -102,10 +88,7 @@ TunedBatch &BatchQueue::select_next_batch(const MetaParameters &current_paramete
 }
 
 void BatchQueue::finish_batch(TunedBatch &batch) {
-    const std::lock_guard<std::mutex> lock(batch_mutex);
-    if (batch.get_plausible_tree_count() > 0) {
-        guarded_backup_batch_model(batch, *this->backup_model, lock);
-    }
+    const std::lock_guard lock(batch_mutex);
 
     if (batch.get_plausible_tree_count() > this->batch_size / 2) {
         this->finalize_batch(batch);

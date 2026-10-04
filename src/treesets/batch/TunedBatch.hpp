@@ -137,20 +137,6 @@ public:
     [[nodiscard]] bool is_compatible(const MetaParameters &new_parameters) const;
 
     /**
-     * Replace the model parameters with the model parameters of a different batch, which allows restoring the model instead of
-     * optimizing it from scratch. The model will be written into this batch's model backup and then directly
-     * applied.
-     */
-    void assign_batch_models(const ModelMap &other);
-
-    /**
-     * Store the model of the first tree in the batch into a given model map.
-     *
-     * @param target Reference to a ModelMap where to store the model parameters
-     */
-    void backup_models(ModelMap &target) const;
-
-    /**
      * Free resources used during inference that will not be used again. The batch data stays valid but further
      * inference will not be possible.
      */
@@ -275,12 +261,6 @@ protected:
      * and we perform the AU test by combining it with the reference tree loglikelihood vectors.
      */
     std::vector<std::vector<doubleVector> > batch_persite_logh;
-
-    /**
-     * Initial model parameters that get loaded into the tree info objects upon creation.
-     * This is initialized after creating the TunedBatch with a call to assign_batch_models.
-     */
-    std::shared_ptr<ModelMap> initial_model;
 
     /**
      * How many starting trees have been generated.
