@@ -97,8 +97,8 @@ void TreesetOptimizer::initialize_bandits() {
 }
 
 void TreesetOptimizer::run_batch(
-    TunedBatch &batch, TaskGroup &context, unsigned int worker_id,
-    unsigned int thread_id) {
+    TunedBatch &batch, const TaskGroup &context, const unsigned int worker_id,
+    const unsigned int thread_id) {
     batch.optimize(instance, opts, shared_batch_resources, context, worker_id, thread_id);
 
     if (context.is_group_leader(worker_id, thread_id)) {
@@ -121,7 +121,7 @@ BatchTask TreesetOptimizer::next_work_unit() {
                                                               pool.threads_per_task());
     current_batch.update_meta_parameters(parameters);
 
-    BatchTask runner = [this, &current_batch](TaskGroup &context, const unsigned int worker_id,
+    BatchTask runner = [this, &current_batch](const TaskGroup &context, const unsigned int worker_id,
                                               const unsigned int thread_id) {
         this->run_batch(current_batch, context, worker_id, thread_id);
     };
