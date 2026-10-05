@@ -9,7 +9,7 @@ void EbgGate::reset_gate(const RaxmlInstance &instance, const ConstTreeRange &su
     if (bootstrap_support_trees.empty()) {
         bootstrap_support_trees.reserve(BOOTSTRAP_SUPPORT_COUNT);
         while (bootstrap_support_trees.size() < BOOTSTRAP_SUPPORT_COUNT) {
-            bootstrap_support_trees.emplace_back(generate_tree(instance, StartingTree::parsimony, 1234567, true));
+            bootstrap_support_trees.emplace_back(generate_tree(instance, StartingTree::parsimony, 1234567 + bootstrap_support_trees.size(), true));
         }
     }
 
