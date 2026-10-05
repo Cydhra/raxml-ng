@@ -61,9 +61,9 @@ bool ResampleSource::has_majority_split(
 }
 
 bool ResampleSource::ensure(const RaxmlInstance &, const SmartBarrier &,
-                                const unsigned int, const unsigned int,
-                                const unsigned int,
-                                const unsigned int required_trees) {
+                            const unsigned int, const unsigned int,
+                            const unsigned int,
+                            const unsigned int required_trees) {
     // build_parsimony_msa(instance, false); // TODO initialize in main.cpp in case of checkpoint
 
     const auto old_list_size = tree_list.size();
@@ -76,33 +76,59 @@ bool ResampleSource::ensure(const RaxmlInstance &, const SmartBarrier &,
 }
 
 void ResampleSource::generate(const RaxmlInstance &instance, const SmartBarrier &barrier,
-                              const unsigned int num_workers, const unsigned int worker_id, const unsigned int num_trees) {
+                              const unsigned int num_workers, const unsigned int worker_id,
+                              const unsigned int num_trees) {
     const auto begin = std::chrono::steady_clock::now();
 
     donor_tree_source->ensure(instance, barrier, 1, worker_id, 0, (sampled_batches + 1) * NUM_DONOR_TREE);
-    const auto donors = donor_tree_source->range(sampled_batches * NUM_DONOR_TREE, (sampled_batches + 1) * NUM_DONOR_TREE);
+    const auto donors = donor_tree_source->range(sampled_batches * NUM_DONOR_TREE,
+                                                 (sampled_batches + 1) * NUM_DONOR_TREE);
 
     gate->reset_gate(instance, donors, barrier, num_workers, worker_id);
 
-    // TODO parallelize
     if (worker_id == 0) {
-        // generate splits from donor trees
-        SplitList donor_splits;
-        donor_splits.reserve(NUM_DONOR_TREE);
-        for (const auto &tree: donors)
-            donor_splits.push_back(topology_key(tree));
+        local_lists.resize(num_workers);
+    }
 
-        const auto generated = gate->gate_and_rank(generate_candidates(instance, donors, donor_splits, num_trees, seed));
+    // generate splits from donor trees
+    SplitList donor_splits;
+    donor_splits.reserve(NUM_DONOR_TREE);
+    for (const auto &tree: donors)
+        donor_splits.push_back(topology_key(tree));
+
+    // generate assignment
+    CoarseAssignment bootstrap_tree_ids(num_trees);
+    std::iota(bootstrap_tree_ids.begin(), bootstrap_tree_ids.end(), 0);
+    ContiguousCoarseLoadBalancer balancer{};
+    const auto assignment = balancer.get_proc_assignments(bootstrap_tree_ids, num_workers, worker_id);
+
+    const auto seed_offset = worker_id * (2 * assignment.size() + 1);
+    barrier.enter();
+
+    // infer trees in parallel
+    local_lists[worker_id] = generate_candidates(instance, donors, donor_splits, assignment.size(), seed + seed_offset);
+
+    const auto end = std::chrono::steady_clock::now();
+    const unsigned int elapsed = static_cast<unsigned int>(std::chrono::duration_cast<
+        std::chrono::milliseconds>(end - begin).count());
+    cumulative_wall_time->fetch_add(elapsed);
+
+    barrier.enter();
+
+    // collect trees and evaluate
+    if (worker_id == 0) {
+        auto all_trees = TreeList();
+        for (size_t wid = 0; wid < num_workers; ++wid) {
+            all_trees.insert(all_trees.end(), local_lists[wid].begin(), local_lists[wid].end());
+        }
+
+        const auto generated = gate->gate_and_rank(std::move(all_trees));
 
         for (auto &candidate: generated) {
             if (is_unique(candidate))
                 tree_list.push_back(candidate);
         }
         sampled_batches += 1;
-
-        const auto end = std::chrono::steady_clock::now();
-        const unsigned int elapsed = static_cast<unsigned int>(std::chrono::duration_cast<std::chrono::milliseconds>(end - begin).count());
-        cumulative_wall_time->fetch_add(elapsed);
     }
 
     barrier.enter();
@@ -110,7 +136,8 @@ void ResampleSource::generate(const RaxmlInstance &instance, const SmartBarrier 
 
 double ResampleSource::amortized_time(const unsigned int batch_size) const {
     // not thread-safe but we stay silly
-    return static_cast<double>(*cumulative_wall_time) / static_cast<double>(tree_list.size()) * static_cast<double>(batch_size);
+    return static_cast<double>(*cumulative_wall_time) / static_cast<double>(tree_list.size()) * static_cast<double>(
+               batch_size);
 }
 
 bool ResampleSource::is_unique(const Tree &candidate) {

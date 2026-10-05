@@ -74,6 +74,11 @@ protected:
     std::deque<Tree> tree_list = {};
 
     /**
+     * Temporary list used during tree generation. Is a class field because of shared access.
+     */
+    std::vector<TreeList> local_lists = {};
+
+    /**
      * Cursor within the treelist to demarc the boundary of yet-unconsumed tree topologies.
      */
     unsigned int tree_cursor = 0;
