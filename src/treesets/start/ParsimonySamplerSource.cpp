@@ -46,17 +46,8 @@ TreeList ParsimonySamplerSource::generate_candidates(const RaxmlInstance &instan
             Tree candidate = generate_parsimony_tree(instance, static_cast<int>(round_seed + attempt), false,
                                                      constraint);
 
-            if (candidate.empty() ||
-                candidate.num_tips() != tip_count ||
-                !candidate.binary() ||
-                !constraint.compatible(candidate)) {
-                ++materialization_failures;
-                continue;
-            }
-
-            auto topology = topology_key(candidate);
-            if (topology.empty() || seen_topologies.find(topology) != seen_topologies.end() ||
-                !staged_topologies.insert(std::move(topology)).second) {
+            if (auto topology = topology_key(candidate); seen_topologies.find(topology) != seen_topologies.end() ||
+                                                         !staged_topologies.insert(std::move(topology)).second) {
                 ++deduplicated_this_call;
                 continue;
             }
