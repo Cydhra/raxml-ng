@@ -4,7 +4,7 @@
 #include "../../pool/Threadpool.hpp"
 #include "../../au/AuTest.hpp"
 #include "../../Optimizer.hpp"
-#include "../start/GreedySamplerSource.hpp"
+#include "../start/SplitSamplerSource.hpp"
 #include "../start/ParsimonySource.hpp"
 #include "../start/ParsimonySamplerSource.hpp"
 /**
@@ -38,7 +38,7 @@ public:
                                                               parsimony_source, gate, seed, initial_ml_trees,
                                                               baseline_tree)),
                                                       greedy_split_sampling(
-                                                          make_shared<GreedySamplerSource>(
+                                                          make_shared<SplitSamplerSource>(
                                                               parsimony_source, gate, seed, initial_ml_trees,
                                                               baseline_tree)) {
         // prepare a dummy matrix with empty vectors to correctly initialize the AU-Test. These dummy vectors
@@ -185,11 +185,11 @@ public:
         return *parsimony_source;
     }
 
-    [[nodiscard]] SplitSamplerSource &get_parsimony_split_source() const {
+    [[nodiscard]] ResampleSource &get_parsimony_split_source() const {
         return *parsimony_split_sampling;
     }
 
-    [[nodiscard]] SplitSamplerSource &get_greedy_split_source() const {
+    [[nodiscard]] ResampleSource &get_greedy_split_source() const {
         return *greedy_split_sampling;
     }
 
@@ -267,7 +267,7 @@ protected:
 
     shared_ptr<ParsimonySamplerSource> parsimony_split_sampling;
 
-    shared_ptr<GreedySamplerSource> greedy_split_sampling;
+    shared_ptr<SplitSamplerSource> greedy_split_sampling;
 };
 
 #endif //RAXML_SHAREDBATCHRESOURCES_HPP_

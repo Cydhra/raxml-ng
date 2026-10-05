@@ -1,5 +1,5 @@
-#ifndef RAXML_NG_STARTTREESOURCE_HPP
-#define RAXML_NG_STARTTREESOURCE_HPP
+#ifndef RAXML_PARSIMONYSOURCE_HPP_
+#define RAXML_PARSIMONYSOURCE_HPP_
 #include <atomic>
 #include <memory>
 
@@ -48,4 +48,4 @@ private:
 };
 
 
-#endif //RAXML_NG_STARTTREESOURCE_HPP
+#endif //RAXML_PARSIMONYSOURCE_HPP_

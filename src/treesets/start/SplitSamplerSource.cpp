@@ -1,116 +1,246 @@
 #include "SplitSamplerSource.hpp"
 
-constexpr size_t NUM_SAMPLE_ATTEMPTS = 300;
+#include "../../bootstrap/ConsensusTree.hpp"
 
-// extract splits from tree, encoded as bit vectors
-SplitList SplitSamplerSource::extract_splits(const Tree &tree, const bool normalize) {
-    SplitList result;
-    if (tree.empty() || tree.num_splits() == 0)
-        return result;
+TreeList SplitSamplerSource::generate_candidates(const RaxmlInstance &, const ConstTreeRange &donor_pool,
+                                                  const SplitList &donor_splits, unsigned int requested_candidates,
+                                                  unsigned long round_seed) {
+    TreeList candidates;
 
-    const auto tip_count = static_cast<unsigned int>(tree.num_tips());
+    coraxlib_reset_error();
+
+    const auto tip_count = static_cast<unsigned int>(baseline_tree.num_tips());
+    const auto max_splits = tip_count > 3 ? tip_count - 3 : 0;
     const auto bits_per_word = static_cast<unsigned int>(sizeof(corax_split_base_t) * 8);
-    const auto words_per_split = tip_count / bits_per_word +
-                                 static_cast<unsigned int>(tip_count % bits_per_word != 0);
-    const PllSplitSharedPtr splits(corax_utree_split_create(&tree.pll_utree_root(), tip_count, nullptr),
-                                   corax_utree_split_destroy);
-    if (!splits) {
-        return result;
+    const auto words_per_split = tip_count / bits_per_word + static_cast<unsigned int>(
+                                     tip_count % bits_per_word != 0);
+
+    if (max_splits == 0 || words_per_split == 0) {
+        return candidates;
     }
 
-    if (normalize) {
-        corax_utree_split_normalize_and_sort(
-            splits.get(), tip_count,
-            static_cast<unsigned int>(tree.num_splits()), 1);
+    std::vector<CandidateSplit> split_pool;
+
+    auto collect_tree_splits = [&](const Tree &tree, const bool from_ml) {
+        assert(!tree.empty() && tree.num_tips() == tip_count);
+
+        for (auto &words: extract_splits(tree, false)) {
+            auto existing = std::find_if(
+                split_pool.begin(),
+                split_pool.end(),
+                [&words](const CandidateSplit &candidate) {
+                    return candidate.words == words;
+                });
+
+            if (existing == split_pool.end()) {
+                split_pool.push_back({std::move(words), 0, 0});
+                existing = split_pool.end() - 1;
+            }
+
+            if (from_ml) {
+                ++existing->ml_frequency;
+            } else {
+                ++existing->donor_frequency;
+            }
+        }
+    };
+
+    for (const auto &initial_ml_tree: initial_ml_trees) {
+        collect_tree_splits(initial_ml_tree, true);
+    }
+    for (const auto &tree: donor_pool) {
+        collect_tree_splits(tree, false);
     }
 
-    result.reserve(tree.num_splits());
-    for (std::size_t split_id = 0; split_id < tree.num_splits(); ++split_id) {
-        result.emplace_back(splits.get()[split_id],
-                            splits.get()[split_id] + words_per_split);
-    }
-    return result;
-}
+    candidates.reserve(donor_pool.size());
+    unsigned int incomplete_split_systems = 0;
+    unsigned int materialization_failures = 0;
 
-std::vector<corax_split_base_t> SplitSamplerSource::topology_key(const Tree &tree) {
-    const auto split_words = extract_splits(tree, true);
-    Split result;
-    for (const auto &split: split_words)
-        result.insert(result.end(), split.begin(), split.end());
-    return result;
-}
+    // Eight donors is the one retained reference-algorithm choice. Keep it
+    // local to the generator instead of adding a global policy constant.
+    const auto seed_window_size = std::min<std::size_t>(8, donor_pool.size());
 
-bool SplitSamplerSource::has_majority_split(
-    const SplitList &donor_topologies,
-    const std::vector<std::size_t> &donor_ids,
-    const std::size_t words_per_split) {
-    std::map<Split, std::size_t> frequencies;
-    for (const auto donor_id: donor_ids) {
-        const auto &topology = donor_topologies[donor_id];
-        for (std::size_t offset = 0; offset < topology.size(); offset += words_per_split) {
-            std::vector split(
-                topology.begin() + offset,
-                topology.begin() + offset + words_per_split);
-            ++frequencies[std::move(split)];
+    const auto attempt_limit = requested_candidates * 2;
+    unsigned int deduplicated_this_call = 0;
+    std::set<Split> staged_topologies;
+
+    for (unsigned int attempt = 0; attempt < attempt_limit && candidates.size() < requested_candidates; ++attempt) {
+        TreeList seed_trees;
+        seed_trees.reserve(seed_window_size);
+        std::vector<std::size_t> seed_ids;
+        seed_ids.reserve(seed_window_size);
+        for (std::size_t offset = 0; offset < seed_window_size; ++offset) {
+            const auto donor_id = (attempt + offset) % donor_pool.size();
+            seed_ids.push_back(donor_id);
+            seed_trees.push_back(donor_pool[donor_id]);
+        }
+
+        try {
+            if (!has_majority_split(donor_splits, seed_ids, words_per_split)) {
+                ++incomplete_split_systems;
+                continue;
+            }
+
+            ConsensusTree seed_tree(seed_trees, ConsenseCutoff::MR);
+            seed_tree.compute_support();
+
+            std::vector<CandidateSplit> selected;
+            selected.reserve(max_splits);
+
+            auto seed_splits = extract_splits(seed_tree, false);
+            if (seed_splits.empty()) {
+                ++materialization_failures;
+                continue;
+            }
+
+            for (auto &words: seed_splits) {
+                const auto ranked = std::find_if(
+                    split_pool.begin(),
+                    split_pool.end(),
+                    [&words](const CandidateSplit &candidate) {
+                        return candidate.words == words;
+                    });
+
+                selected.push_back(
+                    ranked == split_pool.end()
+                        ? CandidateSplit{std::move(words), 0, 0}
+                        : *ranked);
+            }
+
+            auto try_add = [&](const CandidateSplit &candidate) {
+                if (selected.size() >= max_splits) {
+                    return;
+                }
+
+                for (const auto &existing: selected) {
+                    if (existing.words == candidate.words ||
+                        !corax_utree_split_compatible(const_cast<corax_split_base_t *>(existing.words.data()),
+                                                      const_cast<corax_split_base_t *>(candidate.words.data()),
+                                                      words_per_split, tip_count)) {
+                        return;
+                    }
+                }
+
+                selected.push_back(candidate);
+            };
+
+            // Primary pass: greedily prefer splits seen in the fixed ML set.
+            for (const auto &candidate: split_pool) {
+                if (candidate.ml_frequency > 0) {
+                    try_add(candidate);
+                }
+            }
+
+            // Completion pass: preserve donor-frequency order. The rotating
+            // consensus seed already supplies per-attempt diversity.
+            for (std::size_t offset = 0; offset < split_pool.size() && selected.size() < max_splits; ++offset) {
+                const auto split_id = (static_cast<std::size_t>(attempt) + offset + round_seed) % split_pool.size();
+                try_add(split_pool[split_id]);
+            }
+
+            if (selected.size() != max_splits) {
+                ++incomplete_split_systems;
+                continue;
+            }
+
+            Tree candidate = materialize_candidate(selected);
+            if (candidate.empty() ||
+                !candidate.binary() ||
+                !seed_tree.compatible(candidate)) {
+                coraxlib_reset_error();
+                ++materialization_failures;
+                continue;
+            }
+
+            if (auto topology = topology_key(candidate);
+                topology.empty() || seen_topologies.find(topology) != seen_topologies.end() ||
+                !staged_topologies.insert(std::move(topology)).second) {
+                ++deduplicated_this_call;
+                continue;
+            }
+
+            candidates.push_back(std::move(candidate));
+        } catch (const std::exception &error) {
+            coraxlib_reset_error();
+            ++materialization_failures;
+            LOG_WORKER_TS(LogLevel::info)
+                    << "Treeset seed-greedy candidate skipped: attempt="
+                    << attempt
+                    << ", reason=" << error.what()
+                    << std::endl;
         }
     }
-    return std::any_of(frequencies.begin(), frequencies.end(),
-                       [&donor_ids](const auto &entry) {
-                           return entry.second > donor_ids.size() / 2;
-                       });
+
+    LOG_WORKER_TS(LogLevel::info)
+            << "Treeset seed-greedy generation: initial_ml="
+            << initial_ml_trees.size()
+            << ", donors=" << donor_pool.size()
+            << ", split_pool=" << split_pool.size()
+            << ", incomplete=" << incomplete_split_systems
+            << ", materialization_failures=" << materialization_failures
+            << ", generated=" << candidates.size()
+            << ", attempts=" << attempt_limit
+            << ", deduplicated_this_call=" << deduplicated_this_call
+            << ", seen_topologies=" << seen_topologies.size() + staged_topologies.size()
+            << std::endl;
+
+    return candidates;
 }
 
-bool SplitSamplerSource::ensure(const RaxmlInstance &, const SmartBarrier &,
-                                const unsigned int, const unsigned int,
-                                const unsigned int,
-                                const unsigned int required_trees) {
-    // build_parsimony_msa(instance, false); // TODO initialize in main.cpp in case of checkpoint
+Tree SplitSamplerSource::materialize_candidate(const std::vector<CandidateSplit> &selected) const {
+    Tree result;
+    assert(!selected.empty());
 
-    const auto old_list_size = tree_list.size();
+    // CORAX clones every input split during this call. Keep only a borrowed
+    // pointer view; the CandidateSplit word vectors outlive materialization.
+    std::vector<corax_split_t> split_view;
+    split_view.reserve(selected.size());
+    for (const auto &split: selected) {
+        if (split.words.empty()) {
+            return result;
+        }
 
-    if (required_trees > old_list_size) {
-        return false;
+        split_view.push_back(const_cast<corax_split_base_t *>(split.words.data()));
     }
 
-    return true;
-}
+    const auto tip_labels = baseline_tree.tip_labels_cstr();
 
-void SplitSamplerSource::generate(const RaxmlInstance &instance, const SmartBarrier &barrier,
-    const unsigned int threads_per_worker, const unsigned int worker_id, const unsigned int thread_id, const unsigned int num_trees) {
-    const auto begin = std::chrono::steady_clock::now();
+    corax_split_system_t split_system{};
+    split_system.split_count = static_cast<unsigned int>(selected.size());
+    split_system.max_support = 1.0;
+    split_system.support = nullptr;
+    split_system.splits = split_view.data();
 
-    donor_tree_source->ensure(instance, barrier, threads_per_worker, worker_id, thread_id, (sampled_batches + 1) * NUM_DONOR_TREE);
-    const auto donors = donor_tree_source->range(sampled_batches * NUM_DONOR_TREE, (sampled_batches + 1) * NUM_DONOR_TREE);
+    std::unique_ptr<corax_consensus_utree_t, decltype(&corax_utree_consensus_destroy)> materialized(
+        corax_utree_from_splits(
+            &split_system,
+            static_cast<unsigned int>(baseline_tree.num_tips()),
+            tip_labels.data()),
+        corax_utree_consensus_destroy);
 
-    gate->reset_gate(instance, donors);
-
-    // generate splits from donor trees
-    SplitList donor_splits;
-    donor_splits.reserve(NUM_DONOR_TREE);
-    for (const auto &tree: donors)
-        donor_splits.push_back(topology_key(tree));
-
-    const auto generated = gate->gate_and_rank(generate_candidates(instance, donors, donor_splits, num_trees, seed));
-
-    for (auto &candidate: generated) {
-        if (is_unique(candidate))
-            tree_list.push_back(candidate);
+    if (!materialized || !materialized->tree) {
+        coraxlib_reset_error();
+        return result;
     }
-    sampled_batches += 1;
 
-    const auto end = std::chrono::steady_clock::now();
-    const unsigned int elapsed = static_cast<unsigned int>(std::chrono::duration_cast<std::chrono::milliseconds>(end - begin).count());
-    cumulative_wall_time->fetch_add(elapsed);
-}
+    result.pll_utree(static_cast<unsigned int>(baseline_tree.num_tips()), *materialized->tree);
 
-double SplitSamplerSource::amortized_time(const unsigned int batch_size) const {
-    // not thread-safe but we stay silly
-    return static_cast<double>(*cumulative_wall_time) / static_cast<double>(tree_list.size()) * static_cast<double>(batch_size);
-}
+    // The cloned nodes contain non-owning consensus-data pointers. Clear them
+    // before the temporary CORAX consensus object is destroyed.
+    auto &utree = const_cast<corax_utree_t &>(result.pll_utree());
+    for (std::size_t node_id = 0; node_id < utree.tip_count + utree.inner_count; ++node_id) {
+        auto *node = utree.nodes[node_id];
+        if (!node) {
+            continue;
+        }
 
-bool SplitSamplerSource::is_unique(const Tree &candidate) {
-    auto topology = topology_key(candidate);
+        auto *current = node;
+        do {
+            current->data = nullptr;
+            current = current->next;
+        } while (current && current != node);
+    }
 
-    std::lock_guard lock(*duplicate_filter_mutex);
-    return seen_topologies.insert(std::move(topology)).second;
+    result.reset_brlens();
+    return result;
 }
