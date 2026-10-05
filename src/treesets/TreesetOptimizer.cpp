@@ -33,20 +33,22 @@ void TreesetOptimizer::initialize_bandits() {
     this->mab.register_new_successor(4, "Light", std::move(light_mab));
 
     // low radius heuristics
-    auto low_mab = make_shared<MultiArmedBandit<MetaParameters> >();
-    low_mab->emplace_back("Greedy,2spr,low",
-                          MetaParameters().with_topk(1).with_first_model(true).with_fast_rounds(2).with_radius(
-                              small_radius));
-    low_mab->emplace_back("Fast,2spr,low",
-                          MetaParameters().with_first_model(true).with_fast_rounds(2).with_radius(small_radius));
-    if (very_small_radius < small_radius) {
-        low_mab->emplace_back("Fast,2spr,v-low",
-                              MetaParameters().with_first_model(true).with_fast_rounds(2).
-                              with_radius(very_small_radius));
+    if (small_radius < adaptive_radius) {
+        auto low_mab = make_shared<MultiArmedBandit<MetaParameters> >();
+        low_mab->emplace_back("Greedy,2spr,low",
+                              MetaParameters().with_topk(1).with_first_model(true).with_fast_rounds(2).with_radius(
+                                  small_radius));
+        low_mab->emplace_back("Fast,2spr,low",
+                              MetaParameters().with_first_model(true).with_fast_rounds(2).with_radius(small_radius));
+        if (very_small_radius < small_radius) {
+            low_mab->emplace_back("Fast,2spr,v-low",
+                                  MetaParameters().with_first_model(true).with_fast_rounds(2).
+                                  with_radius(very_small_radius));
+        }
+        low_mab->emplace_back("Slow,2spr,low",
+                              MetaParameters().with_first_model(true).with_slow_rounds(2).with_radius(small_radius));
+        this->mab.register_new_successor(2, "LowRadius", std::move(low_mab));
     }
-    low_mab->emplace_back("Slow,2spr,low",
-                          MetaParameters().with_first_model(true).with_slow_rounds(2).with_radius(small_radius));
-    this->mab.register_new_successor(2, "LowRadius", std::move(low_mab));
 
     auto constrained_mab = make_shared<MultiArmedBandit<MetaParameters> >();
     constrained_mab->emplace_back("Fast,DoModel,2spr,NNI,Constrained",
@@ -55,18 +57,22 @@ void TreesetOptimizer::initialize_bandits() {
     constrained_mab->emplace_back("Greedy,DoModel,2spr,NNI,Constrained",
                                   MetaParameters().with_topk(1).with_first_model(true).with_fast_rounds(2).
                                   with_radius(adaptive_radius).with_nni_round(true).with_constrain(true));
-    constrained_mab->emplace_back("Fast,DoModel,2spr,NNI,Constrained,low",
+    if (small_radius < adaptive_radius) {
+        constrained_mab->emplace_back("Fast,DoModel,2spr,NNI,Constrained,low",
                                   MetaParameters().with_first_model(true).with_fast_rounds(2).
                                   with_radius(small_radius).with_nni_round(true).with_constrain(true));
+    }
     this->mab.register_new_successor(2, "Constrained", std::move(constrained_mab));
 
     auto dynamic_mab = make_shared<MultiArmedBandit<MetaParameters> >();
-    dynamic_mab->emplace_back("Greedy,DoModel,Dynamic,low",
+    if (small_radius < adaptive_radius) {
+        dynamic_mab->emplace_back("Greedy,DoModel,Dynamic,low",
                               MetaParameters().with_topk(1).with_first_model(true).with_radius(small_radius).
                               with_dynamic_spr(true));
-    dynamic_mab->emplace_back("Fast,DoModel,Dynamic,low",
-                              MetaParameters().with_first_model(true).with_radius(small_radius).
-                              with_dynamic_spr(true));
+        dynamic_mab->emplace_back("Fast,DoModel,Dynamic,low",
+                                  MetaParameters().with_first_model(true).with_radius(small_radius).
+                                  with_dynamic_spr(true));
+    }
     dynamic_mab->emplace_back("Greedy,DoModel,Dynamic",
                               MetaParameters().with_topk(1).with_first_model(true).with_dynamic_spr(true));
     dynamic_mab->emplace_back("Fast,DoModel,Dynamic",
