@@ -76,31 +76,36 @@ bool ResampleSource::ensure(const RaxmlInstance &, const SmartBarrier &,
 }
 
 void ResampleSource::generate(const RaxmlInstance &instance, const SmartBarrier &barrier,
-    const unsigned int threads_per_worker, const unsigned int worker_id, const unsigned int thread_id, const unsigned int num_trees) {
+                              const unsigned int num_workers, const unsigned int worker_id, const unsigned int num_trees) {
     const auto begin = std::chrono::steady_clock::now();
 
-    donor_tree_source->ensure(instance, barrier, threads_per_worker, worker_id, thread_id, (sampled_batches + 1) * NUM_DONOR_TREE);
+    donor_tree_source->ensure(instance, barrier, 1, worker_id, 0, (sampled_batches + 1) * NUM_DONOR_TREE);
     const auto donors = donor_tree_source->range(sampled_batches * NUM_DONOR_TREE, (sampled_batches + 1) * NUM_DONOR_TREE);
 
-    gate->reset_gate(instance, donors);
+    gate->reset_gate(instance, donors, barrier, num_workers, worker_id);
 
-    // generate splits from donor trees
-    SplitList donor_splits;
-    donor_splits.reserve(NUM_DONOR_TREE);
-    for (const auto &tree: donors)
-        donor_splits.push_back(topology_key(tree));
+    // TODO parallelize
+    if (worker_id == 0) {
+        // generate splits from donor trees
+        SplitList donor_splits;
+        donor_splits.reserve(NUM_DONOR_TREE);
+        for (const auto &tree: donors)
+            donor_splits.push_back(topology_key(tree));
 
-    const auto generated = gate->gate_and_rank(generate_candidates(instance, donors, donor_splits, num_trees, seed));
+        const auto generated = gate->gate_and_rank(generate_candidates(instance, donors, donor_splits, num_trees, seed));
 
-    for (auto &candidate: generated) {
-        if (is_unique(candidate))
-            tree_list.push_back(candidate);
+        for (auto &candidate: generated) {
+            if (is_unique(candidate))
+                tree_list.push_back(candidate);
+        }
+        sampled_batches += 1;
+
+        const auto end = std::chrono::steady_clock::now();
+        const unsigned int elapsed = static_cast<unsigned int>(std::chrono::duration_cast<std::chrono::milliseconds>(end - begin).count());
+        cumulative_wall_time->fetch_add(elapsed);
     }
-    sampled_batches += 1;
 
-    const auto end = std::chrono::steady_clock::now();
-    const unsigned int elapsed = static_cast<unsigned int>(std::chrono::duration_cast<std::chrono::milliseconds>(end - begin).count());
-    cumulative_wall_time->fetch_add(elapsed);
+    barrier.enter();
 }
 
 double ResampleSource::amortized_time(const unsigned int batch_size) const {

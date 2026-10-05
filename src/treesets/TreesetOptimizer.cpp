@@ -137,16 +137,14 @@ BatchTask TreesetOptimizer::next_work_unit() {
 }
 
 void TreesetOptimizer::initialize_resources(const SmartBarrier &global_barrier) {
-    const auto threads_per_worker = pool.num_threads_total() / pool.workers_per_task() * pool.num_tasks();
-
     LOG_INFO_TS << "Generating " << NUM_DONOR_TREE << " parsimony trees upfront." << std::endl;
-    shared_batch_resources.get_parsimony().ensure(instance, global_barrier, threads_per_worker, ParallelContext::local_group_id(), ParallelContext::local_thread_id(), NUM_DONOR_TREE);
+    shared_batch_resources.get_parsimony().ensure(instance, global_barrier, 1, ParallelContext::local_group_id(), ParallelContext::local_thread_id(), NUM_DONOR_TREE);
 
     LOG_INFO_TS << "Generating " << target_tree_count << " split-informed parsimony trees." << std::endl;
-    shared_batch_resources.get_parsimony_split_source().generate(instance, global_barrier, threads_per_worker, ParallelContext::local_group_id(), ParallelContext::local_thread_id(), target_tree_count);
+    shared_batch_resources.get_parsimony_split_source().generate(instance, global_barrier, ParallelContext::num_groups(), ParallelContext::local_group_id(), target_tree_count);
 
     LOG_INFO_TS << "Generating " << target_tree_count << " split-greedy trees." << std::endl;
-    shared_batch_resources.get_greedy_split_source().generate(instance, global_barrier, threads_per_worker, ParallelContext::local_group_id(), ParallelContext::local_thread_id(), target_tree_count);
+    shared_batch_resources.get_greedy_split_source().generate(instance, global_barrier, ParallelContext::num_groups(), ParallelContext::local_group_id(), target_tree_count);
 }
 
 void TreesetOptimizer::run() {
@@ -160,7 +158,7 @@ void TreesetOptimizer::run() {
     };
 
     // infer 300 parsimony trees as donors
-    ParallelContext::init_pthreads_custom(opts, initializing_function, pool.num_threads_total(), pool.workers_per_task() * pool.num_tasks());
+    ParallelContext::init_pthreads_custom(opts, initializing_function, pool.num_threads_total(), pool.num_threads_total());
     initializing_function();
     ParallelContext::finalize_threads();
     LOG_INFO_TS << "Starting bandit algorithm." << std::endl;

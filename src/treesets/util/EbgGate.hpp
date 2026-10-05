@@ -45,7 +45,8 @@ public:
           initial_ml_trees(std::move(initial_ml_trees)) {
     }
 
-    void reset_gate(const RaxmlInstance &instance, const ConstTreeRange & support_trees);
+    void reset_gate(const RaxmlInstance &instance, const ConstTreeRange & support_trees, const SmartBarrier &barrier, unsigned int
+                    num_workers, unsigned int worker_id);
 
     /**
      * Gate the candidate list.

@@ -1,61 +1,84 @@
 #include "EbgGate.hpp"
 
+#include "../../loadbalance/CoarseLoadBalancer.hpp"
+
 // TODO this can probably be made lower
 static constexpr unsigned int BOOTSTRAP_SUPPORT_COUNT = 200;
 
-void EbgGate::reset_gate(const RaxmlInstance &instance, const ConstTreeRange &support_trees) {
+void EbgGate::reset_gate(const RaxmlInstance &instance, const ConstTreeRange &support_trees,
+                         const SmartBarrier &barrier, const unsigned int
+                         num_workers, const unsigned int worker_id) {
     reference_splits.clear();
 
     if (bootstrap_support_trees.empty()) {
-        bootstrap_support_trees.reserve(BOOTSTRAP_SUPPORT_COUNT);
-        while (bootstrap_support_trees.size() < BOOTSTRAP_SUPPORT_COUNT) {
-            bootstrap_support_trees.emplace_back(generate_tree(instance, StartingTree::parsimony, 1234567 + bootstrap_support_trees.size(), true));
+        barrier.enter();
+
+        if (worker_id == 0) {
+            bootstrap_support_trees.resize(BOOTSTRAP_SUPPORT_COUNT);
         }
+        barrier.enter();
+
+        CoarseAssignment bootstrap_tree_ids(BOOTSTRAP_SUPPORT_COUNT);
+        std::iota(bootstrap_tree_ids.begin(), bootstrap_tree_ids.end(), 0);
+        ContiguousCoarseLoadBalancer balancer{};
+        const auto assignment = balancer.get_proc_assignments(bootstrap_tree_ids, num_workers, worker_id);
+
+        for (const auto id: assignment) {
+            bootstrap_support_trees.at(id) = generate_tree(instance, StartingTree::parsimony,
+                                                           1234567 + static_cast<int>(id), true);
+        }
+
+        barrier.enter();
     }
 
-    auto parsimony_trees = TreeList();
-    parsimony_trees.reserve(support_trees.size());
+    // the rest of the gate is decided by the thread leader alone
+    if (worker_id == 0) {
+        auto parsimony_trees = TreeList();
+        parsimony_trees.reserve(support_trees.size());
 
-    // we have to copy because EBG needs a list
-    for (auto &tree: support_trees) {
-        parsimony_trees.emplace_back(tree);
-    }
+        // we have to copy because EBG needs a list
+        for (auto &tree: support_trees) {
+            parsimony_trees.emplace_back(tree);
+        }
 
-    CandidateEbgSupportTree support_tree(baseline_tree, parsimony_trees, bootstrap_support_trees);
-    support_tree.compute();
-    coraxlib_check_error("Could not calculate EBG tree support during gate initialization.");
+        CandidateEbgSupportTree support_tree(baseline_tree, parsimony_trees, bootstrap_support_trees);
+        support_tree.compute();
+        coraxlib_check_error("Could not calculate EBG tree support during gate initialization.");
 
-    const auto split_count = support_tree.num_splits();
-    const auto *splits = support_tree.reference_splits();
+        const auto split_count = support_tree.num_splits();
+        const auto *splits = support_tree.reference_splits();
 
-    const auto tip_count = static_cast<unsigned int>(baseline_tree.num_tips());
-    const auto bits_per_word = static_cast<unsigned int>(sizeof(corax_split_base_t) * 8);
-    const auto words_per_split = tip_count / bits_per_word +
-                                 static_cast<unsigned int>(tip_count % bits_per_word != 0);
+        const auto tip_count = static_cast<unsigned int>(baseline_tree.num_tips());
+        const auto bits_per_word = static_cast<unsigned int>(sizeof(corax_split_base_t) * 8);
+        const auto words_per_split = tip_count / bits_per_word +
+                                     static_cast<unsigned int>(tip_count % bits_per_word != 0);
 
-    ebg_support = support_tree.support();
-    reference_splits.reserve(split_count);
-    for (std::size_t split_id = 0; split_id < split_count; ++split_id) {
-        reference_splits.emplace_back(words_per_split);
-        std::memcpy(reference_splits.back().data(), splits[split_id],
-                    words_per_split * sizeof(corax_split_base_t));
-    }
-
-    ml_frequency.assign(split_count, 0.0);
-    for (const auto &initial_ml_tree: initial_ml_trees) {
-        PllSplitSharedPtr initial_splits(
-            corax_utree_split_create(&initial_ml_tree.pll_utree_root(),
-                                     initial_ml_tree.num_tips(), nullptr),
-            corax_utree_split_destroy);
-        coraxlib_check_error("Could not create split during EbgGate initialization");
-
+        ebg_support = support_tree.support();
+        reference_splits.reserve(split_count);
         for (std::size_t split_id = 0; split_id < split_count; ++split_id) {
-            if (corax_utree_split_find(initial_splits.get(), reference_splits[split_id].data(), tip_count) >= 0)
-                ml_frequency[split_id] += 1.0;
+            reference_splits.emplace_back(words_per_split);
+            std::memcpy(reference_splits.back().data(), splits[split_id],
+                        words_per_split * sizeof(corax_split_base_t));
         }
+
+        ml_frequency.assign(split_count, 0.0);
+        for (const auto &initial_ml_tree: initial_ml_trees) {
+            PllSplitSharedPtr initial_splits(
+                corax_utree_split_create(&initial_ml_tree.pll_utree_root(),
+                                         initial_ml_tree.num_tips(), nullptr),
+                corax_utree_split_destroy);
+            coraxlib_check_error("Could not create split during EbgGate initialization");
+
+            for (std::size_t split_id = 0; split_id < split_count; ++split_id) {
+                if (corax_utree_split_find(initial_splits.get(), reference_splits[split_id].data(), tip_count) >= 0)
+                    ml_frequency[split_id] += 1.0;
+            }
+        }
+        for (auto &frequency: ml_frequency)
+            frequency /= static_cast<double>(initial_ml_trees.size());
     }
-    for (auto &frequency: ml_frequency)
-        frequency /= static_cast<double>(initial_ml_trees.size());
+
+    barrier.enter();
 }
 
 TreeList EbgGate::gate_and_rank(TreeList candidates) {

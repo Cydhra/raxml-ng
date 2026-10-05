@@ -37,8 +37,8 @@ public:
     /**
      * Generate trees in the source. This is not implemented in `ensure` to avoid refilling it.
      */
-    void generate(const RaxmlInstance &instance, const SmartBarrier &barrier, unsigned int threads_per_worker,
-                  unsigned int worker_id, unsigned int thread_id, unsigned int num_trees);
+    void generate(const RaxmlInstance &instance, const SmartBarrier &barrier, unsigned int num_workers,
+                  unsigned int worker_id, unsigned int num_trees);
 
     [[nodiscard]] double amortized_time(unsigned int batch_size) const override;
 

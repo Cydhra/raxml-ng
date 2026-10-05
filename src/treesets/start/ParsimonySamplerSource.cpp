@@ -3,8 +3,8 @@
 #include "../../bootstrap/ConsensusTree.hpp"
 
 TreeList ParsimonySamplerSource::generate_candidates(const RaxmlInstance &instance, const ConstTreeRange &donor_pool,
-                                                     const SplitList &donor_splits, unsigned int requested_candidates,
-                                                     unsigned long round_seed) {
+                                                     const SplitList &donor_splits, const unsigned int requested_candidates,
+                                                     const unsigned long round_seed) {
     TreeList candidates;
 
     const auto tip_count = static_cast<unsigned int>(baseline_tree.num_tips());
