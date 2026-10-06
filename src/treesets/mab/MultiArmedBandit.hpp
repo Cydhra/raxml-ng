@@ -211,6 +211,34 @@ public:
         return iterations_completed;
     }
 
+    /**
+     * Disable the bandit with the given id. If no more bandit is available, return false to allow disabling the entire
+     * MAB.
+     * @param bandit_id id of the bandit given during registration
+     * @return true, if the MAB has bandits remaining.
+     */
+    bool disable_bandit(size_t bandit_id) {
+        this->bandits[bandit_id].participating = false;
+
+        if (this->best_known_bandit == bandit_id) {
+            // find new next best bandit
+            auto new_best = std::max_element(this->bandits.begin(), this->bandits.end(), [](const Bandit<Heuristic> &a, const Bandit<Heuristic> &b) {
+                return !a.participating || (b.participating && b.get_mean_throughput() > a.get_mean_throughput());
+            });
+
+            auto index = std::distance(this->bandits.begin(), new_best);
+
+            // if the new best one is not participating, no bandit is participating anymore
+            if (!this->bandits[index].participating) {
+                return false;
+            }
+
+            this->best_known_bandit = index;
+        }
+
+        return true;
+    }
+
 private:
     /**
      * Registered bandits in this MAB.

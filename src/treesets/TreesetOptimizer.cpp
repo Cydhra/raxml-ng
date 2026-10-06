@@ -4,8 +4,10 @@
 #include "mab/DynamicMAB.hpp"
 
 void TreesetOptimizer::initialize_bandits() {
-    auto parsimony = make_shared<MultiArmedBandit<MetaParameters> >();
-    parsimony->emplace_back("Parsimony", MetaParameters());
+    auto starting_trees = make_shared<MultiArmedBandit<MetaParameters> >();
+    starting_trees->emplace_back("Parsimony", MetaParameters());
+    starting_trees->emplace_back("Split-Parsimony", MetaParameters().with_treesource(SplitParsimony));
+    starting_trees->emplace_back("Split-Greedy", MetaParameters().with_treesource(SplitGreedy));
 
     const auto adaptive_radius = pythia_score >= 0.0
                                      ? Optimizer::adaptive_radius(pythia_score)
@@ -93,13 +95,23 @@ void TreesetOptimizer::initialize_bandits() {
     this->mab.register_new_successor(7, "Fallback-Adaptive", std::move(fallback_adaptive_mab));
 
     // second-level MAB
-    this->mab.register_new_arm("Starting Trees", parsimony);
+    this->mab.register_new_arm("Starting Trees", starting_trees);
 }
 
-void TreesetOptimizer::run_batch(
-    TunedBatch &batch, const TaskGroup &context, const unsigned int worker_id,
-    const unsigned int thread_id) {
-    batch.optimize(instance, opts, shared_batch_resources, context, worker_id, thread_id);
+bool TreesetOptimizer::run_batch(TunedBatch &batch, const TaskGroup &context, const unsigned int worker_id,
+                                 const unsigned int thread_id) {
+    try {
+        batch.optimize(instance, opts, shared_batch_resources, context, worker_id, thread_id);
+    } catch (BanditFailedException &e) {
+        LOG_INFO << "Batch " << batch.get_name() << " failed because: " << e.message() << ". Disabling bandit." <<
+                std::endl;
+
+        // inform the batch queue that the batch has been inferred
+        this->batch_queue.finish_batch(batch);
+
+        return false;
+    }
+
 
     if (context.is_group_leader(worker_id, thread_id)) {
         // inform the mab about the results
@@ -113,6 +125,8 @@ void TreesetOptimizer::run_batch(
             pool.shutdown();
         }
     }
+
+    return true;
 }
 
 BatchTask TreesetOptimizer::next_work_unit() {
@@ -121,18 +135,42 @@ BatchTask TreesetOptimizer::next_work_unit() {
                                                               pool.threads_per_task());
     current_batch.update_meta_parameters(parameters);
 
-    BatchTask runner = [this, &current_batch](const TaskGroup &context, const unsigned int worker_id,
+    BatchTask runner = [this, &parameters, &current_batch](TaskGroup &context, const unsigned int worker_id,
                                               const unsigned int thread_id) {
-        this->run_batch(current_batch, context, worker_id, thread_id);
+        if (!this->run_batch(current_batch, context, worker_id, thread_id)) {
+            this->mab.disable_bandit(parameters);
+        }
     };
 
     return runner;
+}
+
+void TreesetOptimizer::initialize_resources(const SmartBarrier &global_barrier) {
+    LOG_INFO_TS << "Generating " << NUM_DONOR_TREE << " parsimony trees upfront." << std::endl;
+    shared_batch_resources.get_parsimony().ensure(instance, global_barrier, 1, ParallelContext::local_group_id(), ParallelContext::local_thread_id(), NUM_DONOR_TREE);
+
+    LOG_INFO_TS << "Generating " << target_tree_count << " split-informed parsimony trees." << std::endl;
+    shared_batch_resources.get_parsimony_split_source().generate(instance, global_barrier, ParallelContext::num_groups(), ParallelContext::local_group_id(), target_tree_count);
+
+    LOG_INFO_TS << "Generating " << target_tree_count << " split-greedy trees." << std::endl;
+    shared_batch_resources.get_greedy_split_source().generate(instance, global_barrier, ParallelContext::num_groups(), ParallelContext::local_group_id(), target_tree_count);
 }
 
 void TreesetOptimizer::run() {
     LOG_INFO << std::endl;
     LOG_INFO_TS << "Treeset: Inferring at least " << this->target_tree_count <<
             " plausible trees while optimizing throughput." << std::endl;
+
+    auto global_barrier = SmartBarrier(pool.num_threads_total());
+    auto initializing_function = [this, &global_barrier]() {
+        this->initialize_resources(global_barrier);
+    };
+
+    // infer 300 parsimony trees as donors
+    ParallelContext::init_pthreads_custom(opts, initializing_function, pool.num_threads_total(), pool.num_threads_total());
+    initializing_function();
+    ParallelContext::finalize_threads();
+    LOG_INFO_TS << "Starting bandit algorithm." << std::endl;
 
     // initialize all bandit arms, and add the parsimony arm to the top-level MAB.
     this->initialize_bandits();
@@ -148,8 +186,10 @@ std::vector<Tree> TreesetOptimizer::get_all_trees() const {
     auto full_set = std::vector<Tree>();
 
     for (auto &batch: batch_queue.view_batches()) {
-        for (unsigned int tree_id = 0; tree_id < batch.get_batch_size(); ++tree_id) {
-            full_set.push_back(batch.get_tree(tree_id));
+        if (batch.has_trees()) {
+            for (unsigned int tree_id = 0; tree_id < batch.get_batch_size(); ++tree_id) {
+                full_set.push_back(batch.get_tree(tree_id));
+            }
         }
     }
 
@@ -161,7 +201,9 @@ std::vector<Tree> TreesetOptimizer::get_plausible_trees() const {
     auto plausible_set = std::vector<Tree>();
 
     for (auto &batch: batch_queue.view_batches()) {
-        batch.get_plausible_trees(plausible_set);
+        if (batch.has_trees()) {
+            batch.get_plausible_trees(plausible_set);
+        }
     }
 
     return plausible_set;

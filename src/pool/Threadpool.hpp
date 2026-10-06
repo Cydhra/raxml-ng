@@ -194,7 +194,15 @@ public:
      * @return the total number of threads assigned to each task group. Divisible by the number of workers
      */
     unsigned int threads_per_task() const {
-        return this->total_threads / this->task_groups.size();
+        return this->total_threads / this->num_tasks();
+    }
+
+    unsigned int num_threads_total() const {
+        return this->total_threads;
+    }
+
+    unsigned int num_tasks() const {
+        return this->task_groups.size();
     }
 
 protected:

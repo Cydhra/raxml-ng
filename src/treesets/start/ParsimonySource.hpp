@@ -1,13 +1,11 @@
-#ifndef RAXML_NG_STARTTREESOURCE_HPP
-#define RAXML_NG_STARTTREESOURCE_HPP
+#ifndef RAXML_PARSIMONYSOURCE_HPP_
+#define RAXML_PARSIMONYSOURCE_HPP_
 #include <atomic>
 #include <memory>
 
 #include "TreeSource.hpp"
 #include "../../loadbalance/CoarseLoadBalancer.hpp"
 #include "../../Tree.hpp"
-
-
 
 // forward declaration of generate_tree in main.cpp to make it accessible. If the function in main.cpp
 // changes signature, just update this declaration as well.
@@ -18,7 +16,7 @@ class ParsimonySource : public TreeSource {
 public:
     explicit ParsimonySource(const int starting_seed) : starting_seed(starting_seed) {}
 
-    void ensure(const RaxmlInstance &instance, const SmartBarrier &barrier, unsigned int threads_per_worker, unsigned int worker_id, unsigned int thread_id, unsigned int num_trees) override;
+    bool ensure(const RaxmlInstance &instance, const SmartBarrier &barrier, unsigned int threads_per_worker, unsigned int worker_id, unsigned int thread_id, unsigned int num_trees) override;
 
     /**
      * @return mean estimate of time spent per tree on parsimony
@@ -50,4 +48,4 @@ private:
 };
 
 
-#endif //RAXML_NG_STARTTREESOURCE_HPP
+#endif //RAXML_PARSIMONYSOURCE_HPP_

@@ -2,7 +2,7 @@
 #include "../batch/SharedBatchResources.hpp"
 
 void ChangeConfig::do_optimize(std::optional<TreeInfo> &tree, const unsigned int tree_id, const Options &opts,
-    const TaskGroup &context, SharedBatchResources &resources, const unsigned int worker_id, const unsigned int thread_id) {
+    const TaskGroup &context, SharedBatchResources &, const unsigned int worker_id, const unsigned int thread_id) {
 
     if (context.is_group_leader(worker_id, thread_id) && tree_id == 0) {
         LOG_INFO_TS << this->batch_name << ": Changing inference configuration..." << std::endl;

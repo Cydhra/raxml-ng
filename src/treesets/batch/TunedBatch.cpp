@@ -17,13 +17,33 @@ unsigned int TunedBatch::get_batch_size() const {
 void TunedBatch::generate_starting_trees(const RaxmlInstance &instance, SharedBatchResources &resources,
                                          const TaskGroup &context,
                                          const unsigned int worker_id, const unsigned int thread_id) {
-    auto &tree_source = resources.get_parsimony();
-    auto [start, end] = tree_source.consume_batch(instance, context.get_barrier(), this->threads_per_worker,
+    TreeSource *tree_source;
+    switch (this->meta_parameters.treeSource) {
+        case Parsimony:
+            tree_source = &resources.get_parsimony();
+            break;
+        case SplitParsimony:
+            tree_source = &resources.get_parsimony_split_source();
+            break;
+        case SplitGreedy:
+            tree_source = &resources.get_greedy_split_source();
+            break;
+        default:
+            throw RaxmlException("TreeSourceType not implemented");
+    }
+
+    auto reservation = tree_source->consume_batch(instance, context.get_barrier(), this->threads_per_worker,
                                                   worker_id, thread_id, this->batch_size);
-    context.enter_barrier();
-    for (const auto id: this->exclusive_assignment->at(context.get_group_thread_id(worker_id, thread_id))) {
-        tree_source.copy_tree(this->batch_start_trees->at(id), start + id);
-        this->num_trees_generated->fetch_add(1);
+
+    if (reservation) {
+        auto [start, end] = *reservation;
+        context.enter_barrier();
+        for (const auto id: this->exclusive_assignment->at(context.get_group_thread_id(worker_id, thread_id))) {
+            tree_source->copy_tree(this->batch_start_trees->at(id), start + id);
+            this->num_trees_generated->fetch_add(1);
+        }
+    } else {
+        throw BanditFailedException("tree source exhausted.");
     }
 }
 
@@ -258,6 +278,11 @@ void TunedBatch::update_meta_parameters(const MetaParameters &new_parameters) {
 }
 
 bool TunedBatch::is_compatible(const MetaParameters &new_parameters) const {
+    // if nothing has been inferred so far, we can just do that
+    if (this->tree_topologies.empty()) {
+        return true;
+    }
+
     // a batch that already optimized with these exact parameters cannot be reused for the same parameters again
     if (this->meta_parameters == new_parameters) {
         return false;
@@ -338,6 +363,11 @@ void TunedBatch::finalize() {
 
     // delete corax allocations
     this->batch_trees.clear();
+}
+
+bool TunedBatch::has_trees() const {
+    auto guard = std::lock_guard(*this->topology_access);
+    return !this->tree_topologies.empty();
 }
 
 unsigned int TunedBatch::elapsed_wall_time() const {

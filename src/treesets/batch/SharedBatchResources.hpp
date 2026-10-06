@@ -4,8 +4,9 @@
 #include "../../pool/Threadpool.hpp"
 #include "../../au/AuTest.hpp"
 #include "../../Optimizer.hpp"
+#include "../start/SplitSamplerSource.hpp"
 #include "../start/ParsimonySource.hpp"
-
+#include "../start/ParsimonySamplerSource.hpp"
 /**
  * Shallow replication counts for a faster AU test.
  */
@@ -23,12 +24,23 @@ public:
                          const unsigned int workers_per_group,
                          const unsigned int total_threads,
                          const Options &opts,
-                         std::shared_ptr<PartitionedMSA> msa,
+                         const TreeList& initial_ml_trees,
+                         const Tree& baseline_tree,
+                         const std::shared_ptr<PartitionedMSA>& msa,
                          const Tree &tree,
                          const std::vector<std::vector<doubleVector> > &reference_logh_matrix,
                          const unsigned int batch_size,
                          long seed,
-                         const double pythia_score) : parsimony_source(seed) {
+                         const double pythia_score) : gate(make_shared<EbgGate>(baseline_tree, initial_ml_trees)),
+                                                      parsimony_source(make_shared<ParsimonySource>(seed)),
+                                                      parsimony_split_sampling(
+                                                          make_shared<ParsimonySamplerSource>(
+                                                              parsimony_source, gate, seed, initial_ml_trees,
+                                                              baseline_tree)),
+                                                      greedy_split_sampling(
+                                                          make_shared<SplitSamplerSource>(
+                                                              parsimony_source, gate, seed, initial_ml_trees,
+                                                              baseline_tree)) {
         // prepare a dummy matrix with empty vectors to correctly initialize the AU-Test. These dummy vectors
         // will be replaced by the TunedBatch instance before the AU test is called.
         std::vector<std::vector<doubleVector> > batch_loglh_dummy(batch_size);
@@ -169,8 +181,16 @@ public:
         this->au_test_factors[context.group_id()] = factor;
     }
 
-    ParsimonySource &get_parsimony() {
-        return parsimony_source;
+    [[nodiscard]] TreeSource &get_parsimony() const {
+        return *parsimony_source;
+    }
+
+    [[nodiscard]] ResampleSource &get_parsimony_split_source() const {
+        return *parsimony_split_sampling;
+    }
+
+    [[nodiscard]] ResampleSource &get_greedy_split_source() const {
+        return *greedy_split_sampling;
     }
 
 protected:
@@ -236,9 +256,18 @@ protected:
     shared_ptr<CheckpointManager> adaptive_checkpoint_manager;
 
     /**
+     * EBG gate to reject this source if the generated trees do not approximate the expected distribution of splits.
+     */
+    shared_ptr<EbgGate> gate;
+
+    /**
      * Global source of parsimony trees, such that trees can be reused for heuristics other than ML.
      */
-    ParsimonySource parsimony_source;
+    shared_ptr<ParsimonySource> parsimony_source;
+
+    shared_ptr<ParsimonySamplerSource> parsimony_split_sampling;
+
+    shared_ptr<SplitSamplerSource> greedy_split_sampling;
 };
 
 #endif //RAXML_SHAREDBATCHRESOURCES_HPP_

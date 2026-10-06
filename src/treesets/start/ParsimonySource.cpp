@@ -2,7 +2,7 @@
 
 #include "../../pool/SmartBarrier.hpp"
 
-void ParsimonySource::ensure(const RaxmlInstance &instance, const SmartBarrier &barrier, const unsigned int threads_per_worker, const unsigned int worker_id, const unsigned int thread_id, const unsigned int required_trees) {
+bool ParsimonySource::ensure(const RaxmlInstance &instance, const SmartBarrier &barrier, const unsigned int threads_per_worker, const unsigned int worker_id, const unsigned int thread_id, const unsigned int required_trees) {
     // lock the mutex to ensure all threads see the same list size
     if (worker_id + thread_id == 0) {
         tree_list_mutex->lock();
@@ -52,6 +52,8 @@ void ParsimonySource::ensure(const RaxmlInstance &instance, const SmartBarrier &
     if (worker_id + thread_id == 0) {
         tree_list_mutex->unlock();
     }
+
+    return true;
 }
 
 double ParsimonySource::amortized_time(unsigned int batch_size) const {

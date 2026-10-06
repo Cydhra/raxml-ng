@@ -58,6 +58,11 @@ protected:
     DynamicMAB mab = {};
 
     /**
+     * Initialize resources that require multithreading, such as pre-filling tree sources.
+     */
+    void initialize_resources(const SmartBarrier &global_barrier);
+
+    /**
      * Initialize the bandit algorithms we use during the inference. These depend on the parameters derivded from initial
      * starting tree inference in `prepare_initial_batches()`
      */
@@ -66,10 +71,9 @@ protected:
     /**
      * Main method for the threadpool workers.
      * This method runs one batch and then handles the updates to the MABs.
-     * It is bound into a BatchTask by next_work_unit.
+     * If the batch fails, it returns false so the bandit can be disabled.
      */
-    void run_batch(
-        TunedBatch &batch, const TaskGroup &context, unsigned int worker_id, unsigned int thread_id);
+    bool run_batch(TunedBatch &batch, const TaskGroup &context, unsigned int worker_id, unsigned int thread_id);
 
     /**
      * Select a unit of work of the current state of the optimizer algorithm.
@@ -98,6 +102,8 @@ public:
                      Options &opts,
                      const std::shared_ptr<PartitionedMSA> &msa,
                      const Tree &tree,
+                     const TreeList initial_ml_trees,
+                     const Tree &baseline_tree, // TODO we do not need the randomTree above then
                      IDVector &tip_msa_idmap,
                      const std::vector<std::vector<doubleVector> > &persite_loglh,
                      LoadBalancer &load_balancer,
@@ -112,7 +118,10 @@ public:
                                                                    opts.treeset_groups,
                                                                    opts.treeset_workers,
                                                                    opts.treeset_threads,
-                                                                   opts, msa, tree,
+                                                                   opts,
+                                                                   initial_ml_trees,
+                                                                   baseline_tree,
+                                                                   msa, tree,
                                                                    persite_loglh,
                                                                    DEFAULT_BATCH_SIZE,
                                                                    starting_seed,

@@ -27,6 +27,24 @@ constexpr double SIGNIFICANCE_LEVEL = 0.05;
 // forward declaration of RaxmlInstance
 struct RaxmlInstance;
 
+class BanditFailedException : public std::exception
+{
+public:
+    explicit BanditFailedException(std::string  message)
+    : _message(std::move(message))
+    {
+    }
+
+    const char* what() const noexcept override
+    { return message().c_str(); }
+
+    virtual const std::string& message() const
+    { return _message; };
+
+protected:
+    mutable std::string _message;
+};
+
 class TunedBatch final {
 public:
     TunedBatch(std::string name,
@@ -141,6 +159,11 @@ public:
      * inference will not be possible.
      */
     void finalize();
+
+    /**
+     * @return true, if trees have been inferred for this batch, false if no trees have been inferred ever.
+     */
+    bool has_trees() const;
 
     /**
      * @return the number of trees that are inferred in this batch.
