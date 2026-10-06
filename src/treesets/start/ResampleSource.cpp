@@ -135,9 +135,11 @@ void ResampleSource::generate(const RaxmlInstance &instance, const SmartBarrier 
 }
 
 double ResampleSource::amortized_time(const unsigned int batch_size) const {
-    // not thread-safe but we stay silly
-    return static_cast<double>(*cumulative_wall_time) / static_cast<double>(tree_list.size()) * static_cast<double>(
-               batch_size);
+    // we do not count time spent in this bandit toward the amortized time. If we did, the multi-armed bandit might
+    // decide that other tree sources are more efficient, but we already spent the entire time budget anyway, and we
+    // will never refill this tree source, so we won't need information about its efficiency anyway. We pretend that the
+    // cost of this bandit is the same as parsimony, and then the MAB will select whatever source has higher success rate.
+    return this->donor_tree_source->amortized_time(batch_size);
 }
 
 bool ResampleSource::is_unique(const Tree &candidate) {
