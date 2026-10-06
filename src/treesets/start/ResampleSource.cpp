@@ -129,6 +129,7 @@ void ResampleSource::generate(const RaxmlInstance &instance, const SmartBarrier 
                 tree_list.push_back(candidate);
         }
         sampled_batches += 1;
+        LOG_INFO_TS << "Generated " << tree_list.size() << " trees." << std::endl;
     }
 
     barrier.enter();

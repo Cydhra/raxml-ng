@@ -70,7 +70,7 @@ TreeList SplitSamplerSource::generate_candidates(const RaxmlInstance &, const Co
         std::vector<std::size_t> seed_ids;
         seed_ids.reserve(seed_window_size);
         for (std::size_t offset = 0; offset < seed_window_size; ++offset) {
-            const auto donor_id = (attempt + offset) % donor_pool.size();
+            const auto donor_id = (attempt + offset + round_seed) % donor_pool.size();
             seed_ids.push_back(donor_id);
             seed_trees.push_back(donor_pool[donor_id]);
         }
@@ -130,10 +130,8 @@ TreeList SplitSamplerSource::generate_candidates(const RaxmlInstance &, const Co
             }
         }
 
-        // Completion pass: preserve donor-frequency order. The rotating
-        // consensus seed already supplies per-attempt diversity.
         for (std::size_t offset = 0; offset < split_pool.size() && selected.size() < max_splits; ++offset) {
-            const auto split_id = (static_cast<std::size_t>(attempt) + offset + round_seed) % split_pool.size();
+            const auto split_id = (static_cast<std::size_t>(attempt) + offset + round_seed * 2) % split_pool.size();
             try_add(split_pool[split_id]);
         }
 
