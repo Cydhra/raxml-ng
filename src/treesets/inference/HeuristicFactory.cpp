@@ -68,9 +68,15 @@ static unique_ptr<InferenceHeuristic> from_meta_parameters(const MetaParameters 
     }
 
     if (meta_parameters.fallback_fast_raxml) {
+        // reset model
+        heuristic = make_unique<ChangeConfig>(batch_name, std::move(heuristic), num_trees, threads_per_worker, start_tree_list, part_assignments, make_shared<ModelMap>(), std::nullopt, partitioned_msa, tip_msa_idmap);
+
         heuristic = make_unique<FastRaxml>(batch_name, std::move(heuristic), num_trees, threads_per_worker,
                                            part_assignments);
     } else if (meta_parameters.fallback_adaptive_raxml) {
+        // reset model
+        heuristic = make_unique<ChangeConfig>(batch_name, std::move(heuristic), num_trees, threads_per_worker, start_tree_list, part_assignments, make_shared<ModelMap>(), std::nullopt, partitioned_msa, tip_msa_idmap);
+
         heuristic = make_unique<AdaptiveRaxml>(batch_name, std::move(heuristic), num_trees, threads_per_worker);
     }
 
