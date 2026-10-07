@@ -87,11 +87,11 @@ void TreesetOptimizer::initialize_bandits() {
 
     // fallbacks
     auto fallback_fast_mab = make_shared<MultiArmedBandit<MetaParameters> >();
-    fallback_fast_mab->emplace_back("Fast-Raxml", MetaParameters().with_fallback_fast_raxml(true));
+    fallback_fast_mab->emplace_back("Fast-Raxml", MetaParameters().with_fallback_fast_raxml(true).with_final_model(false));
     this->mab.register_new_successor(6, "Fallback-Fast", std::move(fallback_fast_mab));
 
     auto fallback_adaptive_mab = make_shared<MultiArmedBandit<MetaParameters> >();
-    fallback_adaptive_mab->emplace_back("Adaptive-Raxml", MetaParameters().with_fallback_adaptive(true));
+    fallback_adaptive_mab->emplace_back("Adaptive-Raxml", MetaParameters().with_fallback_adaptive(true).with_final_model(false));
     this->mab.register_new_successor(7, "Fallback-Adaptive", std::move(fallback_adaptive_mab));
 
     // second-level MAB
