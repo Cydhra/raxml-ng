@@ -9,6 +9,11 @@
 #include "../batch/TunedBatch.hpp"
 
 /**
+ * Consistency factor to convert Mean Absolute Deviation into an estimator for the standard deviation.
+ */
+constexpr double CONSISTENCY = 1.48;
+
+/**
  * A measurement sample obtained from inferring a TunedBatch with a given set of parameters. The bandits are keeping
  * track of the measurements to estimate the mean and standard deviation of the underlying probability distribution of
  * the reward.
@@ -35,8 +40,8 @@ template<class Heuristic>
 class Bandit {
 public:
     explicit Bandit(std::string name, Heuristic parameters) : name(std::move(name)),
-                                                                     parameters(std::make_shared<Heuristic>(
-                                                                         parameters)) {
+                                                              parameters(std::make_shared<Heuristic>(
+                                                                  parameters)) {
     }
 
     // grant MAB access to protected members, specifically "take_measurement" and "disable"
@@ -115,6 +120,39 @@ public:
     }
 
     /**
+     * @return the mean expected reward (throughput) of the underlying distribution.
+     */
+    [[nodiscard]] double get_median_throughput() const {
+        auto throughput_samples = std::vector<double>();
+
+
+        for (auto &sample: this->samples) {
+            throughput_samples.push_back(
+                static_cast<double>(sample.plausible_trees) / static_cast<double>(sample.time_spent));
+        }
+
+        std::nth_element(throughput_samples.begin(), throughput_samples.begin() + throughput_samples.size() / 2,
+                         throughput_samples.end());
+        return throughput_samples[throughput_samples.size() / 2];
+    }
+
+    /**
+     * @return the median absolute deviation as an outlier-resistant replacement of the mean
+     */
+    [[nodiscard]] double get_median_adev() const {
+        const double median = this->get_median_throughput();
+        auto adev = std::vector<double>();
+
+        for (auto &sample: this->samples) {
+            adev.push_back(
+                abs(median - static_cast<double>(sample.plausible_trees) / static_cast<double>(sample.time_spent)));
+        }
+
+        std::nth_element(adev.begin(), adev.begin() + adev.size() / 2, adev.end());
+        return adev[adev.size() / 2];
+    }
+
+    /**
      * @return the mean success rate (between 0 and 1) of yielding a plausible tree under this bandit's parameters.
      */
     [[nodiscard]] double get_expected_tree_rate() const {
@@ -151,6 +189,15 @@ public:
     }
 
     /**
+     * Get a best-effort estimator for the variance or deviation of the underlying distribution.
+     * When we have under 5 measurements, we use variance (including the initial variance overestimation),
+     * then we switch to MAD to avoid outliers influencing the variance.
+     */
+    [[nodiscard]] double get_deviation_estimator() const {
+        return this->samples.size() < 5 ? this->get_variance() : this->get_median_adev() * CONSISTENCY;
+    }
+
+    /**
      * Calculate the upper confident limit of the mean expected success of this bandit. This depends on the total
      * number of samples drawn so far, as well as the number of samples drawn for this bandit.
      *
@@ -160,14 +207,13 @@ public:
      */
     [[nodiscard]] double get_upper_confidence(const unsigned int total_samples) const {
         const auto mean_throughput = this->get_mean_throughput();
-        const auto variance = this->get_variance();
+        const auto std_variation   = this->get_deviation_estimator();
 
         // as defined by 10.1016/0196-8858(85)90002-8, formula 4.13 with the choice of `a_(n,i)` = `(log n) / i`,
         // where `n` is the total number of samples, and `i` is the number of samples drawn for this bandit.
         // do note that the formula contains the standard deviation, not the variance, so we move the variance into the root.
-        return mean_throughput + sqrt(
-                   variance * 2.0 * log(static_cast<double>(total_samples)) / static_cast<double>(this->samples.
-                       size()));
+        return mean_throughput + std_variation * sqrt(
+                   2.0 * log(static_cast<double>(total_samples)) / static_cast<double>(this->samples.size()));
     }
 
     /**
@@ -187,18 +233,17 @@ public:
      */
     [[nodiscard]] double get_upmost_confidence(const unsigned int total_samples) const {
         const auto mean_throughput = this->get_mean_throughput();
-        const auto variance = this->get_variance();
+        const auto std_variation   = this->get_deviation_estimator();
 
         // see get_upper_confidence
-        return mean_throughput + sqrt(
-                   4.0 * variance * 2.0 * log(static_cast<double>(total_samples)) / static_cast<double>(this->samples.
-                       size()));
+        return mean_throughput + 2 * std_variation * sqrt(
+                   2.0 * log(static_cast<double>(total_samples)) / static_cast<double>(this->samples.size()));
     }
 
     /**
      * @return This bandit's meta parameters
      */
-    [[nodiscard]] Heuristic& get_parameters() const {
+    [[nodiscard]] Heuristic &get_parameters() const {
         return *this->parameters;
     }
 
@@ -272,7 +317,8 @@ protected:
             this->initialize_variance(over_estimated_variance / 3, 3);
         }
 
-        LOG_WORKER_TS(LogLevel::info) << "[" << this->name << "]: Takes measurement: " << batch.get_plausible_tree_count() << " plausible trees at " << (
+        LOG_WORKER_TS(LogLevel::info) << "[" << this->name << "]: Takes measurement: " << batch.
+                get_plausible_tree_count() << " plausible trees at " << (
                     static_cast<double>(batch.get_plausible_tree_count()) / static_cast<double>(batch.
                         elapsed_wall_time()) *
                     1000.0)
