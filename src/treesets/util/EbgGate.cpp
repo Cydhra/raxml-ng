@@ -8,7 +8,11 @@ static constexpr unsigned int BOOTSTRAP_SUPPORT_COUNT = 200;
 void EbgGate::reset_gate(const RaxmlInstance &instance, const ConstTreeRange &support_trees,
                          const SmartBarrier &barrier, const unsigned int
                          num_workers, const unsigned int worker_id) {
-    reference_splits.clear();
+    if (worker_id == 0) {
+        reference_splits.clear();
+        // no barrier needed, because either we enter the bootstrap generating barrier, or the rest of the work is done
+        // by this same thread
+    }
 
     if (bootstrap_support_trees.empty()) {
         barrier.enter();
