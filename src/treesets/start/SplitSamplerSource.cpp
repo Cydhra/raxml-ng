@@ -20,27 +20,23 @@ TreeList SplitSamplerSource::generate_candidates(const RaxmlInstance &, const Co
     }
 
     std::vector<CandidateSplit> split_pool;
+    bitv_hashtable_t *split_hash_table = corax_utree_split_hashtable_create(baseline_tree.num_tips(), 0);
 
     auto collect_tree_splits = [&](const Tree &tree, const bool from_ml) {
         assert(!tree.empty() && tree.num_tips() == tip_count);
 
         for (auto &words: extract_splits(tree, false)) {
-            auto existing = std::find_if(
-                split_pool.begin(),
-                split_pool.end(),
-                [&words](const CandidateSplit &candidate) {
-                    return candidate.words == words;
-                });
-
-            if (existing == split_pool.end()) {
-                split_pool.push_back({std::move(words), 0, 0});
-                existing = split_pool.end() - 1;
-            }
-
-            if (from_ml) {
-                ++existing->ml_frequency;
+            if (const auto entry = corax_utree_split_hashtable_lookup(split_hash_table, words.data(),
+                                                                      baseline_tree.num_tips())) {
+                if (from_ml) {
+                    split_pool[entry->bip_number].ml_frequency++;
+                } else {
+                    split_pool[entry->bip_number].donor_frequency++;
+                }
             } else {
-                ++existing->donor_frequency;
+                const auto new_entry = corax_utree_split_hashtable_insert_single(split_hash_table, words.data(), 1.0);
+                split_pool.push_back(CandidateSplit{std::move(words), from_ml ? 1u : 0, from_ml ? 0u : 1});
+                assert(split_pool.size() - 1 == new_entry->bip_number);
             }
         }
     };
@@ -51,6 +47,8 @@ TreeList SplitSamplerSource::generate_candidates(const RaxmlInstance &, const Co
     for (const auto &tree: donor_pool) {
         collect_tree_splits(tree, false);
     }
+
+    corax_utree_split_hashtable_destroy(split_hash_table);
 
     candidates.reserve(donor_pool.size());
     unsigned int incomplete_split_systems = 0;
