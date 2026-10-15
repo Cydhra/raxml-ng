@@ -72,9 +72,9 @@ protected:
     const TreeList initial_ml_trees;
 
     /**
-     * Splits extracted from reference ML trees
+     * Splits extracted from reference ML trees, projected onto a reference tree
      */
-    SplitList reference_splits;
+    std::shared_ptr<CandidateEbgSupportTree> reference_support_tree;
 
     TreeList bootstrap_support_trees;
 
