@@ -375,6 +375,12 @@ unsigned int TunedBatch::elapsed_wall_time() const {
                num_workers * threads_per_worker) + this->au_wall_time;
 }
 
+std::vector<unsigned int> TunedBatch::per_tree_time() const {
+    std::vector per_tree_samples(get_batch_size(), this->au_wall_time + static_cast<unsigned int>(tree_time));
+    this->heuristic->get_total_tree_times(per_tree_samples);
+    return per_tree_samples;
+}
+
 unsigned int TunedBatch::get_plausible_tree_count() const {
     return this->plausible_tree_count;
 }

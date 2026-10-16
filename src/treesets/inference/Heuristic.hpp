@@ -31,7 +31,10 @@ public:
         : batch_name(std::move(batch_name)),
           inner(std::move(inner)),
           num_trees(num_trees),
-          passed(num_trees * threads_per_worker, 0) {
+          passed(num_trees * threads_per_worker, 0){
+        for (unsigned int i = 0; i < num_trees; i++) {
+            per_tree_wall_time.emplace_back(make_unique<atomic_uint>(0));
+        }
     }
 
     InferenceHeuristic(const InferenceHeuristic &other) = delete;
@@ -55,9 +58,9 @@ public:
      * @param worker_id raxml-instance-global id of the current thread's worker. Used for work distribution.
      * @param thread_id thread id within the current worker. Used for work distribution.
      */
-    void optimize(std::optional<TreeInfo> &tree, const unsigned int tree_id, const Options &opts,
+    void optimize(std::optional<TreeInfo> &tree, unsigned int tree_id, const Options &opts,
                   const TaskGroup &context, SharedBatchResources &resources,
-                  const unsigned int worker_id, const unsigned int thread_id);
+                  unsigned int worker_id, unsigned int thread_id);
 
     /**
      * Calculate the cumulative wall-time spent on all inferred trees across the entire heuristic.
@@ -66,6 +69,14 @@ public:
      * @return the total cumulative wall-time across the entire heuristic
      */
     [[nodiscard]] unsigned int get_total_wall_time() const;
+
+    /**
+     * Calculate the cumulative wall-time spent on each tree.
+     * Cumulative time means the wall-time of each thread is simply added up.
+     *
+     * @param accumulator vector of exactly batch size which will accumulate the times in each entry
+     */
+    void get_total_tree_times(std::vector<unsigned int> &accumulator) const;
 
     /**
      * Implementation of the concrete inference strategy. Inference will modify the `tree` argument, which is passed
@@ -117,6 +128,11 @@ private:
      * Further, we cannot use bool here, because vector<bool> may use specialization which breaks concurrency.
      */
     std::vector<char> passed;
+
+    /**
+     * Individual walltime measurements per tree inference
+     */
+    std::vector<std::unique_ptr<atomic_uint>> per_tree_wall_time;
 };
 
 #endif //RAXML_HEURISTIC_HPP_

@@ -186,6 +186,12 @@ public:
     [[nodiscard]] unsigned int elapsed_wall_time() const;
 
     /**
+     * Get the wall time spent on inferring individual trees to gain more measurements at once.
+     * @return Time spent working on inference in milliseconds.
+     */
+    [[nodiscard]] std::vector<unsigned int> per_tree_time() const;
+
+    /**
      * Compute the output tree of the `index`-th tree of this batch.
      *
      * @param index the index of the tree within the batch's trees

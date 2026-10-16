@@ -207,7 +207,7 @@ public:
      */
     [[nodiscard]] double get_upper_confidence(const unsigned int total_samples) const {
         const auto mean_throughput = this->get_mean_throughput();
-        const auto std_variation   = this->get_deviation_estimator();
+        const auto std_variation = this->get_deviation_estimator();
 
         // as defined by 10.1016/0196-8858(85)90002-8, formula 4.13 with the choice of `a_(n,i)` = `(log n) / i`,
         // where `n` is the total number of samples, and `i` is the number of samples drawn for this bandit.
@@ -233,7 +233,7 @@ public:
      */
     [[nodiscard]] double get_upmost_confidence(const unsigned int total_samples) const {
         const auto mean_throughput = this->get_mean_throughput();
-        const auto std_variation   = this->get_deviation_estimator();
+        const auto std_variation = this->get_deviation_estimator();
 
         // see get_upper_confidence
         return mean_throughput + 2 * std_variation * sqrt(
@@ -273,6 +273,10 @@ protected:
      * Samples drawn from the reward distribution.
      */
     std::vector<Measurement> samples = {};
+
+    std::vector<double> inference_time_samples = {};
+
+    std::vector<double> success_samples = {};
 
     /**
      * The set variance will account for n samples in the calculation of the bandit's actual variance (`get_variance()`).
@@ -324,6 +328,32 @@ protected:
                     1000.0)
                 << " trees per second." << std::endl;
         this->samples.emplace_back(batch.elapsed_wall_time(), batch.get_plausible_tree_count(), batch.get_batch_size());
+
+
+        const auto tree_times = batch.per_tree_time();
+        for (const auto time: tree_times) {
+            this->inference_time_samples.push_back(1.0 / static_cast<double>(time));
+        }
+
+        this->success_samples.push_back(
+            static_cast<double>(batch.get_plausible_tree_count()) / static_cast<double>(batch.get_batch_size()));
+
+        auto inference_mean = 0.0;
+        auto success_mean = 0.0;
+
+        for (auto sample : this->inference_time_samples) {
+            inference_mean += sample;
+        }
+
+        for (auto sample : this->success_samples) {
+            success_mean += sample;
+        }
+
+        inference_mean /= static_cast<double>(inference_time_samples.size());
+        success_mean /= static_cast<double>(success_samples.size());
+
+        LOG_WORKER_TS(LogLevel::info) << "[" << this->name << "]: Adjusted Measurement: " <<
+            (1000.0 * success_mean * inference_mean) << " trees per second per worker." << std::endl;
     }
 
     void disable() {
