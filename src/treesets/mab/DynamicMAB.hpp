@@ -52,6 +52,14 @@ public:
      */
     void disable_bandit(const MetaParameters &parameters);
 
+    /**
+     * Set the upper bound to the largest achievable throughput.
+     * If this is underestimated, bandits with higher throughputs cannot be distinguished as their success will be capped.
+     *
+     * @param throughput_bound Upper bound to throughput
+     */
+    void set_upper_bound(double throughput_bound);
+
 protected:
     /**
      * The multi-level multi-armed bandit that is being managed and modified by this class.
@@ -79,6 +87,11 @@ protected:
 
     // TODO get rid of this heuristic
     unsigned int last_mab_modification = 0;
+
+    /**
+     * Upper bound of bandit throughput
+     */
+    double upper_bound = 0;
 
     /**
      * How often

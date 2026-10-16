@@ -149,6 +149,11 @@ void TreesetOptimizer::initialize_resources(const SmartBarrier &global_barrier) 
     LOG_INFO_TS << "Generating " << NUM_DONOR_TREE << " parsimony trees upfront." << std::endl;
     shared_batch_resources.get_parsimony().ensure(instance, global_barrier, 1, ParallelContext::local_group_id(), ParallelContext::local_thread_id(), NUM_DONOR_TREE);
 
+    const auto throughput_bound = 1000.0 * 16.0 * (1.0 / shared_batch_resources.get_parsimony().amortized_time(16));
+    LOG_INFO_TS << "The largest achievable throughput is " << throughput_bound << "tps" << std::endl;
+
+    mab.set_upper_bound(throughput_bound);
+
     LOG_INFO_TS << "Generating " << target_tree_count << " split-informed parsimony trees." << std::endl;
     shared_batch_resources.get_parsimony_split_source().generate(instance, global_barrier, ParallelContext::num_groups(), ParallelContext::local_group_id(), target_tree_count);
 

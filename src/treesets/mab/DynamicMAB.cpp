@@ -63,6 +63,10 @@ void DynamicMAB::disable_bandit(const MetaParameters &parameters) {
     }
 }
 
+void DynamicMAB::set_upper_bound(const double throughput_bound) {
+    this->upper_bound = throughput_bound;
+}
+
 void DynamicMAB::check_update() {
     // check if we have more than a trivial amount of data, if the success rate is low, and we had at least 4 batches since the last modification
     if (last_mab_modification + MIN_PAUSE_BETWEEN_MODIFICATIONS < hierarchical_mab.get_iterations_completed() &&
