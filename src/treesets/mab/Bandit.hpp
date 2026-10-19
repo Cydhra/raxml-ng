@@ -21,8 +21,8 @@ constexpr double CONSISTENCY = 1.48;
 class Measurement {
 public:
     Measurement(const unsigned int time_spent, const unsigned int plausible_trees,
-                const unsigned int batch_size) : time_spent(time_spent),
-                                                 plausible_trees(plausible_trees), batch_size(batch_size) {
+                const unsigned int batch_size, const std::vector<double> &individual_inverse_times) : time_spent(time_spent),
+                                                 plausible_trees(plausible_trees), batch_size(batch_size), individual_inverse_times(individual_inverse_times) {
     }
 
     const unsigned int time_spent;
@@ -30,6 +30,8 @@ public:
     const unsigned int plausible_trees;
 
     const unsigned int batch_size;
+
+    std::vector<double> individual_inverse_times;
 };
 
 /**
@@ -274,10 +276,6 @@ protected:
      */
     std::vector<Measurement> samples = {};
 
-    std::vector<double> inference_time_samples = {};
-
-    std::vector<double> success_samples = {};
-
     /**
      * The set variance will account for n samples in the calculation of the bandit's actual variance (`get_variance()`).
      * It gets replaced by actual `samples`, where each existing sample reduces the `estimated_variance_weight` by one.
@@ -321,39 +319,36 @@ protected:
             this->initialize_variance(over_estimated_variance / 3, 3);
         }
 
+        // extract individual inverse inference times
+        const auto tree_times = batch.per_tree_time();
+        auto inverse_times = std::vector<double>(tree_times.size());
+        for (unsigned int i = 0; i < tree_times.size(); ++i) {
+            inverse_times[i] = (1.0 / static_cast<double>(tree_times[i]));
+        }
+
         LOG_WORKER_TS(LogLevel::info) << "[" << this->name << "]: Takes measurement: " << batch.
                 get_plausible_tree_count() << " plausible trees at " << (
                     static_cast<double>(batch.get_plausible_tree_count()) / static_cast<double>(batch.
                         elapsed_wall_time()) *
                     1000.0)
                 << " trees per second." << std::endl;
-        this->samples.emplace_back(batch.elapsed_wall_time(), batch.get_plausible_tree_count(), batch.get_batch_size());
 
+        this->samples.emplace_back(batch.elapsed_wall_time(), batch.get_plausible_tree_count(), batch.get_batch_size(), inverse_times);
 
-        const auto tree_times = batch.per_tree_time();
-        for (const auto time: tree_times) {
-            this->inference_time_samples.push_back(1.0 / static_cast<double>(time));
+        // calculate mean of the individual inverse inference times
+        auto iiit_mean = 0.0;
+        auto sample_count = 0;
+        for (auto &sample : this->samples) {
+            for (auto time : sample.individual_inverse_times) {
+                sample_count++;
+                iiit_mean += time;
+            }
         }
-
-        this->success_samples.push_back(
-            static_cast<double>(batch.get_plausible_tree_count()) / static_cast<double>(batch.get_batch_size()));
-
-        auto inference_mean = 0.0;
-        auto success_mean = 0.0;
-
-        for (auto sample : this->inference_time_samples) {
-            inference_mean += sample;
-        }
-
-        for (auto sample : this->success_samples) {
-            success_mean += sample;
-        }
-
-        inference_mean /= static_cast<double>(inference_time_samples.size());
-        success_mean /= static_cast<double>(success_samples.size());
+        iiit_mean /= static_cast<double>(sample_count);
+        auto success_mean = this->get_expected_tree_rate();
 
         LOG_WORKER_TS(LogLevel::info) << "[" << this->name << "]: Adjusted Measurement: " <<
-            (1000.0 * success_mean * inference_mean) << " trees per second per worker." << std::endl;
+            (1000.0 * success_mean * iiit_mean) << " trees per second per worker. (" << (1000.0 * success_mean * iiit_mean * 8.0) << " trees per second)."  << std::endl;
     }
 
     void disable() {
