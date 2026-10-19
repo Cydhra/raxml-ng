@@ -301,8 +301,10 @@ protected:
      */
     unsigned int plausible_tree_count{0};
 
-    // TODO placeholder until tree source is dynamic
-    double tree_time{0.0};
+    /**
+     * Cumulative time spent to infer 16 starting trees, fixed costs amortized across all threads fairly.
+     */
+    double start_tree_time{0.0};
 
     /**
      * Time spent in AU test. This has to be considered for the total wall time, because the amortized cost of AU test
