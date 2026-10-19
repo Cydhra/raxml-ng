@@ -171,6 +171,11 @@ public:
     [[nodiscard]] unsigned int get_batch_size() const;
 
     /**
+     * @return the number of workers that infer in this batch
+     */
+    [[nodiscard]] unsigned int get_num_workers() const;
+
+    /**
      * If an AU test has already been performed, count how many of the batch's trees are plausible.
      * If no AU test has been performed, or the last AU test is no longer valid, the method throws a
      * RaxmlException.

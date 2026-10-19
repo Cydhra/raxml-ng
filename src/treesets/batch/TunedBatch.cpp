@@ -14,6 +14,10 @@ unsigned int TunedBatch::get_batch_size() const {
     return this->batch_size;
 }
 
+unsigned int TunedBatch::get_num_workers() const {
+    return this->num_workers;
+}
+
 void TunedBatch::generate_starting_trees(const RaxmlInstance &instance, SharedBatchResources &resources,
                                          const TaskGroup &context,
                                          const unsigned int worker_id, const unsigned int thread_id) {
