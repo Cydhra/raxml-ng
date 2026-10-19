@@ -196,7 +196,7 @@ public:
      * then we switch to MAD to avoid outliers influencing the variance.
      */
     [[nodiscard]] double get_deviation_estimator() const {
-        return this->samples.size() < 5 ? this->get_variance() : this->get_median_abs_dev() * CONSISTENCY;
+        return this->samples.size() < 5 ? sqrt(this->get_variance()) : this->get_median_abs_dev() * CONSISTENCY;
     }
 
     /**
