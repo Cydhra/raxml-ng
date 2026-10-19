@@ -252,9 +252,13 @@ void TunedBatch::perform_plausibility_check(const Options &opts, SharedBatchReso
                 std::endl;
 
         const auto end = std::chrono::steady_clock::now();
-        this->au_wall_time = static_cast<unsigned int>(std::chrono::duration_cast<std::chrono::milliseconds>(
-                end - begin)
-            .count());
+        const auto elapsed = static_cast<unsigned int>(std::chrono::duration_cast<
+            std::chrono::milliseconds>(end - begin).count());
+        const auto trees_in_thread =
+                initialized
+                    ? exclusive_assignment->at(context.get_group_thread_id(worker_id, thread_id)).size()
+                    : au_assignment->at(context.get_group_thread_id(worker_id, thread_id)).size();
+        this->amortized_au_wall_time = elapsed / trees_in_thread;
     }
 }
 
@@ -374,12 +378,23 @@ bool TunedBatch::has_trees() const {
 }
 
 unsigned int TunedBatch::elapsed_wall_time() const {
-    return (this->tree_time + this->heuristic->get_total_wall_time()) / (
-               num_workers * threads_per_worker) + this->au_wall_time;
+    // multiply amortized au time with the number of trees that each thread has to compute bootstraps for.
+    // this way, we get an estimate of the wall-time spent on the AU test under the precondition that the AU test is already
+    // initialized.
+    const auto au_tests_per_thread = max(1u, this->batch_size / (num_workers * threads_per_worker));
+
+    return (static_cast<unsigned int>(this->start_tree_time) + this->heuristic->get_total_wall_time()) / (
+               num_workers * threads_per_worker) + this->amortized_au_wall_time * au_tests_per_thread;
 }
 
 std::vector<unsigned int> TunedBatch::per_tree_time() const {
-    std::vector per_tree_samples(get_batch_size(), this->au_wall_time + static_cast<unsigned int>(tree_time));
+    // initialize accumulators with the amortized time spent per tree on AU test and starting tree generation
+    const auto start_time_per_tree = start_tree_time / this->batch_size;
+
+    std::vector per_tree_samples(get_batch_size(),
+                                 this->amortized_au_wall_time + static_cast<unsigned int>(start_time_per_tree));
+
+    // add the non-amortized time spent on inference on each tree.
     this->heuristic->get_total_tree_times(per_tree_samples);
     return per_tree_samples;
 }

@@ -307,11 +307,17 @@ protected:
     double start_tree_time{0.0};
 
     /**
-     * Time spent in AU test. This has to be considered for the total wall time, because the amortized cost of AU test
-     * increases if less trees become plausible. But it cannot be added directly on top of the wall time, because
-     * batch reusing should not double-count the AU test time.
+     * Time spent in AU test. This has to be considered for the total wall time, because otherwise bandits with low
+     * success rate and low inference times become overvalued since the time spent on the (bottleneck) AU test is not
+     * considered when weighing against the success rate.
+     *
+     * It cannot be added directly on top of the wall time because batch reusing should not double-count the AU test time.
+     *
+     * It is amortized cost for each tree, meaning this variable holds the time spent on AU test PER TREE, even though
+     * the entire batch has to be present at once, and the time is only incurred once.
+     * This enables calculating throughput individually for trees.
      */
-    unsigned int au_wall_time{0};
+    unsigned int amortized_au_wall_time{0};
 
     /**
      * Mutex guard for the topologies vector, where the topologies of previous optimize() calls are backed up, in case
