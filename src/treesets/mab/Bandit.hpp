@@ -131,7 +131,7 @@ public:
                 static_cast<double>(sample.plausible_trees) / static_cast<double>(sample.time_spent));
         }
 
-        std::nth_element(throughput_samples.begin(), throughput_samples.begin() + throughput_samples.size() / 2,
+        std::nth_element(throughput_samples.begin(), throughput_samples.begin() + static_cast<long>(throughput_samples.size() / 2),
                          throughput_samples.end());
         return throughput_samples[throughput_samples.size() / 2];
     }
@@ -139,17 +139,17 @@ public:
     /**
      * @return the median absolute deviation as an outlier-resistant replacement of the mean
      */
-    [[nodiscard]] double get_median_adev() const {
+    [[nodiscard]] double get_median_abs_dev() const {
         const double median = this->get_median_throughput();
-        auto adev = std::vector<double>();
+        auto abs_devs = std::vector<double>();
 
         for (auto &sample: this->samples) {
-            adev.push_back(
+            abs_devs.push_back(
                 abs(median - static_cast<double>(sample.plausible_trees) / static_cast<double>(sample.time_spent)));
         }
 
-        std::nth_element(adev.begin(), adev.begin() + adev.size() / 2, adev.end());
-        return adev[adev.size() / 2];
+        std::nth_element(abs_devs.begin(), abs_devs.begin() + static_cast<long>(abs_devs.size() / 2), abs_devs.end());
+        return abs_devs[abs_devs.size() / 2];
     }
 
     /**
@@ -194,7 +194,7 @@ public:
      * then we switch to MAD to avoid outliers influencing the variance.
      */
     [[nodiscard]] double get_deviation_estimator() const {
-        return this->samples.size() < 5 ? this->get_variance() : this->get_median_adev() * CONSISTENCY;
+        return this->samples.size() < 5 ? this->get_variance() : this->get_median_abs_dev() * CONSISTENCY;
     }
 
     /**
