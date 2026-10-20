@@ -103,12 +103,12 @@ public:
             LOG_WORKER_TS(LogLevel::info) << "Initial estimation of " << selected_bandit.get_name() << "." << std::endl;
         } else {
             if (this->bandit_cursor != this->best_known_bandit && !std::isnan(
-                    this->bandits[this->best_known_bandit].get_mean_throughput()) && selected_bandit.is_worse_than(
+                    this->bandits[this->best_known_bandit].get_normal_mean()) && selected_bandit.is_worse_than(
                     best_bandit, iterations_completed)) {
                 LOG_INFO << std::endl;
                 LOG_WORKER_TS(LogLevel::info) << "Switching to best bandit " << best_bandit.get_name() <<
                         " because its mean expected success ("
-                        << (best_bandit.get_mean_throughput() * 1000.0) <<
+                        << (best_bandit.get_iiit_mean() * 1000.0) <<
                         " t/s) exceeds the largest reasonable success of "
                         << selected_bandit.get_name() << " (" << (
                             selected_bandit.get_upper_confidence(iterations_completed) * 1000.0) << " t/s)." <<
@@ -134,14 +134,14 @@ public:
                             " because its largest reasonable success ("
                             << (selected_bandit.get_upper_confidence(iterations_completed) * 1000.0) <<
                             " t/s) exceeds the mean expected success of current best bandit "
-                            << best_bandit.get_name() << " (" << (best_bandit.get_mean_throughput() * 1000.0) <<
+                            << best_bandit.get_name() << " (" << (best_bandit.get_throughput_mean() * 1000.0) <<
                             " t/s)." <<
                             std::endl;
                 } else {
                     LOG_INFO << std::endl;
                     LOG_WORKER_TS(LogLevel::info) << "Selecting bandit " << selected_bandit.get_name() << " (mean: " <<
                     (
-                        best_bandit.get_mean_throughput() * 1000.0) << " t/s)." << std::endl;
+                        best_bandit.get_throughput_mean() * 1000.0) << " t/s)." << std::endl;
                 }
             }
         }
@@ -166,8 +166,8 @@ public:
 
         // if the current bandit is not the best one, check if the best one has to be updated
         if (&current_bandit.get_parameters() != &this->bandits[best_known_bandit].get_parameters() && !std::isnan(
-                this->bandits[best_known_bandit].get_mean_throughput())) {
-            if (current_bandit.get_mean_throughput() > this->bandits[best_known_bandit].get_mean_throughput()) {
+                this->bandits[best_known_bandit].get_normal_mean())) {
+            if (current_bandit.get_normal_mean() > this->bandits[best_known_bandit].get_normal_mean()) {
                 // find which index is the current bandit. We cannot rely on the cursor since that has been advanced by
                 // concurrent batch groups
                 auto cursor = std::find_if(this->bandits.begin(), this->bandits.end(),
@@ -223,7 +223,7 @@ public:
         if (this->best_known_bandit == bandit_id) {
             // find new next best bandit
             auto new_best = std::max_element(this->bandits.begin(), this->bandits.end(), [](const Bandit<Heuristic> &a, const Bandit<Heuristic> &b) {
-                return !a.participating || (b.participating && b.get_mean_throughput() > a.get_mean_throughput());
+                return !a.participating || (b.participating && b.get_normal_mean() > a.get_normal_mean());
             });
 
             auto index = std::distance(this->bandits.begin(), new_best);

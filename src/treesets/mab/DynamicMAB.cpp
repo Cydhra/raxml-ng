@@ -71,7 +71,7 @@ void DynamicMAB::check_update() {
     // check if we have more than a trivial amount of data, if the success rate is low, and we had at least 4 batches since the last modification
     if (last_mab_modification + MIN_PAUSE_BETWEEN_MODIFICATIONS < hierarchical_mab.get_iterations_completed() &&
         hierarchical_mab.get_best_bandit().num_samples() >= 4) {
-        if (hierarchical_mab.get_best_bandit().get_expected_tree_rate() < 0.75) {
+        if (hierarchical_mab.get_best_bandit().get_success_mean() < 0.75) {
             propose_more_effort();
         } else {
             propose_less_effort();
@@ -90,7 +90,7 @@ void DynamicMAB::propose_more_effort() {
     }
 
     // dont add expensive bandits if that didnt work before and we are already getting trees
-    if (previous_modifications < 2 || bandit.get_expected_tree_rate() < 0.1) {
+    if (previous_modifications < 2 || bandit.get_success_mean() < 0.1) {
         add_next_successor();
         previous_modifications++;
         past_increases[name] = previous_modifications;

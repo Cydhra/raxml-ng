@@ -80,6 +80,26 @@ public:
     friend class MultiArmedBandit;
 
     /**
+     * Configures the bandit to use a normal distribution as the model for the unknown probability distribution its
+     * heuristic is distributed with.
+     */
+    Bandit *with_normal_distribution() {
+        this->mean = &Bandit::get_normal_mean;
+        this->deviation = &Bandit::get_normal_smart_deviation;
+        return this;
+    }
+
+    /**
+     * Configures the bandit to use a ratio distribution of bandit success and bandit walltime distributions for
+     * the unknown probabilitiy distribution its heuristic is distributed with.
+     */
+    Bandit *with_ratio_distribution() {
+        this->mean = &Bandit::get_ratio_mean;
+        this->deviation = &Bandit::get_ratio_deviation;
+        return this;
+    }
+
+    /**
      * Initialize the bandit distribution estimation with a constant variance. This allows comparing bandits with some
      * level of confidence regarding the unknown variance. The set variance will account for n samples in the calculation
      * of the bandit's actual variance, where n is the given weight argument.
@@ -113,7 +133,7 @@ public:
             return false;
         }
 
-        return other.get_mean_throughput() > this->get_upper_confidence(total_samples);
+        return other.get_throughput_mean() > this->get_upper_confidence(total_samples);
     }
 
     /**
@@ -131,13 +151,112 @@ public:
             return false;
         }
 
-        return other.get_mean_throughput() > this->get_upmost_confidence(total_samples);
+        return other.get_throughput_mean() > this->get_upmost_confidence(total_samples);
     }
 
     /**
-     * @return the mean expected reward (throughput) of the underlying distribution.
+     * Get a estimator for the mean using this bandit's selected model for the underlying distribution.
      */
-    [[nodiscard]] double get_mean_throughput() const {
+    [[nodiscard]] double get_throughput_mean() const {
+        return (this->*mean)();
+    }
+
+    /**
+     * Get a standard deviation estimator using this bandit's selected model for the underlying distribution.
+     */
+    [[nodiscard]] double get_throughput_deviation() const {
+        return (this->*deviation)();
+    }
+
+    /**
+     * @return the mean success rate (between 0 and 1) of yielding a plausible tree under this bandit's parameters.
+     */
+    [[nodiscard]] double get_success_mean() const {
+        double success = 0.0;
+        for (auto &sample: this->samples) {
+            success += static_cast<double>(sample.plausible_trees) / static_cast<double>(sample.batch_size);
+        }
+
+        return success / this->samples.size();
+    }
+
+    /**
+     * @return the variance of the bandit's success rate modelled with a bernoulli distribution.
+     */
+    [[nodiscard]] double get_success_variance() const {
+        return get_success_mean() * (1.0 - get_success_mean());
+    }
+
+    /**
+     * Calculate the upper confident limit of the mean expected success of this bandit. This depends on the total
+     * number of samples drawn so far, as well as the number of samples drawn for this bandit.
+     *
+     * @param total_samples the number of total samples from all bandits that have been drawn so far
+     *
+     * @return the upper bound on the mean expected success that can be determined with high confidence.
+     */
+    [[nodiscard]] double get_upper_confidence(const unsigned int total_samples) const {
+        const auto mean_throughput = this->get_throughput_mean();
+        const auto std_variation = this->get_throughput_deviation();
+
+        // as defined by 10.1016/0196-8858(85)90002-8, formula 4.13 with the choice of `a_(n,i)` = `(log n) / i`,
+        // where `n` is the total number of samples, and `i` is the number of samples drawn for this bandit.
+        // do note that the formula contains the standard deviation, not the variance, so we move the variance into the root.
+        return mean_throughput + std_variation * sqrt(
+                   2.0 * log(static_cast<double>(total_samples)) / static_cast<double>(this->samples.size()));
+    }
+
+    /**
+     * The upper confidence limit of the mean expected success is one standard-deviation above the sample mean,
+     * corrected by the number of samples available (more samples means we increase the confidence interval because we
+     * do not have enough data).
+     * This method, however, returns the upper limit at two standard deviations away from the sample mean.
+     * This can be used to reasonably exclude bandits that are so bad that they will not become relevant even with a
+     * high number of total samples.
+     *
+     * This still takes into account the sample ratio (total samples versus samples for this bandit) to estimate how
+     * uncertain the confidence is.
+     *
+     * @param total_samples the number of total samples from all bandits that have been drawn so far
+     *
+     * @return the expected success two standard deviations higher than the mean.
+     */
+    [[nodiscard]] double get_upmost_confidence(const unsigned int total_samples) const {
+        const auto mean_throughput = this->get_throughput_mean();
+        const auto std_variation = this->get_throughput_deviation();
+
+        // see get_upper_confidence
+        return mean_throughput + 2 * std_variation * sqrt(
+                   2.0 * log(static_cast<double>(total_samples)) / static_cast<double>(this->samples.size()));
+    }
+
+    /**
+     * @return This bandit's meta parameters
+     */
+    [[nodiscard]] Heuristic &get_parameters() const {
+        return *this->parameters;
+    }
+
+    /**
+     * @return Bandit name for debug output
+     */
+    [[nodiscard]] std::string get_name() const {
+        return this->name;
+    }
+
+    /**
+     * @return Number of samples taken (i.e. number of batches inferred with this bandit).
+     */
+    [[nodiscard]] unsigned int num_samples() const {
+        return this->samples.size();
+    }
+
+private:
+
+    /**
+     * Get the mean expected reward (throughput) modelled with a single normal distribution.
+     */
+    [[nodiscard]] double get_normal_mean() const {
         double expectation = 0.0;
 
         for (auto &sample: this->samples) {
@@ -151,9 +270,9 @@ public:
     }
 
     /**
-     * @return the mean expected reward (throughput) of the underlying distribution.
+     * @return the median expected reward (throughput) modelled with a single normal distribution.
      */
-    [[nodiscard]] double get_median_throughput() const {
+    [[nodiscard]] double get_normal_median() const {
         auto throughput_samples = std::vector<double>();
 
 
@@ -169,10 +288,12 @@ public:
     }
 
     /**
-     * @return the median absolute deviation as an outlier-resistant replacement of the mean
+     * Calculate the median absolute deviation as an outlier-resistant replacement of the sample variance.
+     * This value has to be multiplied with a correction factor to obtain a consistent estimator of the standard deviation
+     * and cannot be used on its own in the bandit calculations.
      */
     [[nodiscard]] double get_median_abs_dev() const {
-        const double median = this->get_median_throughput();
+        const double median = this->get_normal_median();
         auto abs_devs = std::vector<double>();
 
         for (auto &sample: this->samples) {
@@ -185,24 +306,12 @@ public:
     }
 
     /**
-     * @return the mean success rate (between 0 and 1) of yielding a plausible tree under this bandit's parameters.
+     * @return the variance of the reward distribution when modelled with a single normal distribution.
+     * Because this is required to be known a priori, the value is being interpolated between an initial value and the
+     * sample variance depending on how many measurements are available.
      */
-    [[nodiscard]] double get_expected_tree_rate() const {
-        double success = 0.0;
-        for (auto &sample: this->samples) {
-            success += static_cast<double>(sample.plausible_trees) / static_cast<double>(sample.batch_size);
-        }
-
-        return success / this->samples.size();
-    }
-
-    /**
-     * @return the variance of the reward distribution. Because this is required to be known a priori, the value is
-     * being interpolated between an initial value and the measured value depending on how many measurements are
-     * available.
-     */
-    [[nodiscard]] double get_variance() const {
-        const double mean = get_mean_throughput();
+    [[nodiscard]] double get_normal_variance() const {
+        const double mean = get_normal_mean();
         double variance_sum = this->initial_variance;
 
         // calculate participation of the estimator, gradually replacing it with actual measurements
@@ -221,12 +330,12 @@ public:
     }
 
     /**
-     * Get a best-effort estimator for the standard deviation of the combined distribution.
+     * Get a best-effort estimator for the standard deviation of the normally-distributed model.
      * When we have under 5 measurements, we use the sample variance (including the initial variance overestimation),
      * otherwise we switch to the MAD to avoid outliers influencing the deviation.
      */
-    [[nodiscard]] double get_smart_deviation() const {
-        return this->samples.size() < 5 ? sqrt(this->get_variance()) : this->get_median_abs_dev() * CONSISTENCY;
+    [[nodiscard]] double get_normal_smart_deviation() const {
+        return this->samples.size() < 5 ? sqrt(this->get_normal_variance()) : this->get_median_abs_dev() * CONSISTENCY;
     }
 
     /**
@@ -288,7 +397,7 @@ public:
      */
     [[nodiscard]] double get_ratio_mean() const {
         const auto iiit_mean = get_iiit_mean();
-        auto success_mean = this->get_expected_tree_rate();
+        auto success_mean = this->get_success_mean();
 
         return success_mean * iiit_mean;
     }
@@ -301,109 +410,12 @@ public:
     [[nodiscard]] double get_ratio_deviation() const {
         const auto iiit_mean = get_iiit_mean();
         const auto iiit_variance = get_iiit_variance();
-        const auto success_mean = this->get_expected_tree_rate();
-        const auto success_variance = success_mean * (1.0 - success_mean);
+        const auto success_mean = get_success_mean();
+        const auto success_variance = get_success_variance();
 
         return sqrt((success_mean * success_mean + success_variance) * (iiit_mean * iiit_mean + iiit_variance) - success_mean
                * success_mean * iiit_mean * iiit_mean);
     }
-
-    /**
-     * Calculate the upper confident limit of the mean expected success of this bandit. This depends on the total
-     * number of samples drawn so far, as well as the number of samples drawn for this bandit.
-     *
-     * @param total_samples the number of total samples from all bandits that have been drawn so far
-     *
-     * @return the upper bound on the mean expected success that can be determined with high confidence.
-     */
-    [[nodiscard]] double get_upper_confidence(const unsigned int total_samples) const {
-        const auto mean_throughput = this->get_mean_throughput();
-        const auto std_variation = this->get_smart_deviation();
-
-        // as defined by 10.1016/0196-8858(85)90002-8, formula 4.13 with the choice of `a_(n,i)` = `(log n) / i`,
-        // where `n` is the total number of samples, and `i` is the number of samples drawn for this bandit.
-        // do note that the formula contains the standard deviation, not the variance, so we move the variance into the root.
-        return mean_throughput + std_variation * sqrt(
-                   2.0 * log(static_cast<double>(total_samples)) / static_cast<double>(this->samples.size()));
-    }
-
-    /**
-     * The upper confidence limit of the mean expected success is one standard-deviation above the sample mean,
-     * corrected by the number of samples available (more samples means we increase the confidence interval because we
-     * do not have enough data).
-     * This method, however, returns the upper limit at two standard deviations away from the sample mean.
-     * This can be used to reasonably exclude bandits that are so bad that they will not become relevant even with a
-     * high number of total samples.
-     *
-     * This still takes into account the sample ratio (total samples versus samples for this bandit) to estimate how
-     * uncertain the confidence is.
-     *
-     * @param total_samples the number of total samples from all bandits that have been drawn so far
-     *
-     * @return the expected success two standard deviations higher than the mean.
-     */
-    [[nodiscard]] double get_upmost_confidence(const unsigned int total_samples) const {
-        const auto mean_throughput = this->get_mean_throughput();
-        const auto std_variation = this->get_smart_deviation();
-
-        // see get_upper_confidence
-        return mean_throughput + 2 * std_variation * sqrt(
-                   2.0 * log(static_cast<double>(total_samples)) / static_cast<double>(this->samples.size()));
-    }
-
-    /**
-     * @return This bandit's meta parameters
-     */
-    [[nodiscard]] Heuristic &get_parameters() const {
-        return *this->parameters;
-    }
-
-    /**
-     * @return Bandit name for debug output
-     */
-    [[nodiscard]] std::string get_name() const {
-        return this->name;
-    }
-
-    /**
-     * @return Number of samples taken (i.e. number of batches inferred with this bandit).
-     */
-    [[nodiscard]] unsigned int num_samples() const {
-        return this->samples.size();
-    }
-
-protected:
-    /**
-     * Display name of the bandit for debugging
-     */
-    std::string name;
-
-    /**
-     * Heuristics parameters of this bandit
-     */
-    std::shared_ptr<Heuristic> parameters;
-
-    /**
-     * Samples drawn from the reward distribution.
-     */
-    std::vector<Measurement> samples = {};
-
-    /**
-     * The set variance will account for n samples in the calculation of the bandit's actual variance (`get_variance()`).
-     * It gets replaced by actual `samples`, where each existing sample reduces the `estimated_variance_weight` by one.
-     */
-    double initial_variance{0.0};
-
-    /**
-     * Initial weight of the `estimated_variance` in the calculation of the actual variance. Reduced by one for each
-     * existing measurement in `samples`.
-     */
-    unsigned int initial_variance_weight{0};
-
-    /**
-     * Whether this bandit is participating in the multiarmed bandit algorithm.
-     */
-    bool participating{true};
 
     /**
      * Take the benchmark data of a tuned batch which has previously run its inference with the parameters of this
@@ -441,7 +453,7 @@ protected:
         this->samples.emplace_back(batch.elapsed_wall_time(), batch.get_plausible_tree_count(), batch.get_batch_size(),
                                    inverse_times);
 
-        auto deviation = get_smart_deviation();
+        const auto deviation = get_normal_smart_deviation();
 
         LOG_WORKER_TS(LogLevel::info) << "[" << this->name << "]: Takes measurement: " << batch.
                 get_plausible_tree_count() << " plausible trees at " << (
@@ -452,12 +464,12 @@ protected:
 
         // calculate mean of the individual inverse inference times
         const auto ratio_mean = get_ratio_mean();
-        const auto adjusted_variance = get_ratio_deviation();
+        const auto ratio_std_deviation = get_ratio_deviation();
 
         LOG_WORKER_TS(LogLevel::info) << "[" << this->name << "]: Adjusted Measurement: " <<
-                (1000.0 * ratio_mean) << " (+- " << sqrt(adjusted_variance) * 1000.0 <<
+                (1000.0 * ratio_mean) << " (+- " << ratio_std_deviation * 1000.0 <<
                 ") trees per second per worker. (" << (
-                    1000.0 * batch.get_num_workers() * ratio_mean) << " (+- " << sqrt(adjusted_variance) * 1000.0 * sqrt(batch.get_num_workers())
+                    1000.0 * batch.get_num_workers() * ratio_mean) << " (+- " << ratio_std_deviation * 1000.0 * batch.get_num_workers()
                 << ") trees per second) " << std::endl;
     }
 
@@ -465,5 +477,45 @@ protected:
         this->participating = false;
         LOG_INFO << "Disabled bandit " << this->name << std::endl;
     }
+
+    /**
+     * Display name of the bandit for debugging
+     */
+    std::string name;
+
+    /**
+     * Heuristics parameters of this bandit
+     */
+    std::shared_ptr<Heuristic> parameters;
+
+    /**
+     * Samples drawn from the reward distribution.
+     */
+    std::vector<Measurement> samples = {};
+
+    /**
+     * The set variance will account for n samples in the calculation of the bandit's actual variance (`get_variance()`).
+     * It gets replaced by actual `samples`, where each existing sample reduces the `estimated_variance_weight` by one.
+     */
+    double initial_variance{0.0};
+
+    /**
+     * Initial weight of the `estimated_variance` in the calculation of the actual variance. Reduced by one for each
+     * existing measurement in `samples`.
+     */
+    unsigned int initial_variance_weight{0};
+
+    /**
+     * Whether this bandit is participating in the multiarmed bandit algorithm.
+     */
+    bool participating{true};
+
+    double (Bandit::*mean)() const = &Bandit::get_ratio_mean;
+
+    /**
+     * The selected model for standard deviation. Can be either `get_ratio_deviation` or `get_smart_deviation` which
+     * is a proxy for `get_normal_variance` that switches to Median Absolute Deviation transparently.
+     */
+    double (Bandit::*deviation)() const = &Bandit::get_ratio_deviation;
 };
 #endif //RAXML_BANDIT_HPP_
