@@ -21,8 +21,12 @@ constexpr double CONSISTENCY = 1.48;
 class Measurement {
 public:
     Measurement(const unsigned int time_spent, const unsigned int plausible_trees,
-                const unsigned int batch_size, const std::vector<double> &individual_inverse_times) : time_spent(time_spent),
-                                                 plausible_trees(plausible_trees), batch_size(batch_size), individual_inverse_times(individual_inverse_times) {
+                const unsigned int batch_size,
+                const std::vector<double> &individual_inverse_times) : time_spent(time_spent),
+                                                                       plausible_trees(plausible_trees),
+                                                                       batch_size(batch_size),
+                                                                       individual_inverse_times(
+                                                                           individual_inverse_times) {
     }
 
     const unsigned int time_spent;
@@ -37,6 +41,31 @@ public:
 /**
  * A one-armed bandit which represents a certain set of MetaParameters that generate reward (i.e., throughput of plausible
  * trees) with an unknown probability distribution.
+ * The class is generic over the algorithm that it is modelling.
+ * In the simplest case, a Bandit holds an instance of MetaParameters which
+ *
+ * There are several models for the underlying distribution.
+ *
+ * The simplest one measures throughput of each inferred batch modelling it with a normal distribution.
+ * This makes estimating the sample variance difficult until we have an adequate number of measurements, so we
+ * initially over-estimate variance by simply adding two samples with success rate of 0 and success rate of 1.
+ * The weight of those two samples is reduced as more samples are added.
+ *
+ * The second model only works for lowest level of bandits (i.e., Bandits which explicitly hold MetaParameters).
+ * We measure the inference time for each individual tree and thus obtain BATCH_SIZE measurements per batch for inference
+ * time.
+ * We store 1/time for each measurement and model those measurements with a normal distribution.
+ * This allows faster estimation of the variance but is extremely sensitive to changes in the measuring setup:
+ * If the system load changes between batches, or slightly different starting conditions are used (e.g., for higher
+ * level bandits in the multi-level MAB which model multiple similar but different MetaParameter instances),
+ * the initial variance is grossly underestimated.
+ * To offset this, we introduce a multiplicative epsilon which overestimates the initial variance.
+ * Success rate is modelled as a binomial distribution, so even a single sample is sufficient to get a variance estimate.
+ * The final distribution of throughput is obtained through a ratio distribution of success rate samples divided by
+ * inference time samples.
+ * By multiplying the means of success rate and inverse wall-time, we obtain a mean of the final ratio distribution
+ * that models bandit throughput.
+ * The variance is obtained analogously.
  */
 template<class Heuristic>
 class Bandit {
@@ -64,8 +93,8 @@ public:
      * this weight by one in the calculation of the bandit's variance.
      */
     void initialize_variance(const double variance, const unsigned int weight) {
-        this->estimated_variance = variance;
-        this->estimated_variance_weight = weight;
+        this->initial_variance = variance;
+        this->initial_variance_weight = weight;
     }
 
     /**
@@ -133,7 +162,8 @@ public:
                 static_cast<double>(sample.plausible_trees) / static_cast<double>(sample.time_spent));
         }
 
-        std::nth_element(throughput_samples.begin(), throughput_samples.begin() + static_cast<long>(throughput_samples.size() / 2),
+        std::nth_element(throughput_samples.begin(),
+                         throughput_samples.begin() + static_cast<long>(throughput_samples.size() / 2),
                          throughput_samples.end());
         return throughput_samples[throughput_samples.size() / 2];
     }
@@ -173,11 +203,11 @@ public:
      */
     [[nodiscard]] double get_variance() const {
         const double mean = get_mean_throughput();
-        double variance_sum = this->estimated_variance;
+        double variance_sum = this->initial_variance;
 
         // calculate participation of the estimator, gradually replacing it with actual measurements
-        const auto weight = this->estimated_variance_weight - min(this->estimated_variance_weight,
-                                                                  static_cast<unsigned int>(this->samples.size()));
+        const auto weight = this->initial_variance_weight - min(this->initial_variance_weight,
+                                                                static_cast<unsigned int>(this->samples.size()));
 
         variance_sum *= weight;
 
@@ -191,12 +221,91 @@ public:
     }
 
     /**
-     * Get a best-effort estimator for the variance or deviation of the underlying distribution.
-     * When we have under 5 measurements, we use variance (including the initial variance overestimation),
-     * then we switch to MAD to avoid outliers influencing the variance.
+     * Get a best-effort estimator for the standard deviation of the combined distribution.
+     * When we have under 5 measurements, we use the sample variance (including the initial variance overestimation),
+     * otherwise we switch to the MAD to avoid outliers influencing the deviation.
      */
-    [[nodiscard]] double get_deviation_estimator() const {
+    [[nodiscard]] double get_smart_deviation() const {
         return this->samples.size() < 5 ? sqrt(this->get_variance()) : this->get_median_abs_dev() * CONSISTENCY;
+    }
+
+    /**
+     * Get the mean individual inverse inference time.
+     * That is, the mean of all multiplicative-inverses of time measurements of individual tree inferences, i.e.
+     * BATCH_SIZE measurements per batch.
+     * Taking individual measurements increases the amount of independent measurements we get per batch, reducing
+     * variance.
+     *
+     * Individual measurements can only be taken for inference time, but not success rate.
+     * Therefore, this has to be combined with the ratio distribution calculation.
+     */
+    [[nodiscard]] double get_iiit_mean() const {
+        auto iiit_mean = 0.0;
+        auto sample_count = 0;
+        for (auto &sample: this->samples) {
+            for (auto time: sample.individual_inverse_times) {
+                sample_count++;
+                iiit_mean += time;
+            }
+        }
+        iiit_mean /= static_cast<double>(sample_count);
+        return iiit_mean;
+    }
+
+    /**
+     * Get the variance of all individual inverse inference time measurements.
+     * That is, the mean of all multiplicative-inverses of time measurements of individual tree inferences, i.e.
+     * BATCH_SIZE measurements per batch.
+     * Taking individual measurements increases the amount of independent measurements we get per batch, reducing
+     * variance.
+     * It can however introduce systematic bias within the first few batches if the surrounding system is performing
+     * other tasks, runs into heat dissipation issues, or batch reusing effects become measurable.
+     * Therefore, individual time measurements should be combined with a decreasing multiplicative epsilon factor.
+     *
+     *
+     * Individual measurements can only be taken for inference time, but not success rate.
+     * Therefore, this has to be combined with the ratio distribution calculation.
+     */
+    [[nodiscard]] double get_iiit_variance() const {
+        auto iiit_mean = get_iiit_mean();
+        auto iiit_variance = 0.0;
+        auto sample_count = 0;
+
+        for (auto &sample: this->samples) {
+            for (auto time: sample.individual_inverse_times) {
+                sample_count++;
+                iiit_variance += (iiit_mean - time) * (iiit_mean - time);
+            }
+        }
+        iiit_variance /= static_cast<double>(sample_count);
+        return iiit_variance;
+    }
+
+    /**
+     * Get the mean of the ratio distribution of success rate and wall time measurements.
+     * The success rate is modeled as a binomial distribution (which eliminates estimating the variance),
+     * and the wall time distribution is modelled by a normal distribution of the multiplicative inverse measurements.
+     */
+    [[nodiscard]] double get_ratio_mean() const {
+        const auto iiit_mean = get_iiit_mean();
+        auto success_mean = this->get_expected_tree_rate();
+
+        return success_mean * iiit_mean;
+    }
+
+    /**
+     * Get the mean of the ratio distribution of success rate and wall time measurements.
+     * The success rate is modeled as a binomial distribution (which eliminates estimating the variance),
+     * and the wall time distribution is modelled by a normal distribution of the multiplicative inverse measurements.
+     */
+    [[nodiscard]] double get_ratio_deviation() const {
+        const auto iiit_mean = get_iiit_mean();
+        const auto iiit_variance = get_iiit_variance();
+        const auto success_mean = this->get_expected_tree_rate();
+        const auto success_variance = success_mean * (1.0 - success_mean);
+
+        return (success_mean * success_mean + success_variance) * (iiit_mean * iiit_mean + iiit_variance) - success_mean
+               * success_mean * iiit_mean * iiit_mean;
     }
 
     /**
@@ -209,7 +318,7 @@ public:
      */
     [[nodiscard]] double get_upper_confidence(const unsigned int total_samples) const {
         const auto mean_throughput = this->get_mean_throughput();
-        const auto std_variation = this->get_deviation_estimator();
+        const auto std_variation = this->get_smart_deviation();
 
         // as defined by 10.1016/0196-8858(85)90002-8, formula 4.13 with the choice of `a_(n,i)` = `(log n) / i`,
         // where `n` is the total number of samples, and `i` is the number of samples drawn for this bandit.
@@ -235,7 +344,7 @@ public:
      */
     [[nodiscard]] double get_upmost_confidence(const unsigned int total_samples) const {
         const auto mean_throughput = this->get_mean_throughput();
-        const auto std_variation = this->get_deviation_estimator();
+        const auto std_variation = this->get_smart_deviation();
 
         // see get_upper_confidence
         return mean_throughput + 2 * std_variation * sqrt(
@@ -256,6 +365,9 @@ public:
         return this->name;
     }
 
+    /**
+     * @return Number of samples taken (i.e. number of batches inferred with this bandit).
+     */
     [[nodiscard]] unsigned int num_samples() const {
         return this->samples.size();
     }
@@ -280,13 +392,13 @@ protected:
      * The set variance will account for n samples in the calculation of the bandit's actual variance (`get_variance()`).
      * It gets replaced by actual `samples`, where each existing sample reduces the `estimated_variance_weight` by one.
      */
-    double estimated_variance{0.0};
+    double initial_variance{0.0};
 
     /**
      * Initial weight of the `estimated_variance` in the calculation of the actual variance. Reduced by one for each
      * existing measurement in `samples`.
      */
-    unsigned int estimated_variance_weight{0};
+    unsigned int initial_variance_weight{0};
 
     /**
      * Whether this bandit is participating in the multiarmed bandit algorithm.
@@ -326,29 +438,27 @@ protected:
             inverse_times[i] = (1.0 / static_cast<double>(tree_times[i]));
         }
 
+        this->samples.emplace_back(batch.elapsed_wall_time(), batch.get_plausible_tree_count(), batch.get_batch_size(),
+                                   inverse_times);
+
+        auto deviation = get_smart_deviation();
+
         LOG_WORKER_TS(LogLevel::info) << "[" << this->name << "]: Takes measurement: " << batch.
                 get_plausible_tree_count() << " plausible trees at " << (
                     static_cast<double>(batch.get_plausible_tree_count()) / static_cast<double>(batch.
-                        elapsed_wall_time()) *
-                    1000.0)
-                << " trees per second." << std::endl;
+                        elapsed_wall_time()) * 1000.0)
+                << " (+- " << deviation * 1000.0 << ") trees per second." << std::endl;
 
-        this->samples.emplace_back(batch.elapsed_wall_time(), batch.get_plausible_tree_count(), batch.get_batch_size(), inverse_times);
 
         // calculate mean of the individual inverse inference times
-        auto iiit_mean = 0.0;
-        auto sample_count = 0;
-        for (auto &sample : this->samples) {
-            for (auto time : sample.individual_inverse_times) {
-                sample_count++;
-                iiit_mean += time;
-            }
-        }
-        iiit_mean /= static_cast<double>(sample_count);
-        auto success_mean = this->get_expected_tree_rate();
+        const auto ratio_mean = get_ratio_mean();
+        const auto adjusted_variance = get_ratio_deviation();
 
         LOG_WORKER_TS(LogLevel::info) << "[" << this->name << "]: Adjusted Measurement: " <<
-            (1000.0 * success_mean * iiit_mean) << " trees per second per worker. (" << (1000.0 * success_mean * iiit_mean * 8.0) << " trees per second)."  << std::endl;
+                (1000.0 * ratio_mean) << " (+- " << sqrt(adjusted_variance) * 1000.0 <<
+                ") trees per second per worker. (" << (
+                    1000.0 * batch.get_num_workers() * ratio_mean) << " (+- " << sqrt(adjusted_variance) * 1000.0 * sqrt(batch.get_num_workers())
+                << ") trees per second) " << std::endl;
     }
 
     void disable() {
@@ -356,6 +466,4 @@ protected:
         LOG_INFO << "Disabled bandit " << this->name << std::endl;
     }
 };
-
-
 #endif //RAXML_BANDIT_HPP_
