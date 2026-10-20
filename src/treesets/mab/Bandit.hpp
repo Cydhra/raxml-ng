@@ -294,7 +294,7 @@ public:
     }
 
     /**
-     * Get the mean of the ratio distribution of success rate and wall time measurements.
+     * Get the standard deviation of the ratio distribution of success rate and wall time measurements.
      * The success rate is modeled as a binomial distribution (which eliminates estimating the variance),
      * and the wall time distribution is modelled by a normal distribution of the multiplicative inverse measurements.
      */
@@ -304,8 +304,8 @@ public:
         const auto success_mean = this->get_expected_tree_rate();
         const auto success_variance = success_mean * (1.0 - success_mean);
 
-        return (success_mean * success_mean + success_variance) * (iiit_mean * iiit_mean + iiit_variance) - success_mean
-               * success_mean * iiit_mean * iiit_mean;
+        return sqrt((success_mean * success_mean + success_variance) * (iiit_mean * iiit_mean + iiit_variance) - success_mean
+               * success_mean * iiit_mean * iiit_mean);
     }
 
     /**
