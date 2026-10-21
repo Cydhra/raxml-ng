@@ -4269,9 +4269,14 @@ void master_main(RaxmlInstance& instance, CheckpointManager& cm)
   // Main routines
   thread_main(instance, cm);
 
-  // treeset computation reuses the above treesearch code for the first batch and then switches over to aggressive
+  // treeset computation reuses the above tree-search code for the first batch and then switches over to aggressive
   // heuristics
   if (opts.command == Command::treeset) {
+    // we need parsimony trees even if the starting trees did not need any
+    if (!instance.parted_msa_parsimony) {
+      build_parsimony_msa(instance, true);
+    }
+
     /* initialize treeset optimizer here, after the persite lnl are already calculated */
     const auto &checkpoint = cm.checkp_file();
     const auto best_tree = checkpoint.best_tree().tree;

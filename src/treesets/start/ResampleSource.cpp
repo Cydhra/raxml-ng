@@ -64,8 +64,6 @@ bool ResampleSource::ensure(const RaxmlInstance &, const SmartBarrier &,
                             const unsigned int, const unsigned int,
                             const unsigned int,
                             const unsigned int required_trees) {
-    // build_parsimony_msa(instance, false); // TODO initialize in main.cpp in case of checkpoint
-
     const auto old_list_size = tree_list.size();
 
     if (required_trees > old_list_size) {
