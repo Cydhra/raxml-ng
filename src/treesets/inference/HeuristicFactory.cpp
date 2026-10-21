@@ -10,6 +10,14 @@
 #include "ModelOpt.hpp"
 #include "NniRound.hpp"
 
+constexpr double FIRST_MODEL_EPS = 3.0;
+
+constexpr double FINAL_MODEL_EPS = 0.1;
+
+constexpr double GREEDY_MODEL_EPS = 1.0;
+
+constexpr unsigned int KEEP_TOPOL_NUM = 20;
+
 /**
  * Decorate an existing partial InferenceHeuristic according to the rules of a meta-parameters instance.
  * This function codifies how meta-parameters are converted into a heuristic, and is used to create new
@@ -35,9 +43,8 @@ static unique_ptr<InferenceHeuristic> from_meta_parameters(const MetaParameters 
                                                            shared_ptr<PartitionedMSA> &partitioned_msa,
                                                            shared_ptr<IDVector> &tip_msa_idmap) {
     if (meta_parameters.do_first_model) {
-        // TODO get rid of magic numbers
         heuristic = make_unique<ModelOpt>(batch_name, std::move(heuristic), num_trees, threads_per_worker, true, true,
-                                          3.0);
+                                          FIRST_MODEL_EPS);
     }
 
     if (meta_parameters.nni_round) {
@@ -57,7 +64,7 @@ static unique_ptr<InferenceHeuristic> from_meta_parameters(const MetaParameters 
 
     if (meta_parameters.num_slow_spr > 0) {
         heuristic = make_unique<FixedSpr>(batch_name, std::move(heuristic), num_trees, threads_per_worker,
-                                          meta_parameters.num_slow_spr, 20, true,
+                                          meta_parameters.num_slow_spr, KEEP_TOPOL_NUM, true,
                                           1 * meta_parameters.max_adaptive_radius);
     }
 
@@ -69,29 +76,34 @@ static unique_ptr<InferenceHeuristic> from_meta_parameters(const MetaParameters 
 
     if (meta_parameters.fallback_fast_raxml) {
         // reset model
-        heuristic = make_unique<ChangeConfig>(batch_name, std::move(heuristic), num_trees, threads_per_worker, start_tree_list, part_assignments, make_shared<ModelMap>(), std::nullopt, partitioned_msa, tip_msa_idmap);
+        heuristic = make_unique<ChangeConfig>(batch_name, std::move(heuristic), num_trees, threads_per_worker,
+                                              start_tree_list, part_assignments, make_shared<ModelMap>(), std::nullopt,
+                                              partitioned_msa, tip_msa_idmap);
 
         heuristic = make_unique<FastRaxml>(batch_name, std::move(heuristic), num_trees, threads_per_worker,
                                            part_assignments);
     } else if (meta_parameters.fallback_adaptive_raxml) {
         // reset model
-        heuristic = make_unique<ChangeConfig>(batch_name, std::move(heuristic), num_trees, threads_per_worker, start_tree_list, part_assignments, make_shared<ModelMap>(), std::nullopt, partitioned_msa, tip_msa_idmap);
+        heuristic = make_unique<ChangeConfig>(batch_name, std::move(heuristic), num_trees, threads_per_worker,
+                                              start_tree_list, part_assignments, make_shared<ModelMap>(), std::nullopt,
+                                              partitioned_msa, tip_msa_idmap);
 
         heuristic = make_unique<AdaptiveRaxml>(batch_name, std::move(heuristic), num_trees, threads_per_worker);
     }
 
     if (meta_parameters.model_override) {
         // revert model override
-        heuristic = make_unique<ChangeConfig>(batch_name, std::move(heuristic), num_trees, threads_per_worker, start_tree_list, part_assignments, initial_model, std::nullopt, partitioned_msa, tip_msa_idmap);
+        heuristic = make_unique<ChangeConfig>(batch_name, std::move(heuristic), num_trees, threads_per_worker,
+                                              start_tree_list, part_assignments, initial_model, std::nullopt,
+                                              partitioned_msa, tip_msa_idmap);
     }
 
     if (meta_parameters.do_final_model) {
-        // TODO get rid of magic numbers
         heuristic = make_unique<ModelOpt>(batch_name, std::move(heuristic), num_trees, threads_per_worker, true, true,
-                                          0.1);
+                                          FINAL_MODEL_EPS);
     } else {
         heuristic = make_unique<ModelOpt>(batch_name, std::move(heuristic), num_trees, threads_per_worker, true, true,
-                                          1.0, false);
+                                          GREEDY_MODEL_EPS, false);
     }
 
     return heuristic;
@@ -112,20 +124,20 @@ unique_ptr<InferenceHeuristic> HeuristicFactory::build_heuristic(const MetaParam
                                                                        meta_parameters.model_override, partitioned_msa,
                                                                        tip_msa_idmap);
     return from_meta_parameters(meta_parameters, std::move(heuristic), batch_name, num_trees, threads_per_worker,
-                               start_tree_list, part_assignments, initial_model, partitioned_msa, tip_msa_idmap);
+                                start_tree_list, part_assignments, initial_model, partitioned_msa, tip_msa_idmap);
 }
 
 unique_ptr<InferenceHeuristic> HeuristicFactory::extend_heuristic(const MetaParameters &new_parameters,
                                                                   const MetaParameters &old_parameters,
                                                                   unique_ptr<InferenceHeuristic> old_heuristic,
                                                                   std::string &batch_name,
-                                                                const unsigned int num_trees,
-                                                                const unsigned int threads_per_worker,
-                                                                shared_ptr<TreeList> &start_tree_list,
-                                                                shared_ptr<PartitionAssignmentList> &part_assignments,
-                                                                shared_ptr<ModelMap> &initial_model,
-                                                                shared_ptr<PartitionedMSA> &partitioned_msa,
-                                                                shared_ptr<IDVector> &tip_msa_idmap) {
+                                                                  const unsigned int num_trees,
+                                                                  const unsigned int threads_per_worker,
+                                                                  shared_ptr<TreeList> &start_tree_list,
+                                                                  shared_ptr<PartitionAssignmentList> &part_assignments,
+                                                                  shared_ptr<ModelMap> &initial_model,
+                                                                  shared_ptr<PartitionedMSA> &partitioned_msa,
+                                                                  shared_ptr<IDVector> &tip_msa_idmap) {
     MetaParameters delta = new_parameters; // copy everything into the delta
     const bool accept_anything = !old_parameters.any_rounds() || new_parameters.is_fallback();
 
@@ -164,5 +176,5 @@ unique_ptr<InferenceHeuristic> HeuristicFactory::extend_heuristic(const MetaPara
     }
 
     return from_meta_parameters(delta, std::move(old_heuristic), batch_name, num_trees, threads_per_worker,
-                               start_tree_list, part_assignments, initial_model, partitioned_msa, tip_msa_idmap);
+                                start_tree_list, part_assignments, initial_model, partitioned_msa, tip_msa_idmap);
 }
