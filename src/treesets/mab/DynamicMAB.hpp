@@ -9,6 +9,7 @@ constexpr unsigned int MIN_PAUSE_BETWEEN_MODIFICATIONS = 4;
 /**
  * An opaque wrapper around a multi-level bandit that modifies the bandit during operation to restrict the search
  * space as much as possible.
+ * It adds new arms to the multi-level bandit on demand, and attempts to modify existing arms by mutation.
  */
 class DynamicMAB {
 public:
@@ -85,7 +86,9 @@ protected:
      */
     std::unordered_map<MetaParameters, size_t> inner_mapping = {};
 
-    // TODO get rid of this heuristic
+    /**
+     * A cooldown between attempts to modify the MAB to ensure enough batches have been inferred to collect some data.
+     */
     unsigned int last_mab_modification = 0;
 
     /**
@@ -94,10 +97,15 @@ protected:
     double upper_bound = 0;
 
     /**
-     * How often
+     * How often the dynamic MAB has tried to increase effort from a bandit.
+     * Used to prevent trying out more and more expensive bandits if the current bandit is better than the expensive ones.
      */
     std::unordered_map<std::string, unsigned int> past_increases = {};
 
+    /**
+     * How often the dynamic MAB has tried to mutate a bandit.
+     * Used to select which mutation to try next.
+     */
     std::unordered_map<MetaParameters, unsigned int> past_mutations = {};
 
     /**
@@ -124,6 +132,13 @@ protected:
      */
     void add_next_successor();
 
+    /**
+     * Attempt to change the input parameters to reduce effort spent.
+     * This method changes parameters which are not already being tested by the multi-level bandit scheme.
+     *
+     * @param parameters current bandit parameters that we attempt to mutate
+     * @return New bandit parameters which are a modification of the input parameters
+     */
     MetaParameters mutate(const MetaParameters &parameters);
 };
 
