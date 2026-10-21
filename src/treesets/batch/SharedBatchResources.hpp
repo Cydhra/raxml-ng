@@ -60,13 +60,13 @@ public:
         fast_options->topology_opt_method = TopologyOptMethod::simplified;
         fast_options->stopping_rule = StoppingRule::kh_mult;
         fast_options->nofiles_mode = true;
-        fast_options->num_searches = 16; // TODO sync with batch size
+        fast_options->num_searches = batch_size;
 
         adaptive_options = make_shared<Options>(opts);
         adaptive_options->topology_opt_method = TopologyOptMethod::adaptive;
         adaptive_options->stopping_rule = StoppingRule::none;
         adaptive_options->nofiles_mode = true;
-        adaptive_options->num_searches = 16; // TODO see above
+        adaptive_options->num_searches = batch_size;
 
         // initialize an optimizer and checkpoint manager for raxml-fast.
         fast_optimizer = make_shared<Optimizer>(*fast_options);
