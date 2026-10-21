@@ -66,7 +66,7 @@ protected:
      * Initialize the bandit algorithms we use during the inference. These depend on the parameters derivded from initial
      * starting tree inference in `prepare_initial_batches()`
      */
-    void initialize_bandits();
+    void initialize_bandits(double maximum_success);
 
     /**
      * Main method for the threadpool workers.

@@ -12,7 +12,7 @@ static void register_mapping(std::unordered_map<MetaParameters, size_t> &outer_m
 }
 
 void DynamicMAB::register_new_arm(const std::string &name, const OuterArm &new_arm) {
-    auto id = hierarchical_mab.emplace_back(name, new_arm);
+    auto id = hierarchical_mab.emplace_back(name, new_arm, upper_bound);
     hierarchical_mab.get_bandit(id).with_normal_distribution();
 
     for (size_t inner_id = 0; inner_id < new_arm->num_bandits(); ++inner_id) {
@@ -23,7 +23,7 @@ void DynamicMAB::register_new_arm(const std::string &name, const OuterArm &new_a
 
 void DynamicMAB::add_bandit_to_arm(const Bandit<OuterArm> &arm, const size_t outer_id, MetaParameters &new_parameters,
                                    const std::string &name) {
-    const auto inner_id = arm.get_parameters()->emplace_back(name, new_parameters);
+    const auto inner_id = arm.get_parameters()->emplace_back(name, new_parameters, upper_bound);
     register_mapping(outer_mapping, inner_mapping, new_parameters, outer_id, inner_id);
 }
 
@@ -66,6 +66,10 @@ void DynamicMAB::disable_bandit(const MetaParameters &parameters) {
 
 void DynamicMAB::set_upper_bound(const double throughput_bound) {
     this->upper_bound = throughput_bound;
+}
+
+double DynamicMAB::get_upper_bound() const {
+    return this->upper_bound;
 }
 
 void DynamicMAB::check_update() {

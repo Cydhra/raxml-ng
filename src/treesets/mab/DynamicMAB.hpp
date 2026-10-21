@@ -61,6 +61,11 @@ public:
      */
     void set_upper_bound(double throughput_bound);
 
+    /**
+     * @return the upper bound for attainable tree throughput of bandits
+     */
+    double get_upper_bound() const;
+
 protected:
     /**
      * The multi-level multi-armed bandit that is being managed and modified by this class.

@@ -3,11 +3,11 @@
 #include "../Optimizer.hpp"
 #include "mab/DynamicMAB.hpp"
 
-void TreesetOptimizer::initialize_bandits() {
+void TreesetOptimizer::initialize_bandits(const double maximum_success) {
     auto starting_trees = make_shared<MultiArmedBandit<MetaParameters> >();
-    starting_trees->emplace_back("Parsimony", MetaParameters());
-    starting_trees->emplace_back("Split-Parsimony", MetaParameters().with_treesource(SplitParsimony));
-    starting_trees->emplace_back("Split-Greedy", MetaParameters().with_treesource(SplitGreedy));
+    starting_trees->emplace_back("Parsimony", MetaParameters(), maximum_success);
+    starting_trees->emplace_back("Split-Parsimony", MetaParameters().with_treesource(SplitParsimony), maximum_success);
+    starting_trees->emplace_back("Split-Greedy", MetaParameters().with_treesource(SplitGreedy), maximum_success);
 
     const auto adaptive_radius = pythia_score >= 0.0
                                      ? Optimizer::adaptive_radius(pythia_score)
@@ -17,21 +17,23 @@ void TreesetOptimizer::initialize_bandits() {
 
 
     auto nni_mab = make_shared<MultiArmedBandit<MetaParameters> >();
-    nni_mab->emplace_back("NNI,DoModel", MetaParameters().with_nni_round(true).with_first_model(true));
-    nni_mab->emplace_back("NNI,NoModel", MetaParameters().with_nni_round(true));
+    nni_mab->emplace_back("NNI,DoModel", MetaParameters().with_nni_round(true).with_first_model(true), maximum_success);
+    nni_mab->emplace_back("NNI,NoModel", MetaParameters().with_nni_round(true), maximum_success);
     this->mab.register_new_successor(1, "NNI", std::move(nni_mab));
 
     auto light_mab = make_shared<MultiArmedBandit<MetaParameters> >();
     light_mab->emplace_back("Greedy,NoModel,2spr",
                             MetaParameters().with_topk(1).with_first_model(false).with_fast_rounds(2).with_radius(
-                                adaptive_radius));
+                                adaptive_radius), maximum_success);
     light_mab->emplace_back("Fast,DoModel,2spr",
-                            MetaParameters().with_first_model(true).with_fast_rounds(2).with_radius(adaptive_radius));
+                            MetaParameters().with_first_model(true).with_fast_rounds(2).with_radius(adaptive_radius),
+                            maximum_success);
     light_mab->emplace_back("Fast,NoModel,2spr",
-                            MetaParameters().with_first_model(false).with_fast_rounds(2).with_radius(adaptive_radius));
+                            MetaParameters().with_first_model(false).with_fast_rounds(2).with_radius(adaptive_radius),
+                            maximum_success);
     light_mab->emplace_back("Greedy,DoModel,2spr",
-                        MetaParameters().with_topk(1).with_first_model(true).with_fast_rounds(2).with_radius(
-                            adaptive_radius));
+                            MetaParameters().with_topk(1).with_first_model(true).with_fast_rounds(2).with_radius(
+                                adaptive_radius), maximum_success);
     this->mab.register_new_successor(4, "Light", std::move(light_mab));
 
     // low radius heuristics
@@ -39,15 +41,17 @@ void TreesetOptimizer::initialize_bandits() {
         auto low_mab = make_shared<MultiArmedBandit<MetaParameters> >();
         low_mab->emplace_back("Greedy,2spr,low",
                               MetaParameters().with_topk(1).with_first_model(true).with_fast_rounds(2).with_radius(
-                                  small_radius));
+                                  small_radius), maximum_success);
         low_mab->emplace_back("Slow,2spr,low",
-                              MetaParameters().with_first_model(true).with_slow_rounds(2).with_radius(small_radius));
+                              MetaParameters().with_first_model(true).with_slow_rounds(2).with_radius(small_radius),
+                              maximum_success);
         low_mab->emplace_back("Fast,2spr,low",
-                              MetaParameters().with_first_model(true).with_fast_rounds(2).with_radius(small_radius));
+                              MetaParameters().with_first_model(true).with_fast_rounds(2).with_radius(small_radius),
+                              maximum_success);
         if (very_small_radius < small_radius) {
             low_mab->emplace_back("Fast,2spr,v-low",
                                   MetaParameters().with_first_model(true).with_fast_rounds(2).
-                                  with_radius(very_small_radius));
+                                  with_radius(very_small_radius), maximum_success);
         }
         this->mab.register_new_successor(2, "LowRadius", std::move(low_mab));
     }
@@ -55,43 +59,51 @@ void TreesetOptimizer::initialize_bandits() {
     auto constrained_mab = make_shared<MultiArmedBandit<MetaParameters> >();
     constrained_mab->emplace_back("Greedy,DoModel,2spr,NNI,Constrained",
                                   MetaParameters().with_topk(1).with_first_model(true).with_fast_rounds(2).
-                                  with_radius(adaptive_radius).with_nni_round(true).with_constrain(true));
+                                  with_radius(adaptive_radius).with_nni_round(true).with_constrain(true),
+                                  maximum_success);
     constrained_mab->emplace_back("Fast,DoModel,2spr,NNI,Constrained",
                                   MetaParameters().with_first_model(true).with_fast_rounds(2).
-                                  with_radius(adaptive_radius).with_nni_round(true).with_constrain(true));
+                                  with_radius(adaptive_radius).with_nni_round(true).with_constrain(true),
+                                  maximum_success);
     if (small_radius < adaptive_radius) {
         constrained_mab->emplace_back("Fast,DoModel,2spr,NNI,Constrained,low",
-                                  MetaParameters().with_first_model(true).with_fast_rounds(2).
-                                  with_radius(small_radius).with_nni_round(true).with_constrain(true));
+                                      MetaParameters().with_first_model(true).with_fast_rounds(2).
+                                      with_radius(small_radius).with_nni_round(true).with_constrain(true),
+                                      maximum_success);
     }
     this->mab.register_new_successor(2, "Constrained", std::move(constrained_mab));
 
     auto dynamic_mab = make_shared<MultiArmedBandit<MetaParameters> >();
     if (small_radius < adaptive_radius) {
         dynamic_mab->emplace_back("Greedy,DoModel,Dynamic,low",
-                              MetaParameters().with_topk(1).with_first_model(true).with_radius(small_radius).
-                              with_dynamic_spr(true));
+                                  MetaParameters().with_topk(1).with_first_model(true).with_radius(small_radius).
+                                  with_dynamic_spr(true), maximum_success);
     }
     dynamic_mab->emplace_back("Fast,DoModel,Dynamic",
-                              MetaParameters().with_first_model(true).with_dynamic_spr(true));
+                              MetaParameters().with_first_model(true).with_dynamic_spr(true), maximum_success);
 
     if (small_radius < adaptive_radius) {
         dynamic_mab->emplace_back("Fast,DoModel,Dynamic,low",
                                   MetaParameters().with_first_model(true).with_radius(small_radius).
-                                  with_dynamic_spr(true));
+                                  with_dynamic_spr(true), maximum_success);
     }
     dynamic_mab->emplace_back("Greedy,DoModel,Dynamic",
-                              MetaParameters().with_topk(1).with_first_model(true).with_dynamic_spr(true));
+                              MetaParameters().with_topk(1).with_first_model(true).with_dynamic_spr(true),
+                              maximum_success);
 
     this->mab.register_new_successor(5, "Dynamic", std::move(dynamic_mab));
 
     // fallbacks
     auto fallback_fast_mab = make_shared<MultiArmedBandit<MetaParameters> >();
-    fallback_fast_mab->emplace_back("Fast-Raxml", MetaParameters().with_fallback_fast_raxml(true).with_final_model(false));
+    fallback_fast_mab->emplace_back("Fast-Raxml",
+                                    MetaParameters().with_fallback_fast_raxml(true).with_final_model(false),
+                                    maximum_success);
     this->mab.register_new_successor(6, "Fallback-Fast", std::move(fallback_fast_mab));
 
     auto fallback_adaptive_mab = make_shared<MultiArmedBandit<MetaParameters> >();
-    fallback_adaptive_mab->emplace_back("Adaptive-Raxml", MetaParameters().with_fallback_adaptive(true).with_final_model(false));
+    fallback_adaptive_mab->emplace_back("Adaptive-Raxml",
+                                        MetaParameters().with_fallback_adaptive(true).with_final_model(false),
+                                        maximum_success);
     this->mab.register_new_successor(7, "Fallback-Adaptive", std::move(fallback_adaptive_mab));
 
     // second-level MAB
@@ -136,7 +148,7 @@ BatchTask TreesetOptimizer::next_work_unit() {
     current_batch.update_meta_parameters(parameters);
 
     BatchTask runner = [this, &parameters, &current_batch](TaskGroup &context, const unsigned int worker_id,
-                                              const unsigned int thread_id) {
+                                                           const unsigned int thread_id) {
         if (!this->run_batch(current_batch, context, worker_id, thread_id)) {
             this->mab.disable_bandit(parameters);
         }
@@ -147,18 +159,24 @@ BatchTask TreesetOptimizer::next_work_unit() {
 
 void TreesetOptimizer::initialize_resources(const SmartBarrier &global_barrier) {
     LOG_INFO_TS << "Generating " << NUM_DONOR_TREE << " parsimony trees upfront." << std::endl;
-    shared_batch_resources.get_parsimony().ensure(instance, global_barrier, 1, ParallelContext::local_group_id(), ParallelContext::local_thread_id(), NUM_DONOR_TREE);
+    shared_batch_resources.get_parsimony().ensure(instance, global_barrier, 1, ParallelContext::local_group_id(),
+                                                  ParallelContext::local_thread_id(), NUM_DONOR_TREE);
 
-    const auto throughput_bound = 1000.0 * 16.0 * (1.0 / shared_batch_resources.get_parsimony().amortized_time(16));
-    LOG_INFO_TS << "The largest achievable throughput is " << throughput_bound << "tps" << std::endl;
+    if (ParallelContext::local_group_id() + ParallelContext::local_thread_id() == 0) {
+        const auto throughput_bound = 1.0 / shared_batch_resources.get_parsimony().amortized_time(1);
+        LOG_INFO_TS << "The largest achievable throughput is " << throughput_bound << "tps" << std::endl;
 
-    mab.set_upper_bound(throughput_bound);
+        mab.set_upper_bound(throughput_bound);
+    }
 
     LOG_INFO_TS << "Generating " << target_tree_count << " split-informed parsimony trees." << std::endl;
-    shared_batch_resources.get_parsimony_split_source().generate(instance, global_barrier, ParallelContext::num_groups(), ParallelContext::local_group_id(), target_tree_count);
+    shared_batch_resources.get_parsimony_split_source().generate(instance, global_barrier,
+                                                                 ParallelContext::num_groups(),
+                                                                 ParallelContext::local_group_id(), target_tree_count);
 
     LOG_INFO_TS << "Generating " << target_tree_count << " split-greedy trees." << std::endl;
-    shared_batch_resources.get_greedy_split_source().generate(instance, global_barrier, ParallelContext::num_groups(), ParallelContext::local_group_id(), target_tree_count);
+    shared_batch_resources.get_greedy_split_source().generate(instance, global_barrier, ParallelContext::num_groups(),
+                                                              ParallelContext::local_group_id(), target_tree_count);
 }
 
 void TreesetOptimizer::run() {
@@ -172,13 +190,14 @@ void TreesetOptimizer::run() {
     };
 
     // infer 300 parsimony trees as donors
-    ParallelContext::init_pthreads_custom(opts, initializing_function, pool.num_threads_total(), pool.num_threads_total());
+    ParallelContext::init_pthreads_custom(opts, initializing_function, pool.num_threads_total(),
+                                          pool.num_threads_total());
     initializing_function();
     ParallelContext::finalize_threads();
     LOG_INFO_TS << "Starting bandit algorithm." << std::endl;
 
     // initialize all bandit arms, and add the parsimony arm to the top-level MAB.
-    this->initialize_bandits();
+    this->initialize_bandits(mab.get_upper_bound());
 
     pool.work(opts);
 

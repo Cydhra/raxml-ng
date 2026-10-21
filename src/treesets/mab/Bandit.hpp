@@ -70,9 +70,9 @@ public:
 template<class Heuristic>
 class Bandit {
 public:
-    explicit Bandit(std::string name, Heuristic parameters) : name(std::move(name)),
-                                                              parameters(std::make_shared<Heuristic>(
-                                                                  parameters)) {
+    explicit Bandit(std::string name, Heuristic parameters, const double maximum_success) : name(std::move(name)),
+        parameters(std::make_shared<Heuristic>(
+            parameters)), maximum_success(maximum_success) {
     }
 
     // grant MAB access to protected members, specifically "take_measurement" and "disable"
@@ -133,7 +133,7 @@ public:
             return false;
         }
 
-        return other.get_throughput_mean() > this->get_upper_confidence(total_samples);
+        return other.get_upper_confidence(total_samples) > this->get_upper_confidence(total_samples);
     }
 
     /**
@@ -197,12 +197,12 @@ public:
      */
     [[nodiscard]] double get_upper_confidence(const unsigned int total_samples) const {
         const auto mean_throughput = this->get_throughput_mean();
-        const auto std_variation = this->get_throughput_deviation();
+        // const auto std_variation = this->get_throughput_deviation();
 
         // as defined by 10.1016/0196-8858(85)90002-8, formula 4.13 with the choice of `a_(n,i)` = `(log n) / i`,
         // where `n` is the total number of samples, and `i` is the number of samples drawn for this bandit.
         // do note that the formula contains the standard deviation, not the variance, so we move the variance into the root.
-        return mean_throughput + std_variation * sqrt(
+        return mean_throughput / maximum_success * sqrt(
                    2.0 * log(static_cast<double>(total_samples)) / static_cast<double>(this->samples.size()));
     }
 
@@ -252,7 +252,6 @@ public:
     }
 
 private:
-
     /**
      * Get the mean expected reward (throughput) modelled with a single normal distribution.
      */
@@ -413,8 +412,9 @@ private:
         const auto success_mean = get_success_mean();
         const auto success_variance = get_success_variance();
 
-        return sqrt((success_mean * success_mean + success_variance) * (iiit_mean * iiit_mean + iiit_variance) - success_mean
-               * success_mean * iiit_mean * iiit_mean);
+        return sqrt(
+            (success_mean * success_mean + success_variance) * (iiit_mean * iiit_mean + iiit_variance) - success_mean
+            * success_mean * iiit_mean * iiit_mean);
     }
 
     /**
@@ -469,7 +469,8 @@ private:
         LOG_WORKER_TS(LogLevel::info) << "[" << this->name << "]: Adjusted Measurement: " <<
                 (1000.0 * ratio_mean) << " (+- " << ratio_std_deviation * 1000.0 <<
                 ") trees per second per worker. (" << (
-                    1000.0 * batch.get_num_workers() * ratio_mean) << " (+- " << ratio_std_deviation * 1000.0 * batch.get_num_workers()
+                    1000.0 * batch.get_num_workers() * ratio_mean) << " (+- " << ratio_std_deviation * 1000.0 * batch.
+                get_num_workers()
                 << ") trees per second) " << std::endl;
     }
 
@@ -517,5 +518,10 @@ private:
      * is a proxy for `get_normal_variance` that switches to Median Absolute Deviation transparently.
      */
     double (Bandit::*deviation)() const = &Bandit::get_ratio_deviation;
+
+    /**
+     * Maximum success attainable by any bandit
+     */
+    double maximum_success;
 };
 #endif //RAXML_BANDIT_HPP_

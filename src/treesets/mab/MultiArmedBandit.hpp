@@ -47,8 +47,8 @@ public:
      * @return the unique index of the bandit. This bandit can be identified and retrieved with this index as long as
      * this MAB instance exists.
      */
-    size_t emplace_back(std::string name, Heuristic parameters) {
-        this->bandits.emplace_back(name, parameters);
+    size_t emplace_back(std::string name, Heuristic parameters, const double maximum_success) {
+        this->bandits.emplace_back(name, parameters, maximum_success);
         return this->bandits.size() - 1;
     }
 
@@ -107,9 +107,9 @@ public:
                     best_bandit, iterations_completed)) {
                 LOG_INFO << std::endl;
                 LOG_WORKER_TS(LogLevel::info) << "Switching to best bandit " << best_bandit.get_name() <<
-                        " because its mean expected success ("
-                        << (best_bandit.get_iiit_mean() * 1000.0) <<
-                        " t/s) exceeds the largest reasonable success of "
+                        " because its upper bound ("
+                        << (best_bandit.get_upper_confidence(iterations_completed) * 1000.0) <<
+                        " t/s) exceeds the upper bound of "
                         << selected_bandit.get_name() << " (" << (
                             selected_bandit.get_upper_confidence(iterations_completed) * 1000.0) << " t/s)." <<
                         std::endl;
@@ -131,17 +131,17 @@ public:
                 if (this->bandit_cursor != this->best_known_bandit) {
                     LOG_INFO << std::endl;
                     LOG_WORKER_TS(LogLevel::info) << "Selecting bandit " << selected_bandit.get_name() <<
-                            " because its largest reasonable success ("
+                            " because its upper bound ("
                             << (selected_bandit.get_upper_confidence(iterations_completed) * 1000.0) <<
-                            " t/s) exceeds the mean expected success of current best bandit "
-                            << best_bandit.get_name() << " (" << (best_bandit.get_throughput_mean() * 1000.0) <<
+                            " t/s) exceeds the upper bound of current best bandit "
+                            << best_bandit.get_name() << " (" << (best_bandit.get_upper_confidence(iterations_completed) * 1000.0) <<
                             " t/s)." <<
                             std::endl;
                 } else {
                     LOG_INFO << std::endl;
-                    LOG_WORKER_TS(LogLevel::info) << "Selecting bandit " << selected_bandit.get_name() << " (mean: " <<
+                    LOG_WORKER_TS(LogLevel::info) << "Selecting bandit " << selected_bandit.get_name() << " (confidence: " <<
                     (
-                        best_bandit.get_throughput_mean() * 1000.0) << " t/s)." << std::endl;
+                        best_bandit.get_upper_confidence(iterations_completed) * 1000.0) << " t/s)." << std::endl;
                 }
             }
         }
@@ -167,7 +167,7 @@ public:
         // if the current bandit is not the best one, check if the best one has to be updated
         if (&current_bandit.get_parameters() != &this->bandits[best_known_bandit].get_parameters() && !std::isnan(
                 this->bandits[best_known_bandit].get_normal_mean())) {
-            if (current_bandit.get_normal_mean() > this->bandits[best_known_bandit].get_normal_mean()) {
+            if (current_bandit.get_upper_confidence(iterations_completed) > this->bandits[best_known_bandit].get_upper_confidence(iterations_completed)) {
                 // find which index is the current bandit. We cannot rely on the cursor since that has been advanced by
                 // concurrent batch groups
                 auto cursor = std::find_if(this->bandits.begin(), this->bandits.end(),
