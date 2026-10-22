@@ -299,6 +299,11 @@ bool TunedBatch::is_compatible(const MetaParameters &new_parameters) const {
         return false;
     }
 
+    // don't repeat inference with any heuristics that are just different starting heuristics
+    if (this->meta_parameters.treeSource != new_parameters.treeSource && !this->meta_parameters.any_rounds() && !new_parameters.any_rounds()) {
+        return false;
+    }
+
     // never reuse trees which already failed a fallback
     if (this->meta_parameters.is_fallback()) {
         return false;
