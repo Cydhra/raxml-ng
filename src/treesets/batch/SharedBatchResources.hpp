@@ -2,7 +2,7 @@
 #define RAXML_SHAREDBATCHRESOURCES_HPP_
 
 #include "../../pool/Threadpool.hpp"
-#include "../../au/AuTest.hpp"
+#include "../../topology/AuTest.hpp"
 #include "../../Optimizer.hpp"
 #include "../start/SplitSamplerSource.hpp"
 #include "../start/ParsimonySource.hpp"

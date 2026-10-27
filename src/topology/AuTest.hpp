@@ -2,11 +2,14 @@
 #define RAXML_AUTEST_HPP_
 
 #include <memory>
+#include <utility>
 #include "../types.hpp"
 #include "../PartitionedMSA.hpp"
 
 extern const doubleVector AU_DEFAULT_SCALES;
 extern const uintVector AU_DEFAULT_REPS;
+extern const unsigned int AU_DEFAULT_RUNS;
+extern const double AU_DEFAULT_CUTOFF;
 
 /**
  * Calculates RELL bootstrap replicates at different replicate sequence lengths in parallel, calculate empirical CDF
@@ -21,19 +24,29 @@ extern const uintVector AU_DEFAULT_REPS;
  */
 class AuTest {
 public:
-    AuTest(std::shared_ptr<PartitionedMSA> msa,
+    /** AU test with default scales and a common number of replicates per scale. */
+    AuTest(const std::shared_ptr<PartitionedMSA> &msa,
+           const std::vector<std::vector<doubleVector> > &persite_loglh,
+           unsigned int num_reps_per_run,
+           const int seed) : AuTest(msa, make_persite_vec(persite_loglh),
+                                    AU_DEFAULT_SCALES, uintVector(AU_DEFAULT_RUNS, num_reps_per_run), seed) {
+    }
+
+    /** AU test with custom scaling factors and replication numbers per scale. */
+    AuTest(const std::shared_ptr<PartitionedMSA> &msa,
            const std::vector<std::vector<doubleVector> > &persite_loglh,
            const doubleVector &scales,
            const uintVector &num_replicates,
-           const long seed) : AuTest(msa, make_persite_vec(persite_loglh), scales, num_replicates, seed) {
+           const int seed) : AuTest(msa, make_persite_vec(persite_loglh), scales, num_replicates, seed) {
     }
 
-    AuTest(std::shared_ptr<PartitionedMSA> msa,
+    /** AU test combining two vectors of site likelihoods to compare two sets of trees. */
+    AuTest(const std::shared_ptr<PartitionedMSA> &msa,
            const std::vector<std::vector<doubleVector> > &reference_logh_matrix,
            const std::vector<std::vector<doubleVector> > &comparison_logh_matrix,
            const doubleVector &scales,
            const uintVector &num_replicates,
-           const long seed) : AuTest(msa, combine_persite_vec(reference_logh_matrix, comparison_logh_matrix), scales,
+           const int seed) : AuTest(msa, combine_persite_vec(reference_logh_matrix, comparison_logh_matrix), scales,
                                num_replicates, seed) {
     }
 
@@ -41,13 +54,17 @@ public:
            std::vector<std::vector<const double *> > loglh_matrices,
            doubleVector scales,
            uintVector num_replicates,
-           const long seed) : msa(std::move(msa)), persite_loglh(std::move(loglh_matrices)),
-                        test_statistics(nullptr),
-                        normalized_statistics(nullptr),
-                        p_values(persite_loglh.size()),
-                        finished(false),
-                        scales(std::move(scales)), num_replicates(std::move(num_replicates)), num_trees(persite_loglh.size()),
-                        seed(seed) {
+           const int seed) : msa(std::move(msa)),
+                              persite_loglh(std::move(loglh_matrices)),
+                              test_statistics(nullptr),
+                              normalized_statistics(nullptr),
+                              p_values(persite_loglh.size()),
+                              finished(false),
+                              scales(std::move(scales)),
+                              num_replicates(std::move(num_replicates)),
+                              num_trees(persite_loglh.size()),
+                              seed(seed),
+                              pvalue_cutoff(AU_DEFAULT_CUTOFF) {
     }
 
     // custom move constructor
@@ -60,7 +77,8 @@ public:
                                       scales(std::move(other.scales)),
                                       num_replicates(std::move(other.num_replicates)),
                                       num_trees(other.num_trees),
-                                      seed(other.seed) {
+                                      seed(other.seed),
+                                      pvalue_cutoff(other.pvalue_cutoff) {
         other.test_statistics = nullptr;
         other.normalized_statistics = nullptr;
     }
@@ -134,6 +152,13 @@ public:
     void finalize_test_statistics();
 
     /**
+     * Reset the test statistics to be able to re-run bootstrapping.
+     * This doesn't affect the normalized statistics, because those are overwritten by subsequent calls to
+     * finalize_test_statistics. Only the bootstrap replicates are additive between subsequent calls.
+     */
+    void reset_test_statistics();
+
+    /**
      * Calculate the p-values from the previously generated bootstrap replicates.
      * These are cheap to compute compared to bootstrapping, but require finalized test statistics, so they can either
      * be calculated on the master worker which holds all bootstrap matrices, or the bootstrap matrices need to be
@@ -152,23 +177,42 @@ public:
      *
      * @return A vector of p values, in the order of the rows of the persite log-likelihood matrix
      */
-    doubleVector &get_p_values();
+    const doubleVector &get_p_values() const;
 
     /**
-     * Reset the test statistics to be able to re-run bootstrapping.
-     * This doesn't affect the normalized statistics, because those are overwritten by subsequent calls to
-     * finalize_test_statistics. Only the bootstrap replicates are additive between subsequent calls.
+     * @return p-value for the tree `tree_num`
      */
-    void reset_test_statistics();
+    double p_value(unsigned int tree_num) const;
+
+    /**
+     * @return log-likelihood for the tree `tree_num`
+     */
+    double loglh(unsigned int tree_num) const;
+
+    /**
+     * Check if the tree belongs to the plausible set (= topology can not be excluded with confidence)
+     *
+     * @return true if the p-value for `tree_num` is above the significance cutoff (default: 0.05)
+     */
+    bool is_plausible(unsigned int tree_num) const;
 
     /**
      * @return true, if the p-values have been calculated
      */
-    bool is_finished() const;
+    [[nodiscard]] bool is_finished() const;
+
+    double significance_cutoff() const { return pvalue_cutoff; }
+    void significance_cutoff(double cutoff) { pvalue_cutoff = cutoff; }
 
 private:
+    /**
+     * Shared pointer to the input MSA to obtain site weights and dimensions during bootstrapping.
+     */
     std::shared_ptr<PartitionedMSA> msa;
 
+    /**
+     * A vector containing one per-site log-likelihood vector per partition of each input tree
+     */
     std::vector<std::vector<const double *> > persite_loglh;
 
     /**
@@ -193,13 +237,30 @@ private:
      */
     bool finished;
 
+    /**
+     * Scaling factors for the multiscale bootstrap
+     */
     doubleVector scales;
 
+    /**
+     * Number of bootstrap replicates to generate for each individual scaling factor
+     */
     uintVector num_replicates;
 
+    /**
+     * Number of input trees
+     */
     unsigned int num_trees;
 
-    long seed;
+    /**
+     * Random seed
+     */
+    int seed;
+
+    /**
+     * P-value cutoff for statistical significance (default: 0.05)
+     */
+    double pvalue_cutoff;
 
     /**
      * Construct arrays of raw pointers from a persite_loglh matrix array, where each matrix gets turned into a linear

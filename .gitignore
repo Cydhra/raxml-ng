@@ -40,6 +40,8 @@ release/
 .cproject
 .project
 .settings/
+.vscode
+.devcontainer
 .idea/
 
 # clion target folders
@@ -58,5 +60,3 @@ run/
 
 # TODO file
 todo.txt
-.vscode
-.devcontainer

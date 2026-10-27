@@ -7,7 +7,7 @@
 class StartTrees : public InferenceHeuristic {
 public:
     StartTrees(std::string batch_name, std::unique_ptr<InferenceHeuristic> inner, const unsigned num_trees,
-        const unsigned threads_per_worker, shared_ptr<TreeList> batch_start_trees,
+        const unsigned threads_per_worker, std::shared_ptr<TreeList> batch_start_trees,
         std::shared_ptr<PartitionAssignmentList> part_assignments, std::shared_ptr<ModelMap> initial_model,
         std::optional<std::string> model_override, std::shared_ptr<PartitionedMSA> msa,
         std::shared_ptr<IDVector> tip_msa_idmap)
@@ -29,7 +29,7 @@ public:
                      unsigned int worker_id, unsigned int thread_id) override;
 
 protected:
-    shared_ptr<TreeList> batch_start_trees;
+    std::shared_ptr<TreeList> batch_start_trees;
 
     std::shared_ptr<PartitionAssignmentList> part_assignments;
 

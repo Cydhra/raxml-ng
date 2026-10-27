@@ -314,7 +314,7 @@ private:
         double variance_sum = this->initial_variance;
 
         // calculate participation of the estimator, gradually replacing it with actual measurements
-        const auto weight = this->initial_variance_weight - min(this->initial_variance_weight,
+        const auto weight = this->initial_variance_weight - std::min(this->initial_variance_weight,
                                                                 static_cast<unsigned int>(this->samples.size()));
 
         variance_sum *= weight;

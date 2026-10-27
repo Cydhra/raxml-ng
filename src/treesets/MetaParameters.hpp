@@ -5,7 +5,6 @@
 #include <optional>
 #include <string>
 #include "../Options.hpp"
-#include "../Optimizer.hpp"
 
 enum TreeSourceType {
     Parsimony, SplitParsimony, SplitGreedy

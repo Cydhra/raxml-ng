@@ -9,7 +9,7 @@
 #include "../inference/Heuristic.hpp"
 #include "../../loadbalance/LoadBalancer.hpp"
 #include "../../loadbalance/CoarseLoadBalancer.hpp"
-#include "../../au/AuTest.hpp"
+#include "../../topology/AuTest.hpp"
 #include "../../Checkpoint.hpp"
 #include "../../Optimizer.hpp"
 #include "../start/TreeSource.hpp"
@@ -58,7 +58,7 @@ public:
         : name(std::move(name)),
           reference_persite_loglh(reference_persite_loglh),
           msa(msa),
-          batch_start_trees(make_shared<TreeList>(batch_size)),
+          batch_start_trees(std::make_shared<TreeList>(batch_size)),
           tip_msa_idmap(tip_msa_idmap),
           batch_persite_logh(std::vector<std::vector<doubleVector> >(batch_size)),
           batch_size(batch_size),
@@ -80,7 +80,7 @@ public:
         ContiguousCoarseLoadBalancer load_balancer;
         CoarseAssignment tree_ids(batch_size);
         std::iota(tree_ids.begin(), tree_ids.end(), 0);
-        this->coarse_assignments = make_shared<CoarseAssignmentList>(
+        this->coarse_assignments = std::make_shared<CoarseAssignmentList>(
             load_balancer.get_all_assignments(tree_ids, num_workers));
 
         // load balance partitions for such tasks between threads
@@ -91,7 +91,7 @@ public:
             part_sizes.assign_sites(i, 0, pinfo->length(), static_cast<double>(pinfo->model().clv_entry_size()));
         }
 
-        this->part_assignments = make_shared<PartitionAssignmentList>(
+        this->part_assignments = std::make_shared<PartitionAssignmentList>(
             thread_load_balancer.get_all_assignments(part_sizes, threads_per_worker));
 
         // load-balance work for AU test, where we have reference trees and trees assigned to one thread need to be
@@ -100,13 +100,13 @@ public:
         const unsigned int total_trees_au = reference_persite_loglh->size() + batch_size;
         CoarseAssignment au_tree_ids(total_trees_au);
         std::iota(au_tree_ids.begin(), au_tree_ids.end(), 0);
-        this->au_assignment = make_shared<CoarseAssignmentList>(
+        this->au_assignment = std::make_shared<CoarseAssignmentList>(
             load_balancer.get_all_assignments(au_tree_ids, num_threads));
 
         // load-balance work where one tree can be managed by one thread only
         CoarseAssignment exclusive_tree_access(batch_size);
         std::iota(exclusive_tree_access.begin(), exclusive_tree_access.end(), 0);
-        this->exclusive_assignment = make_shared<CoarseAssignmentList>(
+        this->exclusive_assignment = std::make_shared<CoarseAssignmentList>(
             load_balancer.get_all_assignments(exclusive_tree_access, num_threads));
     }
 
@@ -163,7 +163,7 @@ public:
     /**
      * @return true, if trees have been inferred for this batch, false if no trees have been inferred ever.
      */
-    bool has_trees() const;
+    [[nodiscard]] bool has_trees() const;
 
     /**
      * @return the number of trees that are inferred in this batch.
@@ -236,12 +236,12 @@ protected:
      * Per-site log-likelihoods of the reference trees already inferred before the treeset heuristic kicked in.
      * These cannot change, and constitute the first part of the AU test input.
      */
-    shared_ptr<std::vector<std::vector<doubleVector> > > reference_persite_loglh;
+    std::shared_ptr<std::vector<std::vector<doubleVector> > > reference_persite_loglh;
 
     /**
      * A reference to the MSA used in inference. We need it for the AU test.
      */
-    shared_ptr<PartitionedMSA> msa;
+    std::shared_ptr<PartitionedMSA> msa;
 
     /**
      * The meta-heuristic parameters for inferring trees. These are not the model parameters, but settings of the
@@ -299,7 +299,7 @@ protected:
     /**
      * How many starting trees have been generated.
      */
-    std::unique_ptr<atomic_uint> num_trees_generated = make_unique<atomic_uint>(0);
+    std::unique_ptr<std::atomic_uint> num_trees_generated = std::make_unique<std::atomic_uint>(0);
 
     /**
      * Number of plausible trees as determined by the last AU test.
@@ -329,7 +329,7 @@ protected:
      * we end the algorithm before the current call to optimize() is finished.
      * Unique pointer to provide inner mutability. Const so the move constructors don't touch it.
      */
-    std::unique_ptr<std::mutex> topology_access = make_unique<std::mutex>();
+    std::unique_ptr<std::mutex> topology_access = std::make_unique<std::mutex>();
 
     /**
      * The final tree topologies. This vector is populated by a call to `finalize()` and is otherwise empty.

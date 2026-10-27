@@ -264,9 +264,9 @@ private:
      */
     unsigned int iterations_completed = 0;
 
-    std::unique_ptr<std::mutex> measurement_mutex = make_unique<std::mutex>();
+    std::unique_ptr<std::mutex> measurement_mutex = std::make_unique<std::mutex>();
 
-    std::unique_ptr<std::mutex> selection_mutex = make_unique<std::mutex>();
+    std::unique_ptr<std::mutex> selection_mutex = std::make_unique<std::mutex>();
 };
 
 

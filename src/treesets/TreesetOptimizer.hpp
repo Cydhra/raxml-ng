@@ -8,6 +8,8 @@
 #include "../pool/Threadpool.hpp"
 #include "mab/DynamicMAB.hpp"
 
+using namespace std;
+
 constexpr unsigned int DEFAULT_BATCH_SIZE = 16;
 
 /**

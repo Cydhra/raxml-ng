@@ -12,7 +12,6 @@ file(GLOB RAXML_SOURCES ${PROJECT_SOURCE_DIR}/src/common.h
                         ${PROJECT_SOURCE_DIR}/src/adaptive/*.cpp
                         ${PROJECT_SOURCE_DIR}/src/modeltest/*.cpp
                         ${PROJECT_SOURCE_DIR}/src/pool/*.cpp
-                        ${PROJECT_SOURCE_DIR}/src/au/*.cpp
                         ${PROJECT_SOURCE_DIR}/src/treesets/*.cpp
                         ${PROJECT_SOURCE_DIR}/src/treesets/batch/*.cpp
                         ${PROJECT_SOURCE_DIR}/src/treesets/inference/*.cpp
@@ -117,6 +116,7 @@ message(STATUS "Includes: ${RAXML_INCLUDES}")
 
 target_include_directories(raxml_module PRIVATE ${RAXML_INCLUDES})
 target_link_libraries(raxml_module PUBLIC ${RAXML_LIBS})
+target_compile_definitions(raxml_module PRIVATE $<$<CONFIG:DEBUG>:_RAXML_DEBUG_BUILD=1>)
 
 if (BUILD_AS_LIBRARY AND NOT APPLE)
   target_link_libraries(raxml_module PUBLIC gcc_s gcc)
@@ -165,3 +165,14 @@ add_custom_command(TARGET raxml_module
                    COMMAND ${CMAKE_COMMAND} -E copy $<TARGET_FILE:raxml_module> ${PROJECT_SOURCE_DIR}/bin/$<TARGET_FILE_NAME:raxml_module>)
 
 install(TARGETS raxml_module DESTINATION bin)
+
+add_custom_target(git_version_h ALL
+    COMMAND ${CMAKE_COMMAND}
+        -DSOURCE_DIR=${CMAKE_SOURCE_DIR}
+        -DBINARY_DIR=${CMAKE_BINARY_DIR}
+        -P ${CMAKE_SOURCE_DIR}/cmake/GenerateVersionHeader.cmake
+    BYPRODUCTS ${CMAKE_BINARY_DIR}/generated/git_version.h
+    COMMENT "Checking git commit hash"
+)
+target_include_directories(raxml_module PRIVATE ${CMAKE_BINARY_DIR}/generated)
+add_dependencies(raxml_module git_version_h)

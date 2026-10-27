@@ -2,12 +2,14 @@
 #define RAXML_NG_CHANGECONFIG_HPP
 
 #include "Heuristic.hpp"
-#include "../../loadbalance/CoarseLoadBalancer.hpp"
+#include "../../Tree.hpp"
+#include "../../TreeInfo.hpp"
+#include "../../loadbalance/PartitionAssignment.hpp"
 
 class ChangeConfig : public InferenceHeuristic {
 public:
     ChangeConfig(std::string batch_name, std::unique_ptr<InferenceHeuristic> inner, const unsigned num_trees,
-        const unsigned threads_per_worker, shared_ptr<TreeList> batch_start_trees,
+        const unsigned threads_per_worker, std::shared_ptr<TreeList> batch_start_trees,
         std::shared_ptr<PartitionAssignmentList> part_assignments, std::shared_ptr<ModelMap> initial_model,
         std::optional<std::string> model_override, std::shared_ptr<PartitionedMSA> msa,
         std::shared_ptr<IDVector> tip_msa_idmap, std::optional<std::vector<uintVector>> site_masks = std::nullopt)
@@ -29,7 +31,7 @@ public:
                      unsigned int worker_id, unsigned int thread_id) override;
 
 protected:
-    shared_ptr<TreeList> batch_start_trees;
+    std::shared_ptr<TreeList> batch_start_trees;
 
     std::shared_ptr<PartitionAssignmentList> part_assignments;
 

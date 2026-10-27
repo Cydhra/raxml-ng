@@ -4,6 +4,7 @@
 #include <memory>
 #include <string>
 #include "../MetaParameters.hpp"
+#include "../../TreeInfo.hpp"
 #include "../../pool/Threadpool.hpp"
 
 // forward declaration to avoid cyclic header inclusion.
@@ -33,7 +34,7 @@ public:
           num_trees(num_trees),
           passed(num_trees * threads_per_worker, 0){
         for (unsigned int i = 0; i < num_trees; i++) {
-            per_tree_wall_time.emplace_back(make_unique<atomic_uint>(0));
+            per_tree_wall_time.emplace_back(std::make_unique<std::atomic_uint>(0));
         }
     }
 
@@ -108,7 +109,7 @@ private:
      * Wall-time spent on the current heuristic. This is cumulative across all trees, even if they were processed in
      * parallel.
      */
-    std::unique_ptr<atomic_uint> cumulative_wall_time = make_unique<atomic_uint>(0);
+    std::unique_ptr<std::atomic_uint> cumulative_wall_time = std::make_unique<std::atomic_uint>(0);
 
     /**
      * Previous stage of the decorator chain. If this pointer is not null, the strategy contained in this pointer is
@@ -132,7 +133,7 @@ private:
     /**
      * Individual walltime measurements per tree inference
      */
-    std::vector<std::unique_ptr<atomic_uint>> per_tree_wall_time;
+    std::vector<std::unique_ptr<std::atomic_uint>> per_tree_wall_time;
 };
 
 #endif //RAXML_HEURISTIC_HPP_

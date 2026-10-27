@@ -9,7 +9,7 @@
 
 // forward declaration of generate_tree in main.cpp to make it accessible. If the function in main.cpp
 // changes signature, just update this declaration as well.
-Tree generate_tree(const RaxmlInstance &instance, StartingTree type, int random_seed, bool bootstrap);
+Tree generate_tree(const RaxmlInstance &instance, StartingTree type, unsigned int random_seed, bool bootstrap);
 
 class ParsimonySource : public TreeSource {
 

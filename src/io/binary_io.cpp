@@ -75,7 +75,7 @@ BasicBinaryStream& operator<<(BasicBinaryStream& stream, const Model& m)
   return stream;
 }
 
-static bool save_modparam(const Model& m, ModelBinaryFmt fmt, unsigned int param)
+static bool save_modparam(const Model& m, ModelBinaryFmt fmt, int param)
 {
   auto pmode = m.param_mode(param);
   switch (pmode)
@@ -576,6 +576,10 @@ BasicBinaryStream& operator<<(BasicBinaryStream& stream, const Options& o)
 
   stream << o.stopping_rule;
 
+  stream << o.override_gamma_mode;
+
+  stream << o.num_au_reps << o.au_cutoff;
+
   return stream;
 }
 
@@ -636,6 +640,12 @@ BasicBinaryStream& operator>>(BasicBinaryStream& stream, Options& o)
 
   if (o.opt_version >= 5)
     stream >> o.stopping_rule;
+
+  if (o.opt_version >= 7)
+    stream >> o.override_gamma_mode;
+
+  if (o.opt_version >= 8)
+    stream >> o.num_au_reps >> o.au_cutoff;
 
   return stream;
 }

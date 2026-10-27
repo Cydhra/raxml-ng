@@ -8,7 +8,7 @@
 #include "util/SafetyCheck.hpp"
 #include "modeltest/ModelDefinitions.hpp"
 
-constexpr int RAXML_OPT_VERSION = 5;
+constexpr int RAXML_OPT_VERSION = 8;
 
 struct OutputFileNames
 {
@@ -20,7 +20,6 @@ struct OutputFileNames
   std::string best_model;
   std::string partition_trees;
   std::string ml_trees;
-  std::string plausible_trees;
   std::string bootstrap_trees;
   std::string support_tree;
   std::string tbe_support_tree;
@@ -38,6 +37,7 @@ struct OutputFileNames
   std::string bootstrap_msa;
   std::string rfdist;
   std::string stat_tests;
+  std::string plausible_trees;
   std::string cons_tree;
   std::string site_loglh;
   std::string asr_tree;
@@ -51,6 +51,21 @@ struct OutputFileNames
   std::string tmp_best_tree;
   std::string tmp_ml_trees;
   std::string tmp_bs_trees;
+};
+
+class GammaModeOverride {
+public:
+  bool enabled;
+  int mode;
+
+  GammaModeOverride() : enabled(false), mode(CORAX_GAMMA_RATES_MEAN) {};
+
+  bool operator==(const GammaModeOverride &other) const {
+      return enabled == other.enabled && mode == other.mode;
+  }
+  bool operator!=(const GammaModeOverride &other) const {
+      return !(*this == other);
+  }
 };
 
 class Options
@@ -103,7 +118,7 @@ public:
   LogLevel log_level;
   FileFormat msa_format;
   DataType data_type;
-  long random_seed;
+  unsigned int random_seed;
   StartingTreeMap start_trees;
   double lh_epsilon;
   double lh_epsilon_brlen_triplet;
@@ -115,6 +130,8 @@ public:
   double brlen_max;
   bool brlen_reset_usertree;
   bool use_pars_brlen;
+
+  GammaModeOverride override_gamma_mode;
 
   unsigned int num_searches;
   unsigned long long terrace_maxsize;
@@ -162,6 +179,9 @@ public:
   unsigned int num_sh_reps;
   double sh_epsilon;
 
+  /* AU test */
+  unsigned int num_au_reps;
+  double au_cutoff;
 
   /* Modeltest */
   unsigned int free_rate_min_categories;
@@ -171,6 +191,7 @@ public:
   HeuristicSelection modeltest_heuristics;
   double modeltest_significant_ic_delta;
   RateHeterogeneitySelection modeltest_rhas;
+  GammaModeSelection modeltest_gamma_modes;
   RHASHeuristicMode modeltest_rhas_heuristic_mode;
   std::vector<std::string> modeltest_subst_models;
   bool modeltest_json_output;
@@ -179,7 +200,7 @@ public:
   unsigned int treeset_workers = 0;
   unsigned int treeset_threads = 0;
 
-  bool coarse() const { return num_workers > 1; };
+  bool coarse() const { return num_workers > 1; }
   bool auto_model() const {
       return command == Command::modeltest || \
             (strcasecmp(model_file.c_str(), "auto") == 0) || \
@@ -211,7 +232,6 @@ public:
   const std::string& best_model_file() const { return outfile_names.best_model; }
   const std::string& partition_trees_file() const { return outfile_names.partition_trees; }
   const std::string& ml_trees_file() const { return outfile_names.ml_trees; }
-  const std::string& plausible_trees_file() const { return outfile_names.plausible_trees; }
   const std::string& bootstrap_trees_file() const { return outfile_names.bootstrap_trees; }
   const std::string& support_tree_file(BranchSupportMetric bsm = BranchSupportMetric::fbp) const;
   const std::string& terrace_file() const { return outfile_names.terrace; }
@@ -222,6 +242,7 @@ public:
   const std::string cons_tree_file() const { return outfile_names.cons_tree + consense_type_name(); }
   const std::string sitelh_file() const { return outfile_names.site_loglh; }
   const std::string stat_tests_file() const { return outfile_names.stat_tests; }
+  const std::string plausible_trees_file() const { return outfile_names.plausible_trees; }
   const std::string asr_tree_file() const { return outfile_names.asr_tree; }
   const std::string asr_probs_file() const { return outfile_names.asr_probs; }
   const std::string asr_states_file() const { return outfile_names.asr_states; }

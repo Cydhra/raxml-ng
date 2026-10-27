@@ -48,11 +48,11 @@ private:
 
   // functions for adaptive mode
 public:
-  static int adaptive_radius(double difficulty);
+  static unsigned int adaptive_radius(double difficulty);
 
 private:
   bool check_impr(TreeInfo& treeinfo, double loglh, double old_loglh, double old_loglh_kh,
-                  bool use_kh_test, vector<double*> persite_lnl_new, unsigned long int * increasing_moves);
+                  bool use_kh_test, std::vector<double*> persite_lnl_new, unsigned long int * increasing_moves);
 };
 
 #endif /* RAXML_OPTIMIZER_H_ */
