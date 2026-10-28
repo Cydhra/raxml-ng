@@ -86,16 +86,33 @@ public:
     Bandit *with_normal_distribution() {
         this->mean = &Bandit::get_normal_mean;
         this->deviation = &Bandit::get_normal_smart_deviation;
+        this->upper_confidence = &Bandit<Heuristic>::get_confidence_var;
+        this->selection_policy = &Bandit<Heuristic>::is_worse_confidently;
         return this;
     }
 
     /**
      * Configures the bandit to use a ratio distribution of bandit success and bandit walltime distributions for
-     * the unknown probabilitiy distribution its heuristic is distributed with.
+     * the unknown probability distribution its heuristic is distributed with.
      */
     Bandit *with_ratio_distribution() {
         this->mean = &Bandit::get_ratio_mean;
         this->deviation = &Bandit::get_ratio_deviation;
+        this->upper_confidence = &Bandit<Heuristic>::get_confidence_var;
+        this->selection_policy = &Bandit<Heuristic>::is_worse_confidently;
+        return this;
+    }
+
+    /**
+     * Configures the bandit to use a normal distribution of bandit throughput but forgo standard deviation in the
+     * selection policy and instead chose the current best bandit (under the correction factor) greedily.
+     * This was proposed by (10.1023/A:1013689704352).
+     */
+    Bandit *with_greedy_confidence() {
+        this->mean = &Bandit::get_normal_mean;
+        this->deviation = &Bandit::get_normal_smart_deviation;
+        this->upper_confidence = &Bandit<Heuristic>::get_confidence_greedy;
+        this->selection_policy = &Bandit<Heuristic>::is_worse_greedily;
         return this;
     }
 
@@ -133,7 +150,7 @@ public:
             return false;
         }
 
-        return other.get_upper_confidence(total_samples) > this->get_upper_confidence(total_samples);
+        return (this->*selection_policy)(other, total_samples);
     }
 
     /**
@@ -196,14 +213,7 @@ public:
      * @return the upper bound on the mean expected success that can be determined with high confidence.
      */
     [[nodiscard]] double get_upper_confidence(const unsigned int total_samples) const {
-        const auto mean_throughput = this->get_throughput_mean();
-        // const auto std_variation = this->get_throughput_deviation();
-
-        // as defined by 10.1016/0196-8858(85)90002-8, formula 4.13 with the choice of `a_(n,i)` = `(log n) / i`,
-        // where `n` is the total number of samples, and `i` is the number of samples drawn for this bandit.
-        // do note that the formula contains the standard deviation, not the variance, so we move the variance into the root.
-        return mean_throughput / maximum_success * sqrt(
-                   2.0 * log(static_cast<double>(total_samples)) / static_cast<double>(this->samples.size()));
+        return (this->*upper_confidence)(total_samples);
     }
 
     /**
@@ -418,6 +428,57 @@ private:
     }
 
     /**
+     * Confidence interval upper limit when using the confidence formula by Lai and Robbins (10.1016/0196-8858(85)90002-8)
+     *
+     * @param total_samples Total number of batches inferred so far
+     */
+    [[nodiscard]] double get_confidence_var(const unsigned int total_samples) const {
+        const auto mean_throughput = this->get_throughput_mean();
+        const auto std_variation = this->get_throughput_deviation();
+
+        // as defined by 10.1016/0196-8858(85)90002-8, formula 4.13 with the choice of `a_(n,i)` = `(log n) / i`,
+        // where `n` is the total number of samples, and `i` is the number of samples drawn for this bandit.
+        return mean_throughput + std_variation * sqrt(
+                   2.0 * log(static_cast<double>(total_samples)) / static_cast<double>(this->samples.size()));
+    }
+
+    /**
+     * Confidence interval upper limit when using the confidence formula by Auer, Cesa-Bianchi, and Fischer
+     * (10.1023/A:1013689704352).
+     *
+     * @param total_samples Total number of batches inferred so far
+     */
+    [[nodiscard]] double get_confidence_greedy(const unsigned int total_samples) const {
+        const auto mean_throughput = this->get_throughput_mean();
+
+        // as defined by 10.1023/A:1013689704352, Theorem 1
+        return mean_throughput / maximum_success + sqrt(
+                   2.0 * log(static_cast<double>(total_samples)) / static_cast<double>(this->samples.size()));
+    }
+
+    /**
+     * Selection policy for comparing two bandits. Selects bandits using confidence intervals.
+     *
+     * @param other bandit to compare to
+     * @param total_samples total samples inferred so far
+     * @return true if this bandit is worse than `other`.
+     */
+    [[nodiscard]] bool is_worse_confidently(const Bandit &other, const unsigned int total_samples) const {
+        return other.get_throughput_mean() > this->get_upper_confidence(total_samples);
+    }
+
+    /**
+    * Selection policy for comparing two bandits. Selects bandits using their mean with a correction for number of samples.
+    *
+    * @param other bandit to compare to
+    * @param total_samples total samples inferred so far
+    * @return true if this bandit is worse than `other`.
+    */
+    [[nodiscard]] bool is_worse_greedily(const Bandit &other, const unsigned int total_samples) const {
+        return other.get_upper_confidence(total_samples) > this->get_upper_confidence(total_samples);
+    }
+
+    /**
      * Take the benchmark data of a tuned batch which has previously run its inference with the parameters of this
      * bandit.
      * The measurement is stored and updates the expected mean reward of this bandit.
@@ -511,6 +572,9 @@ private:
      */
     bool participating{true};
 
+    /**
+     * The selected model for the distribution mean. It can either be `get_normal_mean` or `get_ratio_mean`.
+     */
     double (Bandit::*mean)() const = &Bandit::get_ratio_mean;
 
     /**
@@ -518,6 +582,18 @@ private:
      * is a proxy for `get_normal_variance` that switches to Median Absolute Deviation transparently.
      */
     double (Bandit::*deviation)() const = &Bandit::get_ratio_deviation;
+
+    /**
+     * The selected model for confidence value.
+     * This is calculated for other bandits and compared against `get_upper_confidence` for this bandit to determine
+     * whether this bandit is better.
+     */
+    double (Bandit::*upper_confidence)(unsigned int) const = &Bandit::get_confidence_var;
+
+    /**
+     * The comparison model for two bandits.
+     */
+    bool (Bandit::*selection_policy)(const Bandit &other, unsigned int) const = &Bandit::is_worse_confidently;
 
     /**
      * Maximum success attainable by any bandit
