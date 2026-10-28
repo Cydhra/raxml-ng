@@ -121,6 +121,7 @@ static struct option long_options[] =
   {"ts-threads",           required_argument,nullptr, 0 }, /* 85 */
   {"ts-workers",           required_argument,nullptr, 0 }, /* 86 */
   {"bandit",               required_argument,nullptr, 0 }, /* 87 */
+  {"reference-trees",      required_argument,nullptr, 0 }, /* 88 */
 
   { 0, 0, 0, 0 }
 };
@@ -1610,7 +1611,7 @@ void CommandLineParser::parse_options(int argc, char** argv, Options &opts)
         else
           throw InvalidOptionValueException("Unknown topology optimization method: " + string(optarg));
         break;
-      
+
       case 69: /* Stopping criterion */
         if (strcasecmp(optarg, "sn-rell") == 0) {
           opts.stopping_rule = StoppingRule::sn_rell;
@@ -1632,7 +1633,7 @@ void CommandLineParser::parse_options(int argc, char** argv, Options &opts)
                                             "- off : To turn off stopping rules\n");
         }
         break;
-      
+
       case 70: /* ebg: use educated bootstrap guesser to estimate branch support */
         opts.command = Command::all;
         opts.bs_metrics.clear();
@@ -1765,6 +1766,11 @@ void CommandLineParser::parse_options(int argc, char** argv, Options &opts)
         } else {
           throw InvalidOptionValueException("Unknown bandit policy: " + string(optarg) + ". Select one of normal, ratio, or greedy.");
         }
+        break;
+      case 88: /* reference trees (for treeset) */
+        optarg_tree = strdup(optarg);
+        opts.optimize_brlen = false;
+        opts.topology_opt_method = TopologyOptMethod::none;
         break;
       default:
         throw  OptionException("Internal error in option parsing");
