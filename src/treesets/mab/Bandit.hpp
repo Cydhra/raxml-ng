@@ -86,8 +86,9 @@ public:
     Bandit *with_normal_distribution() {
         this->mean = &Bandit::get_normal_mean;
         this->deviation = &Bandit::get_normal_smart_deviation;
-        this->upper_confidence = &Bandit<Heuristic>::get_confidence_var;
-        this->selection_policy = &Bandit<Heuristic>::is_worse_confidently;
+        this->upper_confidence = &Bandit::get_confidence_var;
+        this->selection_policy = &Bandit::is_worse_confidently;
+        this->explain = &Bandit::explain_confidence_policy;
         return this;
     }
 
@@ -98,8 +99,9 @@ public:
     Bandit *with_ratio_distribution() {
         this->mean = &Bandit::get_ratio_mean;
         this->deviation = &Bandit::get_ratio_deviation;
-        this->upper_confidence = &Bandit<Heuristic>::get_confidence_var;
-        this->selection_policy = &Bandit<Heuristic>::is_worse_confidently;
+        this->upper_confidence = &Bandit::get_confidence_var;
+        this->selection_policy = &Bandit::is_worse_confidently;
+        this->explain = &Bandit::explain_confidence_policy;
         return this;
     }
 
@@ -113,6 +115,7 @@ public:
         this->deviation = &Bandit::get_normal_smart_deviation;
         this->upper_confidence = &Bandit<Heuristic>::get_confidence_greedy;
         this->selection_policy = &Bandit<Heuristic>::is_worse_greedily;
+        this->explain = &Bandit::explain_greedy_policy;
         return this;
     }
 
@@ -151,6 +154,17 @@ public:
         }
 
         return (this->*selection_policy)(other, total_samples);
+    }
+
+    /**
+     * Write an explanation into the log stream of why this bandit is preferred over the other or vice versa.
+     *
+     * @param log a log stream object
+     * @param other bandit to compare to
+     * @param total_samples total number of batches inferred so far
+     */
+    void explain_policy(LogStream log, const Bandit &other, const unsigned int total_samples) const {
+        return (this->*explain)(log, other, total_samples);
     }
 
     /**
@@ -325,7 +339,7 @@ private:
 
         // calculate participation of the estimator, gradually replacing it with actual measurements
         const auto weight = this->initial_variance_weight - std::min(this->initial_variance_weight,
-                                                                static_cast<unsigned int>(this->samples.size()));
+                                                                     static_cast<unsigned int>(this->samples.size()));
 
         variance_sum *= weight;
 
@@ -467,6 +481,20 @@ private:
         return other.get_throughput_mean() > this->get_upper_confidence(total_samples);
     }
 
+    void explain_confidence_policy(LogStream log, const Bandit &other, const unsigned int total_samples) const {
+        if (this->is_worse_confidently(other, total_samples)) {
+            log << "Switching to best bandit " << other.name <<
+                    " because its expected throughput (" << other.get_throughput_mean() <<
+                    ") exceeds the upper confidence of " <<
+                    this->name << " (" << this->get_upper_confidence(total_samples) << ")" << std::endl;
+        } else {
+            log << "Selecting bandit " << this->get_name() <<
+                    " because its upper confidence (" << this->get_upper_confidence(total_samples) <<
+                    ") exceeds the expected throughput of " <<
+                    other.name << " (" << other.get_throughput_mean() << ")" << std::endl;
+        }
+    }
+
     /**
     * Selection policy for comparing two bandits. Selects bandits using their mean with a correction for number of samples.
     *
@@ -476,6 +504,18 @@ private:
     */
     [[nodiscard]] bool is_worse_greedily(const Bandit &other, const unsigned int total_samples) const {
         return other.get_upper_confidence(total_samples) > this->get_upper_confidence(total_samples);
+    }
+
+    void explain_greedy_policy(LogStream log, const Bandit &other, const unsigned int total_samples) const {
+        if (this->is_worse_greedily(other, total_samples)) {
+            log << "Switching to best bandit " << other.get_name() <<
+                    " because it has a higher confidence (" << other.get_upper_confidence(total_samples) << ") than " <<
+                    this->name << " (" << this->get_upper_confidence(total_samples) << ")" << std::endl;
+        } else {
+            log << "Selecting bandit " << this->get_name() <<
+                    " because it has a higher confidence (" << this->get_upper_confidence(total_samples) << ") than " <<
+                    other.name << " (" << this->get_upper_confidence(total_samples) << ")" << std::endl;
+        }
     }
 
     /**
@@ -594,6 +634,9 @@ private:
      * The comparison model for two bandits.
      */
     bool (Bandit::*selection_policy)(const Bandit &other, unsigned int) const = &Bandit::is_worse_confidently;
+
+    void (Bandit::*explain)(LogStream log, const Bandit &other, unsigned int) const = &
+            Bandit::explain_confidence_policy;
 
     /**
      * Maximum success attainable by any bandit

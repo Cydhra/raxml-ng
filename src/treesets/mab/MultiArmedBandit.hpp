@@ -19,9 +19,9 @@ public:
 
     MultiArmedBandit(MultiArmedBandit &&other) noexcept = default;
 
-    MultiArmedBandit & operator=(const MultiArmedBandit &other) = delete;
+    MultiArmedBandit &operator=(const MultiArmedBandit &other) = delete;
 
-    MultiArmedBandit & operator=(MultiArmedBandit &&other) noexcept = default;
+    MultiArmedBandit &operator=(MultiArmedBandit &&other) noexcept = default;
 
     /**
      * Add a single-arm bandit to this MAB instance.
@@ -99,20 +99,14 @@ public:
         auto &best_bandit = this->bandits[this->best_known_bandit];
 
         if (selected_bandit.num_samples() == 0) {
-            LOG_INFO << std::endl;
-            LOG_WORKER_TS(LogLevel::info) << "Initial estimation of " << selected_bandit.get_name() << "." << std::endl;
+            RAXML_LOG_WORKER(LogLevel::info) << std::endl;
+            LOG_WORKER_TS(LogLevel::info) << "Initial estimation of " << selected_bandit.get_name() << "."
+                    << std::endl;
         } else {
-            if (this->bandit_cursor != this->best_known_bandit && !std::isnan(
-                    this->bandits[this->best_known_bandit].get_normal_mean()) && selected_bandit.is_worse_than(
+            if (this->bandit_cursor != this->best_known_bandit && selected_bandit.is_worse_than(
                     best_bandit, iterations_completed)) {
-                LOG_INFO << std::endl;
-                LOG_WORKER_TS(LogLevel::info) << "Switching to best bandit " << best_bandit.get_name() <<
-                        " because its upper bound ("
-                        << (best_bandit.get_upper_confidence(iterations_completed) * 1000.0) <<
-                        " t/s) exceeds the upper bound of "
-                        << selected_bandit.get_name() << " (" << (
-                            selected_bandit.get_upper_confidence(iterations_completed) * 1000.0) << " t/s)." <<
-                        std::endl;
+                RAXML_LOG_WORKER(LogLevel::info) << std::endl;
+                selected_bandit.explain_policy(LOG_WORKER_TS(LogLevel::info), best_bandit, iterations_completed);
 
                 // check if the selected bandit is so bad that we can just delete it from the round-robin
                 // because this requires both trees to have been selected thrice, this likely only ever excludes parsimony
@@ -127,22 +121,14 @@ public:
                 return best_bandit;
             }
 
-            if (!std::isnan(selected_bandit.get_upper_confidence(iterations_completed))) {
-                if (this->bandit_cursor != this->best_known_bandit) {
-                    LOG_INFO << std::endl;
-                    LOG_WORKER_TS(LogLevel::info) << "Selecting bandit " << selected_bandit.get_name() <<
-                            " because its upper bound ("
-                            << (selected_bandit.get_upper_confidence(iterations_completed) * 1000.0) <<
-                            " t/s) exceeds the upper bound of current best bandit "
-                            << best_bandit.get_name() << " (" << (best_bandit.get_upper_confidence(iterations_completed) * 1000.0) <<
-                            " t/s)." <<
-                            std::endl;
-                } else {
-                    LOG_INFO << std::endl;
-                    LOG_WORKER_TS(LogLevel::info) << "Selecting bandit " << selected_bandit.get_name() << " (confidence: " <<
-                    (
-                        best_bandit.get_upper_confidence(iterations_completed) * 1000.0) << " t/s)." << std::endl;
-                }
+            if (this->bandit_cursor != this->best_known_bandit) {
+                RAXML_LOG_WORKER(LogLevel::info) << std::endl;
+                selected_bandit.explain_policy(LOG_WORKER_TS(LogLevel::info), best_bandit, iterations_completed);
+            } else {
+                RAXML_LOG_WORKER(LogLevel::info) << std::endl;
+                LOG_WORKER_TS(LogLevel::info) << "Selecting bandit " << selected_bandit.get_name() <<
+                        " (mean: " << best_bandit.get_throughput_mean() << ", upper confidence: " <<
+                        best_bandit.get_upper_confidence(iterations_completed) << ")." << std::endl;
             }
         }
 
@@ -167,7 +153,8 @@ public:
         // if the current bandit is not the best one, check if the best one has to be updated
         if (&current_bandit.get_parameters() != &this->bandits[best_known_bandit].get_parameters() && !std::isnan(
                 this->bandits[best_known_bandit].get_normal_mean())) {
-            if (current_bandit.get_upper_confidence(iterations_completed) > this->bandits[best_known_bandit].get_upper_confidence(iterations_completed)) {
+            if (current_bandit.get_upper_confidence(iterations_completed) > this->bandits[best_known_bandit].
+                get_upper_confidence(iterations_completed)) {
                 // find which index is the current bandit. We cannot rely on the cursor since that has been advanced by
                 // concurrent batch groups
                 auto cursor = std::find_if(this->bandits.begin(), this->bandits.end(),
@@ -222,9 +209,12 @@ public:
 
         if (this->best_known_bandit == bandit_id) {
             // find new next best bandit
-            auto new_best = std::max_element(this->bandits.begin(), this->bandits.end(), [](const Bandit<Heuristic> &a, const Bandit<Heuristic> &b) {
-                return !a.participating || (b.participating && b.get_normal_mean() > a.get_normal_mean());
-            });
+            auto new_best = std::max_element(this->bandits.begin(), this->bandits.end(),
+                                             [](const Bandit<Heuristic> &a, const Bandit<Heuristic> &b) {
+                                                 return !a.participating || (
+                                                            b.participating && b.get_normal_mean() > a.
+                                                            get_normal_mean());
+                                             });
 
             auto index = std::distance(this->bandits.begin(), new_best);
 
