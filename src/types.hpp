@@ -235,6 +235,11 @@ enum class AbnormalSequenceAction
   error        /* exit with error */
 };
 
+enum class BanditPolicy {
+  normal = 0,
+  ratio,
+  greedy
+};
 
 const std::string ParamValueNames[] = {"undefined", "equal", "user", "model", "empirical", "ML"};
 

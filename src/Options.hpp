@@ -199,6 +199,7 @@ public:
   unsigned int treeset_groups = 0;
   unsigned int treeset_workers = 0;
   unsigned int treeset_threads = 0;
+  BanditPolicy bandit_policy = BanditPolicy::normal;
 
   bool coarse() const { return num_workers > 1; }
   bool auto_model() const {

@@ -13,7 +13,7 @@ constexpr unsigned int MIN_PAUSE_BETWEEN_MODIFICATIONS = 4;
  */
 class DynamicMAB {
 public:
-    DynamicMAB() = default;
+    explicit DynamicMAB(const BanditPolicy policy) : policy(policy) {}
 
     /**
      * Add an arm to the dynamic bandit, which itself is a multi-armed bandit.
@@ -67,6 +67,11 @@ public:
     double get_upper_bound() const;
 
 protected:
+    /**
+     * Which policy the bandits should have when added to the mab
+     */
+    BanditPolicy policy;
+
     /**
      * The multi-level multi-armed bandit that is being managed and modified by this class.
      */

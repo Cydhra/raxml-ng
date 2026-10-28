@@ -120,6 +120,7 @@ static struct option long_options[] =
   {"ts-groups",            required_argument,nullptr, 0 }, /* 84 */
   {"ts-threads",           required_argument,nullptr, 0 }, /* 85 */
   {"ts-workers",           required_argument,nullptr, 0 }, /* 86 */
+  {"bandit",               required_argument,nullptr, 0 }, /* 87 */
 
   { 0, 0, 0, 0 }
 };
@@ -1753,6 +1754,17 @@ void CommandLineParser::parse_options(int argc, char** argv, Options &opts)
         break;
       case 86: /* ts-workers */
         sscanf(optarg, "%d", &opts.treeset_workers);
+        break;
+      case 87: /* bandit policy */
+        if (strcasecmp(optarg, "normal") == 0) {
+          opts.bandit_policy = BanditPolicy::normal;
+        } else if (strcasecmp(optarg, "ratio") == 0) {
+          opts.bandit_policy = BanditPolicy::ratio;
+        } else if (strcasecmp(optarg, "greedy") == 0) {
+          opts.bandit_policy = BanditPolicy::greedy;
+        } else {
+          throw InvalidOptionValueException("Unknown bandit policy: " + string(optarg) + ". Select one of normal, ratio, or greedy.");
+        }
         break;
       default:
         throw  OptionException("Internal error in option parsing");

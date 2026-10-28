@@ -4,7 +4,7 @@
 #include "mab/DynamicMAB.hpp"
 
 void TreesetOptimizer::initialize_bandits(const double maximum_success) {
-    auto starting_trees = make_shared<MultiArmedBandit<MetaParameters> >();
+    const auto starting_trees = make_shared<MultiArmedBandit<MetaParameters> >();
     starting_trees->emplace_back("Parsimony", MetaParameters(), maximum_success);
     starting_trees->emplace_back("Split-Parsimony", MetaParameters().with_treesource(SplitParsimony), maximum_success);
     starting_trees->emplace_back("Split-Greedy", MetaParameters().with_treesource(SplitGreedy), maximum_success);
@@ -183,6 +183,19 @@ void TreesetOptimizer::run() {
     LOG_INFO << std::endl;
     LOG_INFO_TS << "Treeset: Inferring at least " << this->target_tree_count <<
             " plausible trees while optimizing throughput." << std::endl;
+    LOG_INFO << "Bandit Policy: ";
+    switch (opts.bandit_policy) {
+        case BanditPolicy::normal:
+            LOG_INFO << "normal";
+            break;
+        case BanditPolicy::ratio:
+            LOG_INFO << "ratio";
+            break;
+        case BanditPolicy::greedy:
+            LOG_INFO << "greedy";
+            break;
+    }
+    LOG_INFO << std::endl << std::endl;
 
     auto global_barrier = SmartBarrier(pool.num_threads_total());
     auto initializing_function = [this, &global_barrier]() {

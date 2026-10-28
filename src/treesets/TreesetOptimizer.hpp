@@ -57,7 +57,10 @@ protected:
      */
     const unsigned int target_tree_count;
 
-    DynamicMAB mab = {};
+    /**
+     * The multi-armed bandit with a progressive search policy
+     */
+    DynamicMAB mab;
 
     /**
      * Initialize resources that require multithreading, such as pre-filling tree sources.
@@ -137,7 +140,8 @@ public:
                                                                        doubleVector> > >(persite_loglh), starting_seed,
                                                                    DEFAULT_BATCH_SIZE),
                                                                pythia_score(pythia_score),
-                                                               target_tree_count(target_tree_count) {
+                                                               target_tree_count(target_tree_count),
+                                                               mab(opts.bandit_policy) {
     }
 
     /**
