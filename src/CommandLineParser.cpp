@@ -1769,7 +1769,6 @@ void CommandLineParser::parse_options(int argc, char** argv, Options &opts)
         break;
       case 88: /* reference trees (for treeset) */
         optarg_tree = strdup(optarg);
-        opts.optimize_brlen = false;
         opts.topology_opt_method = TopologyOptMethod::none;
         break;
       default:
