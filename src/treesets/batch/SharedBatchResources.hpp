@@ -45,7 +45,7 @@ public:
         // will be replaced by the TunedBatch instance before the AU test is called.
         std::vector<std::vector<doubleVector> > batch_loglh_dummy(batch_size);
         for (unsigned int i = 0; i < batch_size; ++i) {
-            batch_loglh_dummy[i] = std::vector<doubleVector>(reference_logh_matrix[i].size());
+            batch_loglh_dummy[i] = std::vector<doubleVector>(reference_logh_matrix[0].size());
         }
 
         for (unsigned int group = 0; group < num_task_groups; ++group) {
