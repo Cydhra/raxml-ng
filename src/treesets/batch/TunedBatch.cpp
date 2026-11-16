@@ -387,6 +387,9 @@ void TunedBatch::finalize() {
 
     // delete corax allocations
     this->batch_trees.clear();
+
+    // delete per-site loglikelihoods
+    this->batch_persite_logh.clear();
 }
 
 bool TunedBatch::has_trees() const {
