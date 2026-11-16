@@ -154,7 +154,7 @@ public:
      * @return true, if the AuTest instance returned for the calling thread has been initialized before.
      */
     [[nodiscard]] bool is_initialized(const TaskGroup &context) const {
-        return initialized.at(context.group_id());
+        return initialized.at(context.group_id()) > 0;
     }
 
     /**
@@ -164,7 +164,7 @@ public:
      * @param context the parallel context for the calling batch leader
      */
     void set_initialized(const TaskGroup &context) {
-        this->initialized[context.group_id()] = true;
+        this->initialized[context.group_id()] = 1;
     }
 
     /**
@@ -211,7 +211,7 @@ protected:
      * The flags are not atomic, because only the group leader of each batch is supposed to ask and only for its own
      * context.
      */
-    std::vector<bool> initialized;
+    std::vector<uint8_t> initialized;
 
     /**
      * A copy of the CLI Options instance, with every option required to run raxml-fast forcibly enabled.
