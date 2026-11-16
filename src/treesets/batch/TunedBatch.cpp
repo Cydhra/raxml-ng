@@ -91,9 +91,10 @@ void TunedBatch::optimize(const RaxmlInstance &instance, const Options &opts, Sh
     }
 
     perform_plausibility_check(opts, resources, resources.is_initialized(context), context, worker_id, thread_id);
-    resources.set_initialized(context);
 
     if (context.is_group_leader(worker_id, thread_id)) {
+        resources.set_initialized(context);
+
         auto guard = std::lock_guard(*this->topology_access);
 
         // clear previous backups
