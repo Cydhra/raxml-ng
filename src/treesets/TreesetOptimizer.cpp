@@ -34,7 +34,7 @@ void TreesetOptimizer::initialize_bandits(const double maximum_success) {
     light_mab->emplace_back("Greedy,DoModel,2spr",
                             MetaParameters().with_topk(1).with_first_model(true).with_fast_rounds(2).with_radius(
                                 adaptive_radius), maximum_success);
-    this->mab.register_new_successor(4, "Light", std::move(light_mab));
+    this->mab.register_new_successor(3, "Light", std::move(light_mab));
 
     // low radius heuristics
     if (small_radius < adaptive_radius) {
@@ -91,20 +91,20 @@ void TreesetOptimizer::initialize_bandits(const double maximum_success) {
                               MetaParameters().with_topk(1).with_first_model(true).with_dynamic_spr(true),
                               maximum_success);
 
-    this->mab.register_new_successor(5, "Dynamic", std::move(dynamic_mab));
+    this->mab.register_new_successor(4, "Dynamic", std::move(dynamic_mab));
 
     // fallbacks
     auto fallback_fast_mab = make_shared<MultiArmedBandit<MetaParameters> >();
     fallback_fast_mab->emplace_back("Fast-Raxml",
                                     MetaParameters().with_fallback_fast_raxml(true).with_final_model(false),
                                     maximum_success);
-    this->mab.register_new_successor(6, "Fallback-Fast", std::move(fallback_fast_mab));
+    this->mab.register_new_successor(5, "Fallback-Fast", std::move(fallback_fast_mab));
 
     auto fallback_adaptive_mab = make_shared<MultiArmedBandit<MetaParameters> >();
     fallback_adaptive_mab->emplace_back("Adaptive-Raxml",
                                         MetaParameters().with_fallback_adaptive(true).with_final_model(false),
                                         maximum_success);
-    this->mab.register_new_successor(7, "Fallback-Adaptive", std::move(fallback_adaptive_mab));
+    this->mab.register_new_successor(6, "Fallback-Adaptive", std::move(fallback_adaptive_mab));
 
     // second-level MAB
     this->mab.register_new_arm("Starting Trees", starting_trees);
