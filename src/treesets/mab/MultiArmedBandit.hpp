@@ -158,8 +158,8 @@ public:
                 // find which index is the current bandit. We cannot rely on the cursor since that has been advanced by
                 // concurrent batch groups
                 auto cursor = std::find_if(this->bandits.begin(), this->bandits.end(),
-                                           [current_bandit](const Bandit<Heuristic> &element) {
-                                               return &element.get_parameters() == &current_bandit.get_parameters();
+                                           [&current_bandit](const Bandit<Heuristic> &element) {
+                                               return element.get_parameters() == current_bandit.get_parameters();
                                            });
                 if (cursor != this->bandits.end()) {
                     best_known_bandit = std::distance(this->bandits.begin(), cursor);
