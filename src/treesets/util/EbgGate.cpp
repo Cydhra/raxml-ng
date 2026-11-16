@@ -110,7 +110,7 @@ TreeList EbgGate::gate_and_rank(TreeList candidates) {
     ml_mae /= static_cast<double>(split_count);
     candidate_mae /= static_cast<double>(split_count);
 
-    if (!std::isfinite(ml_mae) || !std::isfinite(candidate_mae) || candidate_mae + mae_margin >= ml_mae) {
+    if (!std::isfinite(ml_mae) || !std::isfinite(candidate_mae) || candidate_mae - mae_margin >= ml_mae) {
         LOG_INFO
                 << "EBG-Gate failed: "
                 << "ml_ebg_mae=" << ml_mae
