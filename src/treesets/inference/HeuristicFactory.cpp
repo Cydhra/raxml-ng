@@ -59,13 +59,13 @@ static std::unique_ptr<InferenceHeuristic> from_meta_parameters(const MetaParame
     if (meta_parameters.num_fast_spr > 0) {
         heuristic = std::make_unique<FixedSpr>(batch_name, std::move(heuristic), num_trees, threads_per_worker,
                                           meta_parameters.num_fast_spr, meta_parameters.keep_top_k_topol, false,
-                                          2 * meta_parameters.max_adaptive_radius);
+                                          std::min(2 * meta_parameters.max_adaptive_radius, 25u));
     }
 
     if (meta_parameters.num_slow_spr > 0) {
         heuristic = std::make_unique<FixedSpr>(batch_name, std::move(heuristic), num_trees, threads_per_worker,
                                           meta_parameters.num_slow_spr, KEEP_TOPOL_NUM, true,
-                                          1 * meta_parameters.max_adaptive_radius);
+                                          std::min(1 * meta_parameters.max_adaptive_radius, 14u));
     }
 
     if (meta_parameters.dynamic_spr) {
