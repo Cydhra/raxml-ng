@@ -134,10 +134,10 @@ public:
                                                                instance(instance),
                                                                opts(opts),
                                                                batch_queue(
-                                                                   instance, opts, make_shared<IDVector>(tip_msa_idmap),
+                                                                   make_shared<IDVector>(tip_msa_idmap),
                                                                    load_balancer, msa,
                                                                    make_shared<std::vector<std::vector<
-                                                                       doubleVector> > >(persite_loglh), starting_seed,
+                                                                       doubleVector> > >(persite_loglh),
                                                                    DEFAULT_BATCH_SIZE),
                                                                pythia_score(pythia_score),
                                                                target_tree_count(target_tree_count),
@@ -165,13 +165,6 @@ public:
      * @return A new vector instance containing all plausible tree topologies.
      */
     std::vector<Tree> get_plausible_trees() const;
-
-    /**
-     * The hierarchical bandit counts how many iterations of the bandit algorithm have been completed. Modifications
-     * of the bandit shouldn't happen too often, so we ensure there is a minimum amount of iterations between adding
-     * new bandits, such that the new bandit can be tested before adding new ones.
-     */
-    unsigned int last_mab_modification = 0;
 };
 
 

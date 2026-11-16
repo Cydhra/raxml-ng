@@ -25,11 +25,6 @@ public:
 
 protected:
     /**
-     * Number of fast SPR rounds that have already been performed on the tree.
-     */
-    unsigned int num_spr_performed{0};
-
-    /**
      * Number of SPR rounds for this step
      */
     unsigned int num_spr;

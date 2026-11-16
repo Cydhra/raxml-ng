@@ -13,21 +13,15 @@ struct RaxmlInstance;
  */
 class BatchQueue {
 public:
-    BatchQueue(RaxmlInstance &instance,
-               Options &opts,
-               const std::shared_ptr<IDVector> &tip_msa_idmap,
+    BatchQueue(const std::shared_ptr<IDVector> &tip_msa_idmap,
                LoadBalancer &load_balancer,
                const std::shared_ptr<PartitionedMSA> &msa,
                const std::shared_ptr<std::vector<std::vector<doubleVector> > > &persite_loglh,
-               const unsigned long long seed,
-               const unsigned int batch_size) : instance(instance),
-                                                opts(opts),
-                                                tip_msa_idmap(tip_msa_idmap),
+               const unsigned int batch_size) : tip_msa_idmap(tip_msa_idmap),
                                                 msa(msa),
                                                 load_balancer(load_balancer),
                                                 persite_loglh(persite_loglh),
-                                                batch_size(batch_size),
-                                                current_seed(seed) {
+                                                batch_size(batch_size) {
     }
 
     /**
@@ -84,16 +78,6 @@ public:
     }
 
 protected:
-    /**
-     * Reference to the RAxML-ng instance which is required for all optimization steps
-     */
-    RaxmlInstance &instance;
-
-    /**
-     * Reference to the user options which are required for all optimization steps
-     */
-    Options &opts;
-
     /**
      * Reference to the RAxML-ng instance's tip id-map which is used for starting tree generation.
      */
@@ -155,12 +139,6 @@ protected:
      */
     unsigned int batch_size;
 
-    /**
-     * The current seed for starting tree generation. Offset that by the number of generated trees whenever it is used
-     * to generate a batch of trees.
-     */
-    std::atomic_uint64_t current_seed;
-
     std::mutex batch_mutex;
 
     /**
@@ -169,15 +147,6 @@ protected:
      * @param batch tuned batch which is in the unfinished queue
      */
     void finalize_batch(TunedBatch &batch);
-
-    /**
-     * Return the starting seed for generating `num_trees` trees.
-     * The queue keeps track of how many trees have been generated and advances the seed accordingly.
-     */
-    unsigned long generate_seed_for_trees(const unsigned int num_trees) {
-        const auto current = this->current_seed.fetch_add(num_trees);
-        return current;
-    }
 };
 
 
