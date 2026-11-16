@@ -115,12 +115,13 @@ bool TreesetOptimizer::run_batch(TunedBatch &batch, const TaskGroup &context, co
     try {
         batch.optimize(instance, opts, shared_batch_resources, context, worker_id, thread_id);
     } catch (BanditFailedException &e) {
-        LOG_INFO << "Batch " << batch.get_name() << " failed because: " << e.message() << ". Disabling bandit." <<
-                std::endl;
+        if (context.is_group_leader(worker_id, thread_id)) {
+            LOG_INFO << "Batch " << batch.get_name() << " failed because: " << e.message() << ". Disabling bandit." <<
+                    std::endl;
 
-        // inform the batch queue that the batch has been inferred
-        this->batch_queue.finish_batch(batch);
-
+            // inform the batch queue that the batch has been inferred
+            this->batch_queue.finish_batch(batch);
+        }
         return false;
     }
 
@@ -150,7 +151,9 @@ BatchTask TreesetOptimizer::next_work_unit() {
     BatchTask runner = [this, &parameters, &current_batch](TaskGroup &context, const unsigned int worker_id,
                                                            const unsigned int thread_id) {
         if (!this->run_batch(current_batch, context, worker_id, thread_id)) {
-            this->mab.disable_bandit(parameters);
+            if (context.is_group_leader(worker_id, thread_id)) {
+                this->mab.disable_bandit(parameters);
+            }
         }
     };
 
