@@ -22,21 +22,21 @@ TreeList ParsimonySamplerSource::generate_candidates(const RaxmlInstance &instan
     std::set<Split> staged_topologies;
 
     for (unsigned int attempt = 0; attempt < attempt_limit && candidates.size() < requested_candidates; ++attempt) {
-        TreeList seed_trees;
-        seed_trees.reserve(seed_window_size);
+        TreeList constraint_seed_trees;
+        constraint_seed_trees.reserve(seed_window_size);
         std::vector<std::size_t> seed_ids;
         seed_ids.reserve(seed_window_size);
         for (std::size_t offset = 0; offset < seed_window_size; ++offset) {
-            const auto donor_id = (static_cast<std::size_t>(attempt) * 2 + offset) % donor_pool.size();
+            const auto donor_id = (static_cast<std::size_t>(attempt) * seed_window_size + offset + round_seed) % donor_pool.size();
             seed_ids.push_back(donor_id);
-            seed_trees.push_back(donor_pool[donor_id]);
+            constraint_seed_trees.push_back(donor_pool[donor_id]);
         }
 
         if (!has_majority_split(donor_splits, seed_ids, words_per_split)) {
             ++materialization_failures;
             continue;
         }
-        ConsensusTree constraint(seed_trees, ConsenseCutoff::MR);
+        ConsensusTree constraint(constraint_seed_trees, ConsenseCutoff::MR);
         constraint.compute_support();
         if (constraint.num_splits() == 0) {
             ++materialization_failures;
