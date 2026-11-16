@@ -80,7 +80,8 @@ void TreesetOptimizer::initialize_bandits(const double maximum_success) {
                                   with_dynamic_spr(true), maximum_success);
     }
     dynamic_mab->emplace_back("Fast,DoModel,Dynamic",
-                              MetaParameters().with_first_model(true).with_dynamic_spr(true), maximum_success);
+                              MetaParameters().with_first_model(true).with_dynamic_spr(true).with_radius(
+                                  adaptive_radius), maximum_success);
 
     if (small_radius < adaptive_radius) {
         dynamic_mab->emplace_back("Fast,DoModel,Dynamic,low",
@@ -88,7 +89,8 @@ void TreesetOptimizer::initialize_bandits(const double maximum_success) {
                                   with_dynamic_spr(true), maximum_success);
     }
     dynamic_mab->emplace_back("Greedy,DoModel,Dynamic",
-                              MetaParameters().with_topk(1).with_first_model(true).with_dynamic_spr(true),
+                              MetaParameters().with_topk(1).with_first_model(true).with_dynamic_spr(true).with_radius(
+                                  adaptive_radius),
                               maximum_success);
 
     this->mab.register_new_successor(4, "Dynamic", std::move(dynamic_mab));
