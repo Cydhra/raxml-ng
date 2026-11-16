@@ -45,6 +45,29 @@ public:
           initial_ml_trees(std::move(initial_ml_trees)) {
     }
 
+    /**
+     * Initialize the EBG gate with an EBG support tree and split frequencies. Calling this method multiple times has
+     * no effect. To re-initialize with different support trees, call `reset_gate`.
+     *
+     * @param instance RaxmlInstance to generate parsimony trees
+     * @param support_trees The parsimony trees we use to generate EBG support values. Use a different range to reset the gate to new values
+     * @param barrier a thread barrier over all threads involved in the gate instantiation
+     * @param num_workers number of threads involved in the gate instantiation. For this method, workers and threads are equivalent, so each thread must be treated as a worker
+     * @param worker_id thread id (global, not per worker) of the current thread
+     */
+    void init_gate(const RaxmlInstance &instance, const ConstTreeRange & support_trees, const SmartBarrier &barrier, unsigned int
+                    num_workers, unsigned int worker_id);
+
+    /**
+     * Reset the EBG gate with new EBG support values and calculate split frequencies.
+     * This can be called multiple times to instantiate the gate with a new EBG support tree.
+     *
+     * @param instance RaxmlInstance to generate parsimony trees
+     * @param support_trees The parsimony trees we use to generate EBG support values. Use a different range to reset the gate to new values
+     * @param barrier a thread barrier over all threads involved in the gate instantiation
+     * @param num_workers number of threads involved in the gate instantiation. For this method, workers and threads are equivalent, so each thread must be treated as a worker
+     * @param worker_id thread id (global, not per worker) of the current thread
+     */
     void reset_gate(const RaxmlInstance &instance, const ConstTreeRange & support_trees, const SmartBarrier &barrier, unsigned int
                     num_workers, unsigned int worker_id);
 

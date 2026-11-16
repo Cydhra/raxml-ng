@@ -5,6 +5,13 @@
 // TODO this can probably be made lower
 static constexpr unsigned int BOOTSTRAP_SUPPORT_COUNT = 200;
 
+void EbgGate::init_gate(const RaxmlInstance &instance, const ConstTreeRange &support_trees, const SmartBarrier &barrier, unsigned int num_workers, unsigned int worker_id) {
+    if (!reference_support_tree) {
+        barrier.enter();
+        this->reset_gate(instance, support_trees, barrier, num_workers, worker_id);
+    }
+}
+
 void EbgGate::reset_gate(const RaxmlInstance &instance, const ConstTreeRange &support_trees,
                          const SmartBarrier &barrier, const unsigned int
                          num_workers, const unsigned int worker_id) {

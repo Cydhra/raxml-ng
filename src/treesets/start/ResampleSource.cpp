@@ -82,7 +82,7 @@ void ResampleSource::generate(const RaxmlInstance &instance, const SmartBarrier 
     const auto donors = donor_tree_source->range(sampled_batches * NUM_DONOR_TREE,
                                                  (sampled_batches + 1) * NUM_DONOR_TREE);
 
-    gate->reset_gate(instance, donors, barrier, num_workers, worker_id);
+    gate->init_gate(instance, donors, barrier, num_workers, worker_id);
 
     if (worker_id == 0) {
         local_lists.resize(num_workers);
