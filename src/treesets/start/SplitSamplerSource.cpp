@@ -48,8 +48,6 @@ TreeList SplitSamplerSource::generate_candidates(const RaxmlInstance &, const Co
         collect_tree_splits(tree, false);
     }
 
-    corax_utree_split_hashtable_destroy(split_hash_table);
-
     candidates.reserve(donor_pool.size());
     unsigned int incomplete_split_systems = 0;
     unsigned int materialization_failures = 0;
@@ -91,17 +89,14 @@ TreeList SplitSamplerSource::generate_candidates(const RaxmlInstance &, const Co
         }
 
         for (auto &words: seed_splits) {
-            const auto ranked = std::find_if(
-                split_pool.begin(),
-                split_pool.end(),
-                [&words](const CandidateSplit &candidate) {
-                    return candidate.words == words;
-                });
+            const auto ranked = corax_utree_split_hashtable_lookup(split_hash_table, words.data(),
+                                                                      baseline_tree.num_tips());
 
-            selected.push_back(
-                ranked == split_pool.end()
-                    ? CandidateSplit{std::move(words), 0, 0}
-                    : *ranked);
+            if (ranked) {
+                selected.push_back(split_pool[ranked->bip_number]);
+            } else {
+                selected.push_back(CandidateSplit{std::move(words), 0, 0});
+            }
         }
 
         auto try_add = [&](const CandidateSplit &candidate) {
@@ -156,6 +151,8 @@ TreeList SplitSamplerSource::generate_candidates(const RaxmlInstance &, const Co
 
         candidates.push_back(std::move(candidate));
     }
+
+    corax_utree_split_hashtable_destroy(split_hash_table);
 
     LOG_WORKER_TS(LogLevel::info)
             << "Treeset seed-greedy generation: initial_ml="
