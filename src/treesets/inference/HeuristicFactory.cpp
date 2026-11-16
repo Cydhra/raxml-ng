@@ -75,19 +75,9 @@ static std::unique_ptr<InferenceHeuristic> from_meta_parameters(const MetaParame
     }
 
     if (meta_parameters.fallback_fast_raxml) {
-        // reset model
-        heuristic = std::make_unique<ChangeConfig>(batch_name, std::move(heuristic), num_trees, threads_per_worker,
-                                              start_tree_list, part_assignments, std::make_shared<ModelMap>(), std::nullopt,
-                                              partitioned_msa, tip_msa_idmap);
-
         heuristic = std::make_unique<FastRaxml>(batch_name, std::move(heuristic), num_trees, threads_per_worker,
                                            part_assignments);
     } else if (meta_parameters.fallback_adaptive_raxml) {
-        // reset model
-        heuristic = std::make_unique<ChangeConfig>(batch_name, std::move(heuristic), num_trees, threads_per_worker,
-                                              start_tree_list, part_assignments, std::make_shared<ModelMap>(), std::nullopt,
-                                              partitioned_msa, tip_msa_idmap);
-
         heuristic = std::make_unique<AdaptiveRaxml>(batch_name, std::move(heuristic), num_trees, threads_per_worker);
     }
 
@@ -149,9 +139,10 @@ std::unique_ptr<InferenceHeuristic> HeuristicFactory::extend_heuristic(const Met
         assert(accept_anything || !old_parameters.do_final_model || new_parameters.do_final_model);
 
         // we cannot undo a previously inferred model
-        // skip model is inverse of do-model, so we need == here instead of !=
         delta.do_first_model = old_parameters.do_first_model != new_parameters.do_first_model;
-        delta.do_final_model = old_parameters.do_final_model != new_parameters.do_final_model;
+
+        // we have to re-do final model if the new parameters want one
+        delta.do_final_model = new_parameters.do_final_model;
 
         assert(accept_anything || !old_parameters.nni_round || new_parameters.nni_round);
         // we cannot undo an NNI round
@@ -175,6 +166,10 @@ std::unique_ptr<InferenceHeuristic> HeuristicFactory::extend_heuristic(const Met
         delta.fallback_fast_raxml = new_parameters.fallback_fast_raxml;
     }
 
-    return from_meta_parameters(delta, std::move(old_heuristic), batch_name, num_trees, threads_per_worker,
+    // reset model
+    auto heuristic = std::make_unique<ChangeConfig>(batch_name, std::move(old_heuristic), num_trees, threads_per_worker,
+                                          start_tree_list, part_assignments, std::make_shared<ModelMap>(), std::nullopt,
+                                          partitioned_msa, tip_msa_idmap);
+    return from_meta_parameters(delta, std::move(heuristic), batch_name, num_trees, threads_per_worker,
                                 start_tree_list, part_assignments, initial_model, partitioned_msa, tip_msa_idmap);
 }
