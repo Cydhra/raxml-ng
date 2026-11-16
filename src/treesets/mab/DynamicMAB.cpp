@@ -166,6 +166,6 @@ MetaParameters DynamicMAB::mutate(const MetaParameters &parameters) {
         default: break;
     }
 
-    past_mutations.insert({parameters, mutation});
+    past_mutations[parameters] = mutation;
     return new_parameters;
 }
