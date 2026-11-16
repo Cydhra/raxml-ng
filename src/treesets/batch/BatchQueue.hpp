@@ -43,8 +43,10 @@ public:
      *
      * @param num_workers number of workers assigned to the batch
      * @param num_threads total number of threads (not per worker) assigned to the batch
+     * @param lock proof that the calling thread is allowed to modify the batch list. Because this method does not
+     * trigger any inference, it does not stall the queue.
      */
-    TunedBatch &generate_batch(unsigned int num_workers, unsigned int num_threads);
+    TunedBatch &generate_batch(unsigned int num_workers, unsigned int num_threads, const std::lock_guard<std::mutex> &lock);
 
     /**
      * Select a TunedBatch instance for inference with the given parameters.

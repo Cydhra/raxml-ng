@@ -1,12 +1,10 @@
 #include "BatchQueue.hpp"
 
-TunedBatch &BatchQueue::generate_batch(const unsigned int num_workers, const unsigned int num_threads) {
+TunedBatch &BatchQueue::generate_batch(const unsigned int num_workers, const unsigned int num_threads, const std::lock_guard<std::mutex> &) {
     const std::string name_prefix = "Batch";
 
     // lock the mutex for the batch queue
-    const std::lock_guard<std::mutex> lock(batch_mutex);
-
-    auto batch_name_index = this->batches.size();
+    const auto batch_name_index = this->batches.size();
 
     // place new batches at the end of the queue, and mark them as unfinished
     std::string batch_name = name_prefix + std::to_string(batch_name_index);
@@ -19,12 +17,12 @@ TunedBatch &BatchQueue::generate_batch(const unsigned int num_workers, const uns
                                num_workers,
                                load_balancer);
 
-    auto &batch = this->batches.back();
+    const auto &batch = this->batches.back();
 
-    // mark the batch as unfinished
+    // mark the batch as unfinished and reserved
+    this->in_flight.emplace(batch.get_name());
     this->unfinished.emplace(batch.get_name());
 
-    // return (which drops the mutex guard)
     return this->batches[batch_name_index];
 }
 
@@ -49,7 +47,9 @@ TunedBatch &BatchQueue::select_next_batch(const MetaParameters &current_paramete
                                           const unsigned int num_threads) {
     TunedBatch *selected_batch = nullptr;
 
-    batch_mutex.lock();
+    // lock the batch mutex to avoid comodification of the list
+    const std::lock_guard lock(batch_mutex);
+
     // check if there exists a batch that is compatible
     for (auto &batch: this->batches) {
         if (unfinished.find(batch.get_name()) != unfinished.end()) {
@@ -72,17 +72,10 @@ TunedBatch &BatchQueue::select_next_batch(const MetaParameters &current_paramete
     }
 
     if (!selected_batch) {
-        // unlock mutex to allow generation of batches without keeping the queue locked, and because generate_batches
-        // will attempt to lock it again when the batch is added to the vector.
-        batch_mutex.unlock();
-        selected_batch = &generate_batch(num_workers, num_threads);
-
-        // relock to add batch to in-flight set
-        batch_mutex.lock();
+        selected_batch = &generate_batch(num_workers, num_threads, lock);
+    } else {
+        this->in_flight.emplace(selected_batch->get_name());
     }
-
-    this->in_flight.emplace(selected_batch->get_name());
-    batch_mutex.unlock();
 
     return *selected_batch;
 }
