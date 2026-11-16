@@ -3,10 +3,9 @@
 TunedBatch &BatchQueue::generate_batch(const unsigned int num_workers, const unsigned int num_threads, const std::lock_guard<std::mutex> &) {
     const std::string name_prefix = "Batch";
 
-    // lock the mutex for the batch queue
     const auto batch_name_index = this->batches.size();
 
-    // place new batches at the end of the queue, and mark them as unfinished
+    // place new batches at the end of the queue, it will be marked as unfinished and in-flight
     std::string batch_name = name_prefix + std::to_string(batch_name_index);
     this->batches.emplace_back(batch_name,
                                msa,
