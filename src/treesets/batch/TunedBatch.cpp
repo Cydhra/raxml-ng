@@ -335,6 +335,11 @@ bool TunedBatch::is_compatible(const MetaParameters &new_parameters) const {
         if (this->meta_parameters.model_override != new_parameters.model_override) {
             return false;
         }
+    } else {
+        // avoid reusing batches for starting trees for other starting tree configurations
+        if (!new_parameters.any_rounds()) {
+            return false;
+        }
     }
 
     // if we already did final model optimization, dont accept parameters that dont. We do not mind changing order here
