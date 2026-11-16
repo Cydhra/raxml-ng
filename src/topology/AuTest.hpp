@@ -96,6 +96,7 @@ public:
         num_replicates = other.num_replicates;
         num_trees = other.num_trees;
         seed = other.seed;
+        pvalue_cutoff = other.pvalue_cutoff;
 
         other.test_statistics = nullptr;
         other.normalized_statistics = nullptr;
