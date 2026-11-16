@@ -98,8 +98,8 @@ public:
         seed = other.seed;
         pvalue_cutoff = other.pvalue_cutoff;
 
-        other.test_statistics = nullptr;
-        other.normalized_statistics = nullptr;
+        std::swap(other.test_statistics, this->test_statistics);
+        std::swap(other.normalized_statistics, this->normalized_statistics);
 
         return *this;
     }
