@@ -6,6 +6,7 @@
 #include "TreeSource.hpp"
 #include "../../loadbalance/CoarseLoadBalancer.hpp"
 #include "../../Tree.hpp"
+#include "shared_mutex"
 
 // forward declaration of generate_tree in main.cpp to make it accessible. If the function in main.cpp
 // changes signature, just update this declaration as well.
@@ -18,6 +19,8 @@ public:
 
     bool ensure(const RaxmlInstance &instance, const SmartBarrier &barrier, unsigned int threads_per_worker, unsigned int worker_id, unsigned int thread_id, unsigned int num_trees) override;
 
+    void copy_tree(Tree &target, unsigned tree_id) const override;
+
     /**
      * @return mean estimate of time spent per tree on parsimony
      */
@@ -27,7 +30,7 @@ private:
     /**
      * A mutex that the master-thread must hold during modification of the tree-list or the starting seed.
      */
-    std::unique_ptr<std::mutex> tree_list_mutex = std::make_unique<std::mutex>();
+    std::unique_ptr<std::shared_mutex> tree_list_mutex = std::make_unique<std::shared_mutex>();
 
     /**
      * Seed where the next round of tree generation attempts begins

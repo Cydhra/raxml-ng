@@ -56,6 +56,12 @@ bool ParsimonySource::ensure(const RaxmlInstance &instance, const SmartBarrier &
     return true;
 }
 
+void ParsimonySource::copy_tree(Tree &target, unsigned tree_id) const {
+    tree_list_mutex->lock_shared();
+    TreeSource::copy_tree(target, tree_id);
+    tree_list_mutex->unlock_shared();
+}
+
 double ParsimonySource::amortized_time(unsigned int batch_size) const {
     // not thread-safe but we stay silly
     return static_cast<double>(*cumulative_wall_time) / static_cast<double>(*trees_generated) * static_cast<double>(batch_size);
