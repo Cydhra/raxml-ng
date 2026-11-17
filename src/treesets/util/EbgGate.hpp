@@ -114,7 +114,7 @@ protected:
     /**
      * Margin for acceptable mean absolute error of EBG support from ml_frequency, which are accepted during filtering
      */
-    double mae_margin = 0.1;
+    double mae_margin = 0.01;
 };
 
 
