@@ -115,7 +115,9 @@ protected:
      * @param requested_candidates how many candidates are requested. Implementing classes may generate less trees.
      *                             If the number of generated trees is smaller than the minimum number required from
      *                             the ensure() call, the tree source deactivates itself.
-     * @param round_seed seed for generating trees if required. Seed should be increased by 1 per tree.
+     * @param donor_offset offset within the donor list, different for each worker to ensure unique trees
+     * @param base_seed base seed for parsimony tree generation. Should be the same for each worker, but changed if
+     * the source is being refilled.
      * @return A list of generated candidate trees
      */
     virtual TreeList generate_candidates(
@@ -123,7 +125,8 @@ protected:
         const ConstTreeRange &donor_pool,
         const SplitList &donor_splits,
         unsigned int requested_candidates,
-        unsigned long round_seed) = 0;
+        unsigned int donor_offset,
+        unsigned long base_seed) = 0;
 };
 
 

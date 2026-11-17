@@ -26,6 +26,7 @@ protected:
         const ConstTreeRange &donor_pool,
         const SplitList &donor_splits,
         unsigned int requested_candidates,
+        unsigned int donor_offset,
         unsigned long round_seed) override;
 
     Tree materialize_candidate(const std::vector<CandidateSplit> &selected) const;

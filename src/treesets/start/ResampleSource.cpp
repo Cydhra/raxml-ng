@@ -14,9 +14,6 @@ SplitList ResampleSource::extract_splits(const Tree &tree, const bool normalize)
                                  static_cast<unsigned int>(tip_count % bits_per_word != 0);
     const PllSplitSharedPtr splits(corax_utree_split_create(&tree.pll_utree_root(), tip_count, nullptr),
                                    corax_utree_split_destroy);
-    if (!splits) {
-        return result;
-    }
 
     if (normalize) {
         corax_utree_split_normalize_and_sort(
@@ -94,17 +91,16 @@ void ResampleSource::generate(const RaxmlInstance &instance, const SmartBarrier 
     for (const auto &tree: donors)
         donor_splits.push_back(topology_key(tree));
 
-    // generate assignment
+    // generate assignment with contiguous balancer to allow easy calculation of offset
     CoarseAssignment bootstrap_tree_ids(num_trees);
     std::iota(bootstrap_tree_ids.begin(), bootstrap_tree_ids.end(), 0);
     ContiguousCoarseLoadBalancer balancer{};
     const auto assignment = balancer.get_proc_assignments(bootstrap_tree_ids, num_workers, worker_id);
 
-    const auto seed_offset = worker_id * (2 * assignment.size() + 1);
     barrier.enter();
 
     // infer trees in parallel
-    local_lists[worker_id] = generate_candidates(instance, donors, donor_splits, assignment.size(), seed + seed_offset);
+    local_lists[worker_id] = generate_candidates(instance, donors, donor_splits, assignment.size(), assignment.front(), seed);
 
     const auto end = std::chrono::steady_clock::now();
     const unsigned int elapsed = static_cast<unsigned int>(std::chrono::duration_cast<

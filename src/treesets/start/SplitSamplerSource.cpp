@@ -2,8 +2,14 @@
 
 #include "../../bootstrap/ConsensusTree.hpp"
 
-TreeList SplitSamplerSource::generate_candidates(const RaxmlInstance &, const ConstTreeRange &donor_pool,
-                                                 const SplitList &donor_splits, unsigned int requested_candidates,
+
+constexpr size_t NUM_RETRY = 2;
+
+TreeList SplitSamplerSource::generate_candidates(const RaxmlInstance &,
+                                                 const ConstTreeRange &donor_pool,
+                                                 const SplitList &donor_splits,
+                                                 unsigned int requested_candidates,
+                                                 const unsigned int donor_offset,
                                                  unsigned long round_seed) {
     TreeList candidates;
 
@@ -51,118 +57,122 @@ TreeList SplitSamplerSource::generate_candidates(const RaxmlInstance &, const Co
     candidates.reserve(donor_pool.size());
     unsigned int incomplete_split_systems = 0;
     unsigned int materialization_failures = 0;
+    unsigned int attempt_counter = 0;
 
     // Eight donors is the one retained reference-algorithm choice. Keep it
     // local to the generator instead of adding a global policy constant.
     const auto seed_window_size = std::min<std::size_t>(8, donor_pool.size());
 
-    const auto attempt_limit = requested_candidates * 2;
     unsigned int deduplicated_this_call = 0;
     std::set<Split> staged_topologies;
 
-    for (unsigned int attempt = 0; attempt < attempt_limit && candidates.size() < requested_candidates; ++attempt) {
-        TreeList seed_trees;
-        seed_trees.reserve(seed_window_size);
-        std::vector<std::size_t> seed_ids;
-        seed_ids.reserve(seed_window_size);
-        for (std::size_t offset = 0; offset < seed_window_size; ++offset) {
-            const auto donor_id = (attempt + offset + round_seed) % donor_pool.size();
-            seed_ids.push_back(donor_id);
-            seed_trees.push_back(donor_pool[donor_id]);
-        }
+    for (unsigned int tree_num = 0; tree_num < requested_candidates; ++tree_num) {
+        for (unsigned int attempt = 0; attempt < NUM_RETRY; attempt++) {
+            TreeList seed_trees;
+            seed_trees.reserve(seed_window_size);
+            std::vector<std::size_t> seed_ids;
+            seed_ids.reserve(seed_window_size);
 
-        if (!has_majority_split(donor_splits, seed_ids, words_per_split)) {
-            ++incomplete_split_systems;
-            continue;
-        }
+            for (std::size_t window_index = 0; window_index < seed_window_size; ++window_index) {
+                // the donor ids are chosen such that different workers use different donors, and failed attempts do
+                // spread out the donor ids to avoid re-using donors of other workers
+                const auto donor_id = (donor_offset + tree_num + window_index * (attempt + 1)) % donor_pool.size();
 
-        ConsensusTree seed_tree(seed_trees, ConsenseCutoff::MR);
-        seed_tree.compute_support();
-
-        std::vector<CandidateSplit> selected;
-        selected.reserve(max_splits);
-
-        auto seed_splits = extract_splits(seed_tree, false);
-        if (seed_splits.empty()) {
-            ++materialization_failures;
-            continue;
-        }
-
-        for (auto &words: seed_splits) {
-            const auto ranked = corax_utree_split_hashtable_lookup(split_hash_table, words.data(),
-                                                                      baseline_tree.num_tips());
-
-            if (ranked) {
-                selected.push_back(split_pool[ranked->bip_number]);
-            } else {
-                selected.push_back(CandidateSplit{std::move(words), 0, 0});
+                seed_ids.push_back(donor_id);
+                seed_trees.push_back(donor_pool[donor_id]);
             }
-        }
+            attempt_counter += 1;
 
-        auto try_add = [&](const CandidateSplit &candidate) {
-            if (selected.size() >= max_splits) {
-                return;
+            if (!has_majority_split(donor_splits, seed_ids, words_per_split)) {
+                ++incomplete_split_systems;
+                continue;
             }
 
-            for (const auto &existing: selected) {
-                if (existing.words == candidate.words ||
-                    !corax_utree_split_compatible(const_cast<corax_split_base_t *>(existing.words.data()),
-                                                  const_cast<corax_split_base_t *>(candidate.words.data()),
-                                                  words_per_split, tip_count)) {
-                    return;
+            ConsensusTree seed_tree(seed_trees, ConsenseCutoff::MR);
+            seed_tree.compute_support();
+
+            std::vector<CandidateSplit> selected;
+            selected.reserve(max_splits);
+
+            auto seed_splits = extract_splits(seed_tree, false);
+
+            for (auto &words: seed_splits) {
+                const auto ranked = corax_utree_split_hashtable_lookup(split_hash_table, words.data(),
+                                                                       baseline_tree.num_tips());
+
+                if (ranked) {
+                    selected.push_back(split_pool[ranked->bip_number]);
+                } else {
+                    selected.push_back(CandidateSplit{std::move(words), 0, 0});
                 }
             }
 
-            selected.push_back(candidate);
-        };
+            auto try_add = [&](const CandidateSplit &candidate) {
+                if (selected.size() >= max_splits) {
+                    return;
+                }
 
-        // Primary pass: greedily prefer splits seen in the fixed ML set.
-        for (const auto &candidate: split_pool) {
-            if (candidate.ml_frequency > 0) {
-                try_add(candidate);
+                for (const auto &existing: selected) {
+                    if (existing.words == candidate.words ||
+                        !corax_utree_split_compatible(const_cast<corax_split_base_t *>(existing.words.data()),
+                                                      const_cast<corax_split_base_t *>(candidate.words.data()),
+                                                      words_per_split, tip_count)) {
+                        return;
+                    }
+                }
+
+                selected.push_back(candidate);
+            };
+
+            // Primary pass: greedily prefer splits seen in the fixed ML set.
+            for (const auto &candidate: split_pool) {
+                if (candidate.ml_frequency > 0) {
+                    try_add(candidate);
+                }
             }
-        }
 
-        for (std::size_t offset = 0; offset < split_pool.size() && selected.size() < max_splits; ++offset) {
-            const auto split_id = (static_cast<std::size_t>(attempt) + offset + round_seed * 2) % split_pool.size();
-            try_add(split_pool[split_id]);
-        }
+            for (std::size_t offset = 0; offset < split_pool.size() && selected.size() < max_splits; ++offset) {
+                const auto split_id = (static_cast<std::size_t>(tree_num) + offset + round_seed * 2) % split_pool.
+                                      size();
+                try_add(split_pool[split_id]);
+            }
 
-        if (selected.size() != max_splits) {
-            ++incomplete_split_systems;
-            continue;
-        }
+            if (selected.size() != max_splits) {
+                ++incomplete_split_systems;
+                continue;
+            }
 
-        Tree candidate = materialize_candidate(selected);
-        if (candidate.empty() ||
-            !candidate.binary() ||
-            !seed_tree.compatible(candidate)) {
-            coraxlib_reset_error();
-            ++materialization_failures;
-            continue;
-        }
+            Tree candidate = materialize_candidate(selected);
+            if (candidate.empty() ||
+                !candidate.binary() ||
+                !seed_tree.compatible(candidate)) {
+                coraxlib_reset_error();
+                ++materialization_failures;
+                continue;
+            }
 
-        if (auto topology = topology_key(candidate);
-            topology.empty() || seen_topologies.find(topology) != seen_topologies.end() ||
-            !staged_topologies.insert(std::move(topology)).second) {
-            ++deduplicated_this_call;
-            continue;
-        }
+            if (auto topology = topology_key(candidate);
+                topology.empty() || seen_topologies.find(topology) != seen_topologies.end() ||
+                !staged_topologies.insert(std::move(topology)).second) {
+                ++deduplicated_this_call;
+                continue;
+            }
 
-        candidates.push_back(std::move(candidate));
+            candidates.push_back(std::move(candidate));
+            break; // success, no more retry required
+        }
     }
 
     corax_utree_split_hashtable_destroy(split_hash_table);
 
     LOG_WORKER_TS(LogLevel::info)
-            << "Treeset seed-greedy generation: initial_ml="
-            << initial_ml_trees.size()
-            << ", donors=" << donor_pool.size()
+            << "Split-Sampler generation: donors="
+            << donor_pool.size()
             << ", split_pool=" << split_pool.size()
             << ", incomplete=" << incomplete_split_systems
             << ", materialization_failures=" << materialization_failures
             << ", generated=" << candidates.size()
-            << ", attempts=" << attempt_limit
+            << ", attempts=" << attempt_counter
             << ", deduplicated_this_call=" << deduplicated_this_call
             << ", seen_topologies=" << seen_topologies.size() + staged_topologies.size()
             << std::endl;
