@@ -27,7 +27,6 @@ public:
                          const TreeList& initial_ml_trees,
                          const Tree& baseline_tree,
                          const std::shared_ptr<PartitionedMSA>& msa,
-                         const Tree &tree,
                          const std::vector<std::vector<doubleVector> > &reference_logh_matrix,
                          const unsigned int batch_size,
                          long seed,
@@ -84,10 +83,10 @@ public:
         // unfortunately this method wants a tree. Please do not ask why it wants that, it doesn't deserve the tree.
         // But we have to comply, so we give it one of the reference trees since
         // any tree that conforms to the MSA will do.
-        checkpoint_manager->init_checkpoints(tree, msa->models(), num_task_groups * workers_per_group);
+        checkpoint_manager->init_checkpoints(baseline_tree, msa->models(), num_task_groups * workers_per_group);
 
         adaptive_checkpoint_manager->pythia_score(pythia_score);
-        adaptive_checkpoint_manager->init_checkpoints(tree, msa->models(), num_task_groups * workers_per_group);
+        adaptive_checkpoint_manager->init_checkpoints(baseline_tree, msa->models(), num_task_groups * workers_per_group);
     }
 
     /**

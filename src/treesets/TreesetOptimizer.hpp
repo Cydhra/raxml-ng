@@ -106,7 +106,6 @@ public:
     TreesetOptimizer(RaxmlInstance &instance,
                      Options &opts,
                      const std::shared_ptr<PartitionedMSA> &msa,
-                     const Tree &tree,
                      const TreeList initial_ml_trees,
                      const Tree &baseline_tree, // TODO we do not need the randomTree above then
                      IDVector &tip_msa_idmap,
@@ -126,7 +125,7 @@ public:
                                                                    opts,
                                                                    initial_ml_trees,
                                                                    baseline_tree,
-                                                                   msa, tree,
+                                                                   msa,
                                                                    persite_loglh,
                                                                    DEFAULT_BATCH_SIZE,
                                                                    starting_seed,

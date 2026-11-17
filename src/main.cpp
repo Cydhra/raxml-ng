@@ -4423,7 +4423,7 @@ void master_main(RaxmlInstance& instance, CheckpointManager& cm)
       initial_ml_trees.push_back(ml_tree);
     }
 
-    instance.treeset_optimizer = std::make_unique<TreesetOptimizer>(instance, instance.opts, instance.parted_msa, instance.random_tree, initial_ml_trees, best_tree, instance.tip_msa_idmap, instance.persite_loglh, *instance.load_balancer, cm.pythia_score(), 300, opts.random_seed + 1);
+    instance.treeset_optimizer = std::make_unique<TreesetOptimizer>(instance, instance.opts, instance.parted_msa, initial_ml_trees, best_tree, instance.tip_msa_idmap, instance.persite_loglh, *instance.load_balancer, cm.pythia_score(), 300, opts.random_seed + 1);
 
     ParallelContext::finalize_threads();
     instance.treeset_optimizer->run();
