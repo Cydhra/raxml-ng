@@ -122,6 +122,7 @@ static struct option long_options[] =
   {"ts-workers",           required_argument,nullptr, 0 }, /* 86 */
   {"bandit",               required_argument,nullptr, 0 }, /* 87 */
   {"reference-trees",      required_argument,nullptr, 0 }, /* 88 */
+  {"gate-margin",          required_argument,nullptr, 0 }, /* 89 */
 
   { 0, 0, 0, 0 }
 };
@@ -1770,6 +1771,9 @@ void CommandLineParser::parse_options(int argc, char** argv, Options &opts)
       case 88: /* reference trees (for treeset) */
         optarg_tree = strdup(optarg);
         opts.topology_opt_method = TopologyOptMethod::none;
+        break;
+      case 89: /* gate margin */
+        sscanf(optarg, "%g", &opts.gate_margin);
         break;
       default:
         throw  OptionException("Internal error in option parsing");

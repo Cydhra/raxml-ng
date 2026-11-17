@@ -30,7 +30,7 @@ public:
                          const std::vector<std::vector<doubleVector> > &reference_logh_matrix,
                          const unsigned int batch_size,
                          long seed,
-                         const double pythia_score) : gate(make_shared<EbgGate>(baseline_tree, initial_ml_trees)),
+                         const double pythia_score) : gate(make_shared<EbgGate>(opts, baseline_tree, initial_ml_trees)),
                                                       parsimony_source(make_shared<ParsimonySource>(seed)),
                                                       parsimony_split_sampling(
                                                           make_shared<ParsimonySamplerSource>(

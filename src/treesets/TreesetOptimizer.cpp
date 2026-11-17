@@ -208,6 +208,7 @@ void TreesetOptimizer::run() {
             LOG_INFO << "greedy";
             break;
     }
+    LOG_INFO << "EBG Gate Margin: " << opts.gate_margin;
     LOG_INFO << std::endl << std::endl;
 
     auto global_barrier = SmartBarrier(pool.num_threads_total());

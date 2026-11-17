@@ -1,6 +1,7 @@
 #ifndef RAXML_EBGFILTER_HPP
 #define RAXML_EBGFILTER_HPP
 
+#include "../../Options.hpp"
 #include "../start/TreeSource.hpp"
 
 #include "../../Tree.hpp"
@@ -40,9 +41,9 @@ struct RankedCandidate {
  */
 class EbgGate {
 public:
-    EbgGate(Tree baseline_tree, TreeList initial_ml_trees)
+    EbgGate(const Options &opts, Tree baseline_tree, TreeList initial_ml_trees)
         : baseline_tree(std::move(baseline_tree)),
-          initial_ml_trees(std::move(initial_ml_trees)) {
+          initial_ml_trees(std::move(initial_ml_trees)), mae_margin(opts.gate_margin) {
     }
 
     /**
@@ -114,7 +115,7 @@ protected:
     /**
      * Margin for acceptable mean absolute error of EBG support from ml_frequency, which are accepted during filtering
      */
-    double mae_margin = 0.01;
+    double mae_margin;
 };
 
 
