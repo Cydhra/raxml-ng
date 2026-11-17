@@ -363,6 +363,14 @@ protected:
     unsigned int threads_per_worker;
 
     /**
+     * batch-local version of SharedBatchResources::target_au_test_factor. When the batch tests whether the AUTest
+     * has the correct size, the group leader loads the target_au_test_factor from SharedBatchResources into the batch
+     * to ensure consensus of all worker threads on its value.
+     * Then, the AU Test rescaling is performed.
+     */
+    unsigned int target_au_test_factor;
+
+    /**
      * @return Whether all starting trees have been generated for this batch.
      */
     [[nodiscard]] bool start_trees_generated() const {

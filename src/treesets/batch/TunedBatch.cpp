@@ -158,11 +158,16 @@ void TunedBatch::perform_plausibility_check(const Options &opts, SharedBatchReso
                                             const unsigned int thread_id) {
     auto &au_test = resources.get_screening_test(context);
 
-    // check if the AU test needs to be re-build with more replicates
+    // load the replication factor for the AU test
     const auto rep_factor = resources.get_au_factor(context);
-    if (const auto target_factor = resources.target_au_test_factor->load(); rep_factor != target_factor) {
-        // make sure all threads have seen the replication factor is different from the target, before we change the atomic
-        context.enter_barrier();
+
+    // leader loads the target replication factor. Other threads obtain value from leader to ensure consensus.
+    if (context.is_group_leader(worker_id, thread_id)) {
+        this->target_au_test_factor = resources.target_au_test_factor->load();
+    }
+    context.enter_barrier();
+
+    if (const auto target_factor = this->target_au_test_factor; rep_factor != target_factor) {
         if (context.is_group_leader(worker_id, thread_id)) {
             resources.set_au_factor(context, target_factor);
             LOG_INFO_TS << this->name << ": Resetting AU test instance to " << (SHALLOW_REPS[0] * target_factor) <<
