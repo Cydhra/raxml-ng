@@ -235,7 +235,7 @@ void TunedBatch::perform_plausibility_check(const Options &opts, SharedBatchReso
             while (true) {
                 auto target_factor = resources.target_au_test_factor->load();
 
-                if (const auto new_rep_factor = min(rep_factor * 2, 20u); target_factor != new_rep_factor) {
+                if (const auto new_rep_factor = min(rep_factor * 2, 20u); target_factor < new_rep_factor) {
                     if (resources.target_au_test_factor->compare_exchange_strong(
                         target_factor, new_rep_factor, memory_order_acq_rel, memory_order_acquire)) {
                         LOG_WARN << " Updated to replicate factor " << new_rep_factor << std::endl;
