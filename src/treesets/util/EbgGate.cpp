@@ -110,20 +110,38 @@ TreeList EbgGate::gate_and_rank(TreeList candidates) {
     // calculate error of EBG expectation and observed split frequency
     double ml_mae = 0.0;
     double candidate_mae = 0.0;
+    double average_ml_support = 0.0;
+    double average_candidate_support = 0.0;
+
     for (std::size_t split_id = 0; split_id < split_count; ++split_id) {
+        average_ml_support += ml_frequency[split_id];
+        average_candidate_support += candidate_frequency[split_id];
         ml_mae += std::abs(ml_frequency[split_id] - ebg_support[split_id]);
         candidate_mae += std::abs(candidate_frequency[split_id] - ebg_support[split_id]);
     }
     ml_mae /= static_cast<double>(split_count);
     candidate_mae /= static_cast<double>(split_count);
+    average_ml_support /= static_cast<double>(split_count);
+    average_candidate_support /= static_cast<double>(split_count);
+
 
     if (!std::isfinite(ml_mae) || !std::isfinite(candidate_mae) || candidate_mae - mae_margin >= ml_mae) {
-        LOG_INFO
+        LOG_INFO_TS
                 << "EBG-Gate failed: "
                 << "ml_ebg_mae=" << ml_mae
                 << ", candidate_ebg_mae=" << candidate_mae
+                << ", average_ml_support=" << average_ml_support
+                << ", average_candidate_support=" << average_candidate_support
                 << std::endl;
         return selected;
+    } else {
+        LOG_INFO_TS
+                << "EBG-Gate passed: "
+                << "ml_ebg_mae=" << ml_mae
+                << ", candidate_ebg_mae=" << candidate_mae
+                << ", average_ml_support=" << average_ml_support
+                << ", average_candidate_support=" << average_candidate_support
+                << std::endl;
     }
 
     // rank splits using the promise score of splits (i.e. splits with higher frequency are chosen preferentially)
