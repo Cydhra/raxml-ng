@@ -6,8 +6,16 @@
 void TreesetOptimizer::initialize_bandits(const double maximum_success) {
     const auto starting_trees = make_shared<MultiArmedBandit<MetaParameters> >();
     starting_trees->emplace_back("Parsimony", MetaParameters(), maximum_success);
-    starting_trees->emplace_back("Split-Parsimony", MetaParameters().with_treesource(SplitParsimony), maximum_success);
-    starting_trees->emplace_back("Split-Greedy", MetaParameters().with_treesource(SplitGreedy), maximum_success);
+    if (shared_batch_resources.get_parsimony_resample_source().total_trees() >= this->batch_queue.get_batch_size()) {
+        starting_trees->emplace_back("Constrained-Parsimony",
+                                     MetaParameters().with_treesource(SplitParsimony).with_final_model(false),
+                                     maximum_success);
+    }
+    if (shared_batch_resources.get_greedy_split_source().total_trees() >= this->batch_queue.get_batch_size()) {
+        starting_trees->emplace_back("Split-Greedy",
+                                     MetaParameters().with_treesource(SplitGreedy).with_final_model(false),
+                                     maximum_success);
+    }
 
     const auto adaptive_radius = pythia_score >= 0.0
                                      ? Optimizer::adaptive_radius(pythia_score)
@@ -175,7 +183,7 @@ void TreesetOptimizer::initialize_resources(const SmartBarrier &global_barrier) 
     }
 
     LOG_INFO_TS << "Generating " << target_tree_count << " split-informed parsimony trees." << std::endl;
-    shared_batch_resources.get_parsimony_split_source().generate(instance, global_barrier,
+    shared_batch_resources.get_parsimony_resample_source().generate(instance, global_barrier,
                                                                  ParallelContext::num_groups(),
                                                                  ParallelContext::local_group_id(), target_tree_count);
 

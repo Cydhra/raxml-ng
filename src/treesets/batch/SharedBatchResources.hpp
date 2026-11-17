@@ -184,7 +184,7 @@ public:
         return *parsimony_source;
     }
 
-    [[nodiscard]] ResampleSource &get_parsimony_split_source() const {
+    [[nodiscard]] ResampleSource &get_parsimony_resample_source() const {
         return *parsimony_split_sampling;
     }
 

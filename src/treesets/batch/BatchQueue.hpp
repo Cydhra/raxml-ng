@@ -70,6 +70,10 @@ public:
         return this->batches.size();
     }
 
+    unsigned int get_batch_size() const {
+        return this->batch_size;
+    }
+
     /**
      * @return read-only access to the batch vector
      */

@@ -27,7 +27,7 @@ void TunedBatch::generate_starting_trees(const RaxmlInstance &instance, SharedBa
             tree_source = &resources.get_parsimony();
             break;
         case SplitParsimony:
-            tree_source = &resources.get_parsimony_split_source();
+            tree_source = &resources.get_parsimony_resample_source();
             break;
         case SplitGreedy:
             tree_source = &resources.get_greedy_split_source();
