@@ -190,7 +190,7 @@ void TunedBatch::perform_plausibility_check(const Options &opts, SharedBatchReso
     // check if the AU test needs to be initialized
     if (context.is_group_leader(worker_id, thread_id)) {
         if (!initialized) {
-            au_test.allocate_test_statistics(false);
+            au_test.allocate_test_statistics(false, true);
         }
         au_test.replace_persite_loglh(reference_persite_loglh->size(), batch_persite_logh);
     }

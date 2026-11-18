@@ -9,7 +9,8 @@ const doubleVector AU_DEFAULT_SCALES = {0.5, 0.6, 0.7, 0.8, 0.9, 1.0, 1.1, 1.2, 
 const uintVector AU_DEFAULT_REPS = {10000, 10000, 10000, 10000, 10000, 10000, 10000, 10000, 10000, 10000};
 extern const double AU_DEFAULT_CUTOFF = 0.05;
 
-void AuTest::replace_persite_loglh(const unsigned int start_index, const std::vector<std::vector<doubleVector> > &new_vectors) {
+void AuTest::replace_persite_loglh(const unsigned int start_index,
+                                   const std::vector<std::vector<doubleVector> > &new_vectors) {
     assert(start_index + new_vectors.size() <= this->persite_loglh.size());
     finished = false;
 
@@ -24,11 +25,12 @@ void AuTest::replace_persite_loglh(const unsigned int start_index, const std::ve
     }
 
     for (unsigned int scale = 0; scale < scales.size(); scale++) {
-        memset(&test_statistics[scale][start_index * num_replicates[scale]], 0, sizeof(double) * new_vectors.size() * num_replicates[scale]);
+        memset(&test_statistics[scale][start_index * num_replicates[scale]], 0,
+               sizeof(double) * new_vectors.size() * num_replicates[scale]);
     }
 }
 
-void AuTest::allocate_test_statistics(bool inplace) {
+void AuTest::allocate_test_statistics(const bool inplace, const bool keep_weights) {
     if (!corax_RELL_allocate_multiscale_matrices(&test_statistics,
                                                  num_trees,
                                                  num_replicates.data(),
@@ -43,8 +45,28 @@ void AuTest::allocate_test_statistics(bool inplace) {
                                                      num_trees,
                                                      num_replicates.data(),
                                                      num_replicates.size())) {
-          throw std::runtime_error("Failed to allocate memory for the AU test.");
+            throw std::runtime_error("Failed to allocate memory for the AU test.");
         }
+    }
+
+    if (keep_weights) {
+        const auto rstate = corax_random_create(seed);
+        for (size_t part_id = 0; part_id < msa.get()->part_count(); part_id++) {
+            const MSA &part_msa = msa.get()->part_msa(part_id);
+            replicate_weights.push_back(nullptr);
+
+            corax_RELL_initialize_weight_matrices(
+                rstate,
+                &replicate_weights[part_id],
+                part_msa.num_sites(),
+                part_msa.num_patterns(),
+                part_msa.weights().data(),
+                scales.data(),
+                num_replicates.data(),
+                scales.size()
+            );
+        }
+
     }
 }
 
@@ -61,7 +83,7 @@ void AuTest::run_bootstrap(const size_t num_rows, const size_t offset) {
     finished = false;
 
     // some debug information
-    LOG_INFO_TS << "Run Bootstrapping (" << scales.size() << " x " << num_replicates[0] << " reps)... "  <<  std::endl;
+    LOG_INFO_TS << "Run Bootstrapping (" << scales.size() << " x " << num_replicates[0] << " reps)... " << std::endl;
 
     // prepare matrix array with offset matrices
     // we collect subarray pointers in `test_statistics_views` and since corax expects double pointers,
@@ -89,6 +111,7 @@ void AuTest::run_bootstrap(const size_t num_rows, const size_t offset) {
         // array is never cleared by the bootstrap method
         corax_RELL_multiscale_bootstrap(rstate,
                                         test_statistics_pointers.data(),
+                                        replicate_weights.size() > part_id ? &replicate_weights[part_id] : nullptr,
                                         per_site_lnl_matrix.data(),
                                         part_msa.weights().data(),
                                         part_msa.num_sites(),
@@ -134,14 +157,15 @@ void AuTest::calculate_p_values() {
         double d, c;
         double p_value = 0.0;
         const int status = corax_au_p_value(normalized_statistics,
-                         tree,
-                         scales.data(),
-                         num_replicates.data(),
-                         scales.size(),
-                         corax_bootstrap_expectation(normalized_statistics[best_index], num_replicates[best_index], tree),
-                         &d,
-                         &c,
-                         &p_value);
+                                            tree,
+                                            scales.data(),
+                                            num_replicates.data(),
+                                            scales.size(),
+                                            corax_bootstrap_expectation(normalized_statistics[best_index],
+                                                                        num_replicates[best_index], tree),
+                                            &d,
+                                            &c,
+                                            &p_value);
 
         if (status == AU_MATH_ERROR) {
             LOG_WARN << "p-value for " << tree << ". tree is unstable." << std::endl;
@@ -175,8 +199,13 @@ void AuTest::free_test_statistics() {
         free(normalized_statistics);
     }
 
+    for (auto &matrix : replicate_weights) {
+        corax_RELL_delete_weight_matrices(&matrix, num_replicates.data(), scales.size());
+    }
+
     test_statistics = nullptr;
     normalized_statistics = nullptr;
+    replicate_weights.clear();
 }
 
 void AuTest::reset_test_statistics() {
@@ -192,7 +221,7 @@ bool AuTest::is_finished() const {
     return finished;
 }
 
-const doubleVector& AuTest::get_p_values() const {
+const doubleVector &AuTest::get_p_values() const {
     if (!finished) {
         throw std::runtime_error("AU test: please call calculate_p_values before calling get_p_values");
     }
@@ -200,29 +229,24 @@ const doubleVector& AuTest::get_p_values() const {
     return p_values;
 }
 
-double AuTest::p_value(unsigned int tree_num) const
-{
-  assert(tree_num < num_trees);
-  return get_p_values().at(tree_num);
+double AuTest::p_value(unsigned int tree_num) const {
+    assert(tree_num < num_trees);
+    return get_p_values().at(tree_num);
 }
 
-double AuTest::loglh(unsigned int tree_num) const
-{
-  assert(tree_num < num_trees);
-  double tree_loglh = 0;
-  for (unsigned int part_id = 0; part_id < msa->part_count(); part_id++)
-  {
-    const MSA &part_msa = msa->part_msa(part_id);
+double AuTest::loglh(unsigned int tree_num) const {
+    assert(tree_num < num_trees);
+    double tree_loglh = 0;
+    for (unsigned int part_id = 0; part_id < msa->part_count(); part_id++) {
+        const MSA &part_msa = msa->part_msa(part_id);
 
-    for (size_t s = 0; s < part_msa.num_patterns(); ++s)
-    {
-      tree_loglh += persite_loglh[tree_num][part_id][s];
+        for (size_t s = 0; s < part_msa.num_patterns(); ++s) {
+            tree_loglh += persite_loglh[tree_num][part_id][s];
+        }
     }
-  }
-  return tree_loglh;
+    return tree_loglh;
 }
 
-bool AuTest::is_plausible(unsigned int tree_num) const
-{
-  return p_value(tree_num) > pvalue_cutoff;
+bool AuTest::is_plausible(unsigned int tree_num) const {
+    return p_value(tree_num) > pvalue_cutoff;
 }
