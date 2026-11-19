@@ -66,6 +66,8 @@ void AuTest::allocate_test_statistics(const bool inplace, const bool keep_weight
                 scales.size()
             );
         }
+
+        corax_random_destroy(rstate);
     }
 }
 
