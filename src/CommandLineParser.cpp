@@ -1773,7 +1773,7 @@ void CommandLineParser::parse_options(int argc, char** argv, Options &opts)
         opts.topology_opt_method = TopologyOptMethod::none;
         break;
       case 89: /* gate margin */
-        sscanf(optarg, "%g", &opts.gate_margin);
+        sscanf(optarg, "%lg", &opts.gate_margin);
         break;
       default:
         throw  OptionException("Internal error in option parsing");
