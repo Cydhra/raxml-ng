@@ -86,14 +86,15 @@ public:
 
 protected:
     /**
-     * Best ML tree from reference set to use as the EBG filter reference
+     * Best ML tree from reference set to use as the EBG filter reference.
+     * This instance must not be accessed by multiple threads at once because Tree is not thread-safe.
      */
-    const Tree baseline_tree;
+    Tree baseline_tree;
 
     /**
      * Set of reference ML trees
      */
-    const TreeList initial_ml_trees;
+    TreeList initial_ml_trees;
 
     /**
      * Splits extracted from reference ML trees, projected onto a reference tree
