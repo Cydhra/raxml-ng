@@ -15,7 +15,7 @@ TreeList SplitSamplerSource::generate_candidates(const RaxmlInstance &,
 
     coraxlib_reset_error();
 
-    const auto tip_count = static_cast<unsigned int>(baseline_tree.num_tips());
+    const auto tip_count = static_cast<unsigned int>(tip_labels.size());
     const auto max_splits = tip_count > 3 ? tip_count - 3 : 0;
     const auto bits_per_word = static_cast<unsigned int>(sizeof(corax_split_base_t) * 8);
     const auto words_per_split = tip_count / bits_per_word + static_cast<unsigned int>(
@@ -26,14 +26,14 @@ TreeList SplitSamplerSource::generate_candidates(const RaxmlInstance &,
     }
 
     std::vector<CandidateSplit> split_pool;
-    bitv_hashtable_t *split_hash_table = corax_utree_split_hashtable_create(baseline_tree.num_tips(), 0);
+    bitv_hashtable_t *split_hash_table = corax_utree_split_hashtable_create(tip_labels.size(), 0);
 
     auto collect_tree_splits = [&](const Tree &tree, const bool from_ml) {
         assert(!tree.empty() && tree.num_tips() == tip_count);
 
         for (auto &words: extract_splits(tree, false)) {
             if (const auto entry = corax_utree_split_hashtable_lookup(split_hash_table, words.data(),
-                                                                      baseline_tree.num_tips())) {
+                                                                      tip_labels.size())) {
                 if (from_ml) {
                     split_pool[entry->bip_number].ml_frequency++;
                 } else {
@@ -98,7 +98,7 @@ TreeList SplitSamplerSource::generate_candidates(const RaxmlInstance &,
 
             for (auto &words: seed_splits) {
                 const auto ranked = corax_utree_split_hashtable_lookup(split_hash_table, words.data(),
-                                                                       baseline_tree.num_tips());
+                                                                       tip_labels.size());
 
                 if (ranked) {
                     selected.push_back(split_pool[ranked->bip_number]);
@@ -196,7 +196,11 @@ Tree SplitSamplerSource::materialize_candidate(const std::vector<CandidateSplit>
         split_view.push_back(const_cast<corax_split_base_t *>(split.words.data()));
     }
 
-    const auto tip_labels = baseline_tree.tip_labels_cstr();
+    const auto num_labels = tip_labels.size();
+    auto c_tip_labels =  std::vector<const char *>(num_labels);
+    for (unsigned int i = 0; i < tip_labels.size(); i++) {
+        c_tip_labels[i] = tip_labels[i].c_str();
+    }
 
     corax_split_system_t split_system{};
     split_system.split_count = static_cast<unsigned int>(selected.size());
@@ -207,8 +211,8 @@ Tree SplitSamplerSource::materialize_candidate(const std::vector<CandidateSplit>
     std::unique_ptr<corax_consensus_utree_t, decltype(&corax_utree_consensus_destroy)> materialized(
         corax_utree_from_splits(
             &split_system,
-            static_cast<unsigned int>(baseline_tree.num_tips()),
-            tip_labels.data()),
+            static_cast<unsigned int>(num_labels),
+            c_tip_labels.data()),
         corax_utree_consensus_destroy);
 
     if (!materialized || !materialized->tree) {
@@ -216,7 +220,7 @@ Tree SplitSamplerSource::materialize_candidate(const std::vector<CandidateSplit>
         return result;
     }
 
-    result.pll_utree(static_cast<unsigned int>(baseline_tree.num_tips()), *materialized->tree);
+    result.pll_utree(static_cast<unsigned int>(num_labels), *materialized->tree);
 
     // The cloned nodes contain non-owning consensus-data pointers. Clear them
     // before the temporary CORAX consensus object is destroyed.

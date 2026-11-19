@@ -22,13 +22,14 @@ constexpr size_t NUM_DONOR_TREE = 300;
 class ResampleSource : public TreeSource {
 public:
     explicit ResampleSource(const std::shared_ptr<ParsimonySource> &donor,
-                                const std::shared_ptr<EbgGate> &gate,
-                                const int seed,
-                                TreeList initial_ml_trees,
-                                Tree baseline_tree) : gate(gate),
-                                                      baseline_tree(std::move(baseline_tree)),
-                                                      initial_ml_trees(std::move(initial_ml_trees)),
-                                                      donor_tree_source(donor), seed(seed) {
+                            const std::shared_ptr<EbgGate> &gate,
+                            const int seed,
+                            TreeList initial_ml_trees,
+                            const Tree &baseline_tree) : gate(gate),
+                                                   tip_labels(baseline_tree.tip_labels_list()),
+                                                   initial_ml_trees(std::move(initial_ml_trees)),
+                                                   donor_tree_source(donor),
+                                                   seed(seed) {
     }
 
     bool ensure(const RaxmlInstance &instance, const SmartBarrier &barrier, unsigned int threads_per_worker,
@@ -52,12 +53,12 @@ protected:
     /**
      * Best ML tree from reference set to use for labels
      */
-    const Tree baseline_tree;
+    NameList tip_labels;
 
     /**
      * All initially inferred ML trees
      */
-    const TreeList initial_ml_trees;
+    TreeList initial_ml_trees;
 
     /**
      * Tree source which yields a number of donor trees required for statistics in the implementing heuristic.

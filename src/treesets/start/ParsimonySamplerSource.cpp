@@ -11,7 +11,7 @@ TreeList ParsimonySamplerSource::generate_candidates(const RaxmlInstance &instan
                                                      const unsigned long base_seed) {
     TreeList candidates;
 
-    const auto tip_count = static_cast<unsigned int>(baseline_tree.num_tips());
+    const auto tip_count = static_cast<unsigned int>(tip_labels.size());
     constexpr auto bits_per_word = static_cast<unsigned int>(sizeof(corax_split_base_t) * 8);
     const auto words_per_split = tip_count / bits_per_word +
                                  static_cast<unsigned int>(tip_count % bits_per_word != 0);
