@@ -152,8 +152,33 @@ public:
     void run_bootstrap(size_t num_rows, size_t offset = 0);
 
     /**
+     * First part of the normalization step. This cannot be parallelized, so master thread needs to call this alone,
+     * before all threads can call `calculate_bp_distributions` in parallel.
+     */
+    void calculate_maximum();
+
+    /**
+     * Second step of the normalization step. This can be run in parallel. If the normalization is run single-threaded,
+     * `finalize_test_statistics()` can be called rather than calling `calculate_maximum()` and
+     * `calculate_bp_distributions()` individually.
+     *
+     * @param offset the tree number the current thread starts at
+     * @param tree_count the number of trees the current thread is supposed to calculate
+     */
+    void calculate_bp_distributions(size_t offset, size_t tree_count);
+
+    /**
+     * Free the scratch space allocated in `calculate_maximum`.
+     */
+    void free_maximum();
+
+    /**
      * Run the normalization step. This can only be done on the entire replicate matrix, it cannot be called on partial
      * matrices, so before this is called (on the master thread), all other threads need to be done.
+     *
+     * This is a single-threaded convenience function. To run final normalization in parallel, call
+     * `calculate_maximum()` from the master thread, `calculate_bp_distributions(o, n)` from all threads with non-overlapping
+     * intervals, and then `free_maximum()` from the master thread.
      */
     void finalize_test_statistics();
 
@@ -233,6 +258,13 @@ private:
     double **normalized_statistics;
 
     std::vector<double ***> replicate_weights;
+
+    /**
+     * Scratch vector for calculating the replicate maximum likelihoods before calculating the bp distributions.
+     * This has to be a nullptr before calling `calculate_maximum` and after calling `calculate_bp_distributions`,
+     * otherwise something was called in the wrong order.
+     */
+    std::vector<double *> replicate_maximum;
 
     /**
      * The finished AU test p values, which are calculated by `calculate_p_values`. These values are invalid as long

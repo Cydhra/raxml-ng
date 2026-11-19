@@ -144,10 +144,24 @@ void TunedBatch::perform_au_test(AuTest &au_test, const bool initialized, const 
     context.enter_barrier();
 
     if (context.is_group_leader(worker_id, thread_id)) {
+        au_test.calculate_maximum();
+    }
+
+    context.enter_barrier();
+
+    const std::vector<size_t> &dist_assignment = au_assignment->at(context.get_group_thread_id(worker_id, thread_id));
+    if (!dist_assignment.empty()) {
+        au_test.calculate_bp_distributions(dist_assignment.front(), dist_assignment.size());
+    }
+
+    context.enter_barrier();
+
+    if (context.is_group_leader(worker_id, thread_id)) {
+        au_test.free_maximum();
+
         // guard the calculation of AU test p-values with a guard so we don't use partially updated p-values to obtain
         // tree topologies.
         auto guard = std::lock_guard(*this->topology_access);
-        au_test.finalize_test_statistics();
         au_test.calculate_p_values();
     }
 }

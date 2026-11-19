@@ -66,7 +66,6 @@ void AuTest::allocate_test_statistics(const bool inplace, const bool keep_weight
                 scales.size()
             );
         }
-
     }
 }
 
@@ -126,6 +125,56 @@ void AuTest::run_bootstrap(const size_t num_rows, const size_t offset) {
     corax_random_destroy(rstate);
 }
 
+void AuTest::calculate_maximum() {
+    LOG_INFO_TS << "Calculating test statistics" << std::endl;
+
+    // mark p values as dirty
+    finished = false;
+
+    if (!replicate_maximum.empty()) {
+        for (const auto pointer: replicate_maximum) {
+            free(pointer);
+        }
+
+        throw RaxmlException("AuTest invalid state: replicate maximum likelihood vectors already exist.");
+    }
+
+    for (unsigned int id_scale = 0; id_scale < scales.size(); id_scale++) {
+        replicate_maximum.push_back(nullptr);
+        corax_find_replicate_maximum(test_statistics[id_scale], num_replicates[id_scale], num_trees,
+                                     replicate_maximum.data() + id_scale);
+    }
+}
+
+void AuTest::calculate_bp_distributions(const size_t offset, const size_t tree_count) {
+    // mark p values as dirty
+    finished = false;
+
+    if (replicate_maximum.empty()) {
+        throw RaxmlException(
+            "AuTest invalid state: replicate maximum likelihood vectors do not exist. "
+            "Call calculate_maximum() before calling calculate_bp_distributions().");
+    }
+
+    for (unsigned int id_scale = 0; id_scale < scales.size(); id_scale++) {
+        corax_calculate_bp_distribution(test_statistics[id_scale], normalized_statistics[id_scale],
+                                        num_replicates[id_scale], offset, tree_count, replicate_maximum[id_scale]);
+    }
+}
+
+void AuTest::free_maximum() {
+    if (replicate_maximum.empty()) {
+        throw RaxmlException(
+            "AuTest invalid state: replicate maximum likelihood vectors do not exist. Only call when using calculate_maximum().");
+    }
+
+    for (unsigned int id_scale = 0; id_scale < scales.size(); id_scale++) {
+        free(replicate_maximum[id_scale]);
+    }
+
+    replicate_maximum.clear();
+}
+
 void AuTest::finalize_test_statistics() {
     LOG_INFO_TS << "Calculating test statistics" << std::endl;
     for (unsigned int id_scale = 0; id_scale < scales.size(); id_scale++) {
@@ -139,6 +188,16 @@ void AuTest::finalize_test_statistics() {
 
 
 void AuTest::calculate_p_values() {
+    if (!replicate_maximum.empty()) {
+        for (const auto pointer: replicate_maximum) {
+            free(pointer);
+        }
+
+        throw RaxmlException(
+            "AuTest invalid state: replicate maximum likelihood vectors were not freed. "
+            "Call free_maximum() before calling calculate_p_values().");
+    }
+
     LOG_INFO_TS << "Calculating " << num_trees << " p-values" << std::endl;
     // TODO handle fine-grained parallelization: after all workers have generated their bootstrap replicates, we need
     //  to collect them on a master-worker of all worker groups and add them there, and the master will do the AU test
@@ -199,7 +258,7 @@ void AuTest::free_test_statistics() {
         free(normalized_statistics);
     }
 
-    for (auto &matrix : replicate_weights) {
+    for (auto &matrix: replicate_weights) {
         corax_RELL_delete_weight_matrices(&matrix, num_replicates.data(), scales.size());
     }
 
