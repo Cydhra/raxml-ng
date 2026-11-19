@@ -262,6 +262,11 @@ void AuTest::free_test_statistics() {
         corax_RELL_delete_weight_matrices(&matrix, num_replicates.data(), scales.size());
     }
 
+    // cleanup scratch space for maximum calculation if it exists
+    for (auto vec: replicate_maximum) {
+        free(vec);
+    }
+
     test_statistics = nullptr;
     normalized_statistics = nullptr;
     replicate_weights.clear();

@@ -73,6 +73,7 @@ public:
                                       test_statistics(other.test_statistics),
                                       normalized_statistics(other.normalized_statistics),
                                       replicate_weights(std::move(other.replicate_weights)),
+                                      replicate_maximum(std::move(other.replicate_maximum)),
                                       p_values(std::move(other.p_values)),
                                       finished(other.finished),
                                       scales(std::move(other.scales)),
@@ -83,6 +84,7 @@ public:
         other.test_statistics = nullptr;
         other.normalized_statistics = nullptr;
         other.replicate_weights.clear();
+        other.replicate_maximum.clear();
     }
 
     AuTest &operator=(AuTest &&other) noexcept {
@@ -103,6 +105,7 @@ public:
         std::swap(other.test_statistics, this->test_statistics);
         std::swap(other.normalized_statistics, this->normalized_statistics);
         std::swap(other.replicate_weights, this->replicate_weights);
+        std::swap(other.replicate_maximum, this->replicate_maximum);
 
         return *this;
     }
