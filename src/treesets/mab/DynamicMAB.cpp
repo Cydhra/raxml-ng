@@ -52,21 +52,21 @@ void DynamicMAB::take_measurement(const TunedBatch &batch) {
     auto &parameters = batch.get_parameters();
 
     // let outer bandit take the measurement
-    auto &bandit = this->hierarchical_mab.get_bandit(outer_mapping[parameters]);
+    auto &bandit = this->hierarchical_mab.get_bandit(outer_mapping.at(parameters));
     this->hierarchical_mab.take_measurement(bandit, batch, true);
 
     // let the inner bandit take the measurement
-    auto &inner_bandit = bandit.get_parameters()->get_bandit(inner_mapping[parameters]);
+    auto &inner_bandit = bandit.get_parameters()->get_bandit(inner_mapping.at(parameters));
     bandit.get_parameters()->take_measurement(inner_bandit, batch, true);
 
     check_update();
 }
 
 void DynamicMAB::disable_bandit(const MetaParameters &parameters) {
-    const auto outer_bandit_id = this->outer_mapping[parameters];
+    const auto outer_bandit_id = this->outer_mapping.at(parameters);
     const auto &outer_bandit = this->hierarchical_mab.get_bandit(outer_bandit_id);
 
-    const auto inner_bandit_id = this->inner_mapping[parameters];
+    const auto inner_bandit_id = this->inner_mapping.at(parameters);
 
     if (!outer_bandit.get_parameters()->disable_bandit(inner_bandit_id)) {
         if (!this->hierarchical_mab.disable_bandit(outer_bandit_id)) {
@@ -122,7 +122,7 @@ void DynamicMAB::propose_less_effort() {
         LOG_WORKER_TS(LogLevel::info) << std::endl << "Mutating bandit " << inner_bandit.get_name() <<
                 "." << std::endl;
 
-        this->add_bandit_to_arm(bandit, outer_mapping[parameters], new_parameters, inner_bandit.get_name() + ",mut");
+        this->add_bandit_to_arm(bandit, outer_mapping.at(parameters), new_parameters, inner_bandit.get_name() + ",mut");
 
         last_mab_modification = hierarchical_mab.get_iterations_completed();
     }
