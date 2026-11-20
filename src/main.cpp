@@ -50,7 +50,6 @@
 #include "bootstrap/EbgSupportTree.hpp"
 #include "bootstrap/ShSupportTree.hpp"
 #include "bootstrap/IcSupportTree.hpp"
-#include "bootstrap/GCFSupportTree.hpp"
 #include "bootstrap/ConsensusTree.hpp"
 #include "autotune/ResourceEstimator.hpp"
 #include "ICScoreCalculator.hpp"
@@ -59,6 +58,7 @@
 #include "util/EnergyMonitor.hpp"
 #include "adaptive/DifficultyPredictor.hpp"
 #include "adaptive/StoppingCriterion.hpp"
+#include "bootstrap/TCFSupportTree.hpp"
 #include "topology/AuTest.hpp"
 #include "modeltest/ModelTest.hpp"
 #include "git_version.h"
@@ -695,13 +695,19 @@ bool check_msa(RaxmlInstance& instance)
         continue;
 
       ++dup_count;
-      parted_msa_view.exclude_taxon(p.second);
-      dups_to_remove.emplace_back(p.second);
+
+      /* leave at least 4 taxa as this is the minimum required for tree search */
+      bool to_remove = parted_msa_view.taxon_count() > 4;
+      if (to_remove)
+      {
+        parted_msa_view.exclude_taxon(p.second);
+        dups_to_remove.emplace_back(p.second);
+      }
 
       const auto orig_taxon_name = parted_msa.taxon_names().at(p.first);
       const auto dup_taxon_name = parted_msa.taxon_names().at(p.second);
 
-      if (opts.dup_seqs_action == AbnormalSequenceAction::regraft)
+      if (to_remove && opts.dup_seqs_action == AbnormalSequenceAction::regraft)
         parted_msa.mark_dup_seq(dup_taxon_name, p.first);
 
       LOG_WARN << "WARNING: Sequences " << orig_taxon_name << " and " << dup_taxon_name
@@ -717,11 +723,14 @@ bool check_msa(RaxmlInstance& instance)
           break;
         case AbnormalSequenceAction::regraft:
         case AbnormalSequenceAction::remove:
-          seqs_to_remove.insert(dups_to_remove.cbegin(), dups_to_remove.cend());
-          LOG_INFO << "NOTE: Duplicate sequences were removed, "
-                   << (opts.dup_seqs_action == AbnormalSequenceAction::regraft ?
-                         "but will be regrafted into" : "and will not appear in")
-                   << " the final tree." << endl;
+          if (!dups_to_remove.empty())
+          {
+            seqs_to_remove.insert(dups_to_remove.cbegin(), dups_to_remove.cend());
+            LOG_INFO << "NOTE: Duplicate sequences were removed, "
+                     << (opts.dup_seqs_action == AbnormalSequenceAction::regraft ?
+                           "but will be regrafted into" : "and will not appear in")
+                     << " the final tree." << endl;
+          }
           break;
         case AbnormalSequenceAction::error:
           LOG_ERROR << "ERROR: Duplicate sequences found! " << endl;
@@ -963,6 +972,13 @@ void check_tree(const PartitionedMSA& msa, const Tree& tree, bool require_binary
 void check_options_early(Options& opts)
 {
   auto num_procs = opts.num_ranks * (opts.num_threads > 0 ? opts.num_threads : opts.num_threads_max);
+
+#ifndef _RAXML_PTHREADS
+  if (opts.num_threads > 1) {
+      throw OptionException("Requested more than one thread, but this version of RAxML-NG is not built with threading support.\n"
+                            "       Use --threads 1 or rebuild with cmake -DUSE_PTHREADS=ON.");
+  }
+#endif
 
   if (!opts.weights_file.empty() && !sysutil_file_exists(opts.weights_file))
     throw runtime_error("Site weights file not found: " + opts.weights_file);
@@ -2757,9 +2773,9 @@ void draw_bootstrap_support(RaxmlInstance& instance, Tree& ref_tree,
         add_replicate_trees = true;
         support_in_pct = false;
       }
-      else if (metric == BranchSupportMetric::gcf)
+      else if (metric == BranchSupportMetric::tcf)
       {
-        sup_tree = make_shared<GCFSupportTree>(ref_tree);
+        sup_tree = make_shared<TCFSupportTree>(ref_tree);
         add_replicate_trees = true;
         support_in_pct = true;
         require_complete = false;
@@ -2775,7 +2791,7 @@ void draw_bootstrap_support(RaxmlInstance& instance, Tree& ref_tree,
         if (!bs_splits.empty())
         {
           assert(metric != BranchSupportMetric::tbe);
-          assert(metric != BranchSupportMetric::gcf);
+          assert(metric != BranchSupportMetric::tcf);
           sup_tree->add_splits(bs_splits);
         }
         else if (!bs_trees.empty())
@@ -2924,7 +2940,7 @@ void command_support(RaxmlInstance& instance)
   // TODO check whether this is a hard requirement or just implementation detail
   bool require_binary = opts.bs_metrics.count(BranchSupportMetric::ic1) ||
                         opts.bs_metrics.count(BranchSupportMetric::ica) ||
-                        opts.bs_metrics.count(BranchSupportMetric::gcf) ||
+                        opts.bs_metrics.count(BranchSupportMetric::tcf) ||
                         (opts.bs_metrics.count(BranchSupportMetric::tbe) && !opts.tbe_naive);
 
   assert(!opts.start_trees.empty());
@@ -3324,8 +3340,8 @@ void print_final_output(const RaxmlInstance& instance, const CheckpointFile& che
           metric_name = "Internode certainty (IC)";
         else if (it.first == BranchSupportMetric::ica)
           metric_name = "Internode certainty All (ICA)";
-        else if (it.first == BranchSupportMetric::gcf)
-          metric_name = "Gene concordance factor (gCF)";
+        else if (it.first == BranchSupportMetric::tcf)
+          metric_name = "Tree concordance factor (TCF)";
 
         if (it.first == BranchSupportMetric::ic1 || it.first == BranchSupportMetric::ica)
         {
@@ -4216,7 +4232,7 @@ void thread_main(RaxmlInstance& instance, CheckpointManager& cm)
   if ((opts.command == Command::bootstrap || opts.command == Command::all))
   {
     if (opts.bs_metrics.count(BranchSupportMetric::fbp) || opts.bs_metrics.count(BranchSupportMetric::rbs) ||
-        opts.bs_metrics.count(BranchSupportMetric::tbe) || opts.bs_metrics.count(BranchSupportMetric::gcf) ||
+        opts.bs_metrics.count(BranchSupportMetric::tbe) || opts.bs_metrics.count(BranchSupportMetric::tcf) ||
         opts.bs_metrics.count(BranchSupportMetric::ic1) || opts.bs_metrics.count(BranchSupportMetric::ica))
     {
       thread_infer_bootstrap(instance, cm);
