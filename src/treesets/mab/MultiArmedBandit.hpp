@@ -65,14 +65,14 @@ public:
     /**
      * @return number of registered bandits (both, participating and non-participating)
      */
-    unsigned int num_bandits() const {
+    [[nodiscard]] unsigned int num_bandits() const {
         return this->bandits.size();
     }
 
     /*+
      * @return number of iterations that were completed, i.e., a bandit was selected and a measurement returned.
      */
-    unsigned int num_iterations_completed() const {
+    [[nodiscard]] unsigned int num_iterations_completed() const {
         return this->iterations_completed;
     }
 
@@ -177,7 +177,7 @@ public:
         measurement_mutex->unlock();
     }
 
-    bool has_bandit(std::string name) const {
+    [[nodiscard]] bool has_bandit(std::string name) const {
         for (auto &bandit: this->bandits) {
             if (bandit.name == name) {
                 return true;
@@ -194,7 +194,7 @@ public:
     /**
      * @return how many iterations have been completed (i.e., bandit was selected and has submitted the measurements).
      */
-    unsigned int get_iterations_completed() const {
+    [[nodiscard]] unsigned int get_iterations_completed() const {
         return iterations_completed;
     }
 
