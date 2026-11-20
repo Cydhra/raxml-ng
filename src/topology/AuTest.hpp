@@ -28,7 +28,7 @@ public:
     AuTest(const std::shared_ptr<PartitionedMSA> &msa,
            const std::vector<std::vector<doubleVector> > &persite_loglh,
            unsigned int num_reps_per_run,
-           const int seed) : AuTest(msa, make_persite_vec(persite_loglh),
+           const unsigned int seed) : AuTest(msa, make_persite_vec(persite_loglh),
                                     AU_DEFAULT_SCALES, uintVector(AU_DEFAULT_RUNS, num_reps_per_run), seed) {
     }
 
@@ -37,7 +37,7 @@ public:
            const std::vector<std::vector<doubleVector> > &persite_loglh,
            const doubleVector &scales,
            const uintVector &num_replicates,
-           const int seed) : AuTest(msa, make_persite_vec(persite_loglh), scales, num_replicates, seed) {
+           const unsigned int seed) : AuTest(msa, make_persite_vec(persite_loglh), scales, num_replicates, seed) {
     }
 
     /** AU test combining two vectors of site likelihoods to compare two sets of trees. */
@@ -46,7 +46,7 @@ public:
            const std::vector<std::vector<doubleVector> > &comparison_logh_matrix,
            const doubleVector &scales,
            const uintVector &num_replicates,
-           const int seed) : AuTest(msa, combine_persite_vec(reference_logh_matrix, comparison_logh_matrix), scales,
+           const unsigned int seed) : AuTest(msa, combine_persite_vec(reference_logh_matrix, comparison_logh_matrix), scales,
                                     num_replicates, seed) {
     }
 
@@ -54,7 +54,7 @@ public:
            std::vector<std::vector<const double *> > loglh_matrices,
            doubleVector scales,
            uintVector num_replicates,
-           const int seed) : msa(std::move(msa)),
+           const unsigned int seed) : msa(std::move(msa)),
                              persite_loglh(std::move(loglh_matrices)),
                              test_statistics(nullptr),
                              normalized_statistics(nullptr),
@@ -298,7 +298,7 @@ private:
     /**
      * Random seed
      */
-    int seed;
+    unsigned int seed;
 
     /**
      * P-value cutoff for statistical significance (default: 0.05)
