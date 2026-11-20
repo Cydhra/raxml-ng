@@ -96,11 +96,13 @@ public:
         normalized_statistics = other.normalized_statistics;
         p_values = std::move(other.p_values);
         finished = other.finished;
-        scales = other.scales;
-        num_replicates = other.num_replicates;
-        num_trees = other.num_trees;
         seed = other.seed;
         pvalue_cutoff = other.pvalue_cutoff;
+
+        // it is imperative that the other object has the correct dimensions as the destructor relies on it
+        std::swap(num_trees, other.num_trees);
+        std::swap(scales, other.scales);
+        std::swap(num_replicates, other.num_replicates);
 
         std::swap(other.test_statistics, this->test_statistics);
         std::swap(other.normalized_statistics, this->normalized_statistics);
