@@ -1,5 +1,10 @@
 #include "BatchQueue.hpp"
 
+/**
+ * The minimum rate at which a batch is finalized and no longer being reused.
+ */
+constexpr double MINIMUM_SUCCESS_RATE = 0.5;
+
 TunedBatch &BatchQueue::generate_batch(const unsigned int num_workers, const unsigned int num_threads,
                                        const std::lock_guard<std::mutex> &) {
     const std::string name_prefix = "Batch";
@@ -88,7 +93,7 @@ static unsigned int recount_unfinished_trees(std::deque<TunedBatch> &batches,
 void BatchQueue::finish_batch(TunedBatch &batch) {
     const std::lock_guard lock(batch_mutex);
 
-    if (batch.get_plausible_tree_count() > this->batch_size / 2) {
+    if (batch.get_plausible_tree_count() > static_cast<unsigned int>(static_cast<double>(this->batch_size) * MINIMUM_SUCCESS_RATE)) {
         this->finalize_batch(batch);
     }
 
