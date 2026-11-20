@@ -92,8 +92,6 @@ public:
             return *this;
         msa = std::move(other.msa);
         persite_loglh = std::move(other.persite_loglh);
-        test_statistics = other.test_statistics;
-        normalized_statistics = other.normalized_statistics;
         p_values = std::move(other.p_values);
         finished = other.finished;
         seed = other.seed;
