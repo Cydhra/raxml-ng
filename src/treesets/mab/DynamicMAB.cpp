@@ -12,8 +12,19 @@ static void register_mapping(std::unordered_map<MetaParameters, size_t> &outer_m
 }
 
 void DynamicMAB::register_new_arm(const std::string &name, const OuterArm &new_arm) {
-    auto id = hierarchical_mab.emplace_back(name, new_arm, upper_bound);
-    hierarchical_mab.get_bandit(id).with_normal_distribution();
+    const auto id = hierarchical_mab.emplace_back(name, new_arm, upper_bound);
+
+    switch (this->policy) {
+        case BanditPolicy::normal:
+            hierarchical_mab.get_bandit(id).with_normal_distribution();
+            break;
+        case BanditPolicy::ratio:
+            hierarchical_mab.get_bandit(id).with_ratio_distribution();
+            break;
+        case BanditPolicy::greedy:
+            hierarchical_mab.get_bandit(id).with_greedy_confidence();
+            break;
+    }
 
     for (size_t inner_id = 0; inner_id < new_arm->num_bandits(); ++inner_id) {
         auto &parameters = new_arm->get_bandit(inner_id).get_parameters();
