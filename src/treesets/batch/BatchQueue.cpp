@@ -1,6 +1,7 @@
 #include "BatchQueue.hpp"
 
-TunedBatch &BatchQueue::generate_batch(const unsigned int num_workers, const unsigned int num_threads, const std::lock_guard<std::mutex> &) {
+TunedBatch &BatchQueue::generate_batch(const unsigned int num_workers, const unsigned int num_threads,
+                                       const std::lock_guard<std::mutex> &) {
     const std::string name_prefix = "Batch";
 
     const auto batch_name_index = this->batches.size();
@@ -31,15 +32,6 @@ void BatchQueue::finalize_batch(TunedBatch &batch) {
     this->unfinished.erase(batch.get_name());
     batch.finalize();
     this->finalized_plausible_trees += batch.get_plausible_tree_count();
-
-    unsigned int unfinished_plausible = 0;
-    for (auto &batch_ref: this->batches) {
-        if (this->unfinished.find(batch_ref.get_name()) != this->unfinished.cend()) {
-            unfinished_plausible += batch_ref.get_plausible_tree_count();
-        }
-    }
-
-    this->unfinished_plausible_trees = unfinished_plausible;
 }
 
 TunedBatch &BatchQueue::select_next_batch(const MetaParameters &current_parameters, const unsigned int num_workers,
@@ -79,6 +71,20 @@ TunedBatch &BatchQueue::select_next_batch(const MetaParameters &current_paramete
     return *selected_batch;
 }
 
+static unsigned int recount_unfinished_trees(std::deque<TunedBatch> &batches,
+                                             std::unordered_set<std::string> unfinished) {
+    // this can be subject to race conditions, however we accept it, since it will at worst underestimate the amount of
+    // plausible trees from unfinished batches.
+    unsigned int unfinished_plausible = 0;
+    for (auto &batch_ref: batches) {
+        if (unfinished.find(batch_ref.get_name()) != unfinished.cend()) {
+            unfinished_plausible += batch_ref.get_plausible_tree_count();
+        }
+    }
+
+    return unfinished_plausible;
+}
+
 void BatchQueue::finish_batch(TunedBatch &batch) {
     const std::lock_guard lock(batch_mutex);
 
@@ -86,5 +92,6 @@ void BatchQueue::finish_batch(TunedBatch &batch) {
         this->finalize_batch(batch);
     }
 
+    this->unfinished_plausible_trees = recount_unfinished_trees(this->batches, this->unfinished);
     this->in_flight.erase(batch.get_name());
 }
