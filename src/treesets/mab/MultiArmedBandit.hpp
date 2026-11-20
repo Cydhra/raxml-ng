@@ -1,6 +1,8 @@
 #ifndef RAXML_MULTIARMEDBANDIT_HPP_
 #define RAXML_MULTIARMEDBANDIT_HPP_
 
+#include <shared_mutex>
+
 #include "Bandit.hpp"
 
 /**
@@ -33,6 +35,7 @@ public:
      * this MAB instance exists.
      */
     size_t register_bandit(Bandit<Heuristic> &&bandit) {
+        auto exclusive_lock = std::lock_guard(*selection_mutex);
         this->bandits.emplace_back(bandit);
         return this->bandits.size() - 1;
     }
@@ -48,6 +51,7 @@ public:
      * this MAB instance exists.
      */
     size_t emplace_back(std::string name, Heuristic parameters, const double maximum_success) {
+        auto exclusive_lock = std::lock_guard(*selection_mutex);
         this->bandits.emplace_back(name, parameters, maximum_success);
         return this->bandits.size() - 1;
     }
@@ -88,7 +92,7 @@ public:
             return this->bandits[0];
         }
 
-        selection_mutex->lock();
+        selection_mutex->lock_shared();
         // select next participating bandit
         do {
             this->bandit_cursor += 1;
@@ -117,7 +121,7 @@ public:
                     selected_bandit.participating = false;
                 }
 
-                selection_mutex->unlock();
+                selection_mutex->unlock_shared();
                 return best_bandit;
             }
 
@@ -132,7 +136,7 @@ public:
             }
         }
 
-        selection_mutex->unlock();
+        selection_mutex->unlock_shared();
         return selected_bandit;
     }
 
@@ -147,7 +151,8 @@ public:
      * measurements from prior knowledge or heuristics that are not part of the selection rule.
      */
     void take_measurement(Bandit<Heuristic> &current_bandit, const TunedBatch &batch, const bool iteration_completed) {
-        measurement_mutex->lock();
+        auto exclusive_lock = std::lock_guard(*selection_mutex);
+
         current_bandit.take_measurement(batch);
 
         // if the current bandit is not the best one, check if the best one has to be updated
@@ -173,8 +178,6 @@ public:
         if (iteration_completed) {
             this->iterations_completed += 1;
         }
-
-        measurement_mutex->unlock();
     }
 
     [[nodiscard]] bool has_bandit(std::string name) const {
@@ -205,6 +208,8 @@ public:
      * @return true, if the MAB has bandits remaining.
      */
     bool disable_bandit(size_t bandit_id) {
+        auto exclusive_lock = std::lock_guard(*selection_mutex);
+
         this->bandits[bandit_id].participating = false;
 
         if (this->best_known_bandit == bandit_id) {
@@ -254,9 +259,11 @@ private:
      */
     unsigned int iterations_completed = 0;
 
-    std::unique_ptr<std::mutex> measurement_mutex = std::make_unique<std::mutex>();
-
-    std::unique_ptr<std::mutex> selection_mutex = std::make_unique<std::mutex>();
+    /**
+     * Mutex guarding the bandit selection against concurrent modification of the MAB.
+     * It also guards measurement against concurrent modification that would happen if two measurements arrived at once.
+     */
+    std::unique_ptr<std::shared_mutex> selection_mutex = std::make_unique<std::shared_mutex>();
 };
 
 
