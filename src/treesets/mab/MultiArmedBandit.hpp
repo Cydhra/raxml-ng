@@ -87,16 +87,23 @@ public:
      * @return A reference to the bandit that should be used according to the selection rule.
      */
     Bandit<Heuristic> &select_next_bandit() {
+        std::shared_lock<std::shared_mutex> shared_lock(*this->selection_mutex);
+
         // shortcut if we forced the selection of only one bandit, to keep the logs clean
         if (this->bandits.size() == 1) {
+            assert(this->bandits[0].participating); // if not, this MAB should be disabled
             return this->bandits[0];
         }
 
-        selection_mutex->lock_shared();
         // select next participating bandit
+        size_t attempts = 0;
         do {
             this->bandit_cursor += 1;
             this->bandit_cursor %= this->bandits.size();
+
+            if (++attempts > bandits.size()) {
+                throw RaxmlException("No active bandit is participating in the MAB");
+            }
         } while (!bandits[this->bandit_cursor].participating);
 
         auto &selected_bandit = this->bandits[this->bandit_cursor];
@@ -121,7 +128,6 @@ public:
                     selected_bandit.participating = false;
                 }
 
-                selection_mutex->unlock_shared();
                 return best_bandit;
             }
 
@@ -136,7 +142,6 @@ public:
             }
         }
 
-        selection_mutex->unlock_shared();
         return selected_bandit;
     }
 
