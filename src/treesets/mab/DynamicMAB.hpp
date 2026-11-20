@@ -23,9 +23,24 @@ public:
      */
     void register_new_arm(const std::string &name, const OuterArm &new_arm);
 
-    void add_bandit_to_arm(const Bandit<OuterArm> &arm, const size_t outer_id, MetaParameters &new_parameters,
+    /**
+     * Add a new first level bandit configuration (MetaParameters) to an existing second-level bandit.
+     *
+     * @param arm existing second-level bandit
+     * @param outer_id id of the existing second-level bandit
+     * @param new_parameters new parameter object for a new first-level bandit
+     * @param name name of the new first-level bandit
+     */
+    void add_bandit_to_arm(const Bandit<OuterArm> &arm, size_t outer_id, MetaParameters &new_parameters,
                            const std::string &name);
 
+    /**
+     * Add a bandit to the progressive successor heuristic, adding bandits unless no more speedup is being generated.
+     *
+     * @param level The amount of bandits that have to be present in the algorithm to consider adding this new bandit
+     * @param name the name of this new bandit
+     * @param new_arm the new bandit arm
+     */
     void register_new_successor(unsigned int level, const std::string &&name, const OuterArm &&new_arm);
 
     /**
@@ -119,6 +134,12 @@ protected:
     std::unordered_map<MetaParameters, unsigned int> past_mutations = {};
 
     /**
+     * Guards against concurrent modification while a bandit is being selected, or another modification of mappings
+     * or mutations takes place.
+     */
+    std::unique_ptr<std::shared_mutex> modification_lock = std::make_unique<std::shared_mutex>();
+
+    /**
      * Check whether we should insert new arms into the MAB depending on the performance of the current bandit arm.
      * This implements a heuristic that enables exploration for new arms if they have potential to be useful within
      * the algorithm.
@@ -128,19 +149,25 @@ protected:
 
     /**
      * Add a bandit to the MAB that tries to infer trees with more effort spent than the current best bandit
+     *
+     * @param exclusive exclusive lock of the internal read-write mutex
      */
-    void propose_more_effort();
+    void propose_more_effort(std::lock_guard<std::shared_mutex> &exclusive);
 
     /**
      * Add a bandit to the MAB that tries to infer trees with less effort spent than the current best bandit
+     *
+     * @param exclusive exclusive lock of the internal read-write mutex
      */
-    void propose_less_effort();
+    void propose_less_effort(std::lock_guard<std::shared_mutex> &exclusive);
 
     /**
      * Add a bandit to the MAB that is the next in the line of successor bandits. Used when proposing more effort,
      * or if all current bandits are deactivated.
+     *
+     * @param exclusive exclusive lock of the internal read-write mutex
      */
-    void add_next_successor();
+    void add_next_successor(std::lock_guard<std::shared_mutex> &exclusive);
 
     /**
      * Attempt to change the input parameters to reduce effort spent.
@@ -149,7 +176,31 @@ protected:
      * @param parameters current bandit parameters that we attempt to mutate
      * @return New bandit parameters which are a modification of the input parameters
      */
-    MetaParameters mutate(const MetaParameters &parameters);
+    MetaParameters mutate(const MetaParameters &parameters, std::lock_guard<std::shared_mutex>&);
+
+    /**
+     * Add a new bandit arm to the outer MAB and register its bandits in the mappings.
+     * This method requires proof of ownership of a lock guard of the internal mutex.
+     * The equivalent public method calls this method after acquiring a lock.
+     *
+     * @param name bandit name
+     * @param new_arm bandit arm
+     * @param exclusive exclusive lock of the internal read-write mutex
+     */
+    void guarded_register_new_arm(const std::string &name, const OuterArm &new_arm, std::lock_guard<std::shared_mutex> &exclusive);
+
+    /**
+     * Add a new first level bandit configuration (MetaParameters) to an existing second-level bandit.
+     * This method requires proof of ownership of a lock guard of the internal mutex.
+     * The equivalent public method calls this method after acquiring a lock.
+     *
+     * @param arm existing second-level bandit
+     * @param outer_id id of the existing second-level bandit
+     * @param new_parameters new parameter object for a new first-level bandit
+     * @param name name of the new first-level bandit
+     */
+    void guarded_add_bandit_to_arm(const Bandit<OuterArm> &arm, size_t outer_id, MetaParameters &new_parameters,
+                           const std::string &name, std::lock_guard<std::shared_mutex> &exclusive);
 };
 
 
