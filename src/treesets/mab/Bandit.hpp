@@ -563,10 +563,10 @@ private:
                 << " seconds ("
                 << static_cast<double>(batch.get_plausible_tree_count()) / static_cast<double>(batch.
                     elapsed_wall_time()) * 1000.0
-                << " t/s). Updated mean: "
-                << this->get_throughput_mean() * 1000.0
-                << ", upper confidence: "
-                << this->get_upper_confidence(iterations_completed) * 1000.0
+                << " t/s). Updated policy expectation: "
+                << this->get_throughput_mean()
+                << ", Updated policy confidence: "
+                << this->get_upper_confidence(iterations_completed)
                 << std::endl;
     }
 
