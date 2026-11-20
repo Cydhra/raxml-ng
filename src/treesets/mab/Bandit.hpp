@@ -524,8 +524,9 @@ private:
      * The measurement is stored and updates the expected mean reward of this bandit.
      *
      * @param batch A tuned batch which has been run on the parameter set of this Bandit instance.
+     * @param iterations_completed how many iterations the dynamic MAB has completed in total
      */
-    void take_measurement(const TunedBatch &batch) {
+    void take_measurement(const TunedBatch &batch, const unsigned int iterations_completed) {
         // if we have no other samples yet, we initialize the variance estimate by overestimating it intentionally
         if (samples.empty()) {
             const auto mean = static_cast<double>(batch.get_plausible_tree_count()) / static_cast<double>(batch.
@@ -554,25 +555,19 @@ private:
         this->samples.emplace_back(batch.elapsed_wall_time(), batch.get_plausible_tree_count(), batch.get_batch_size(),
                                    inverse_times);
 
-        const auto deviation = get_normal_smart_deviation();
-
-        LOG_WORKER_TS(LogLevel::info) << "[" << this->name << "]: Takes measurement: " << batch.
-                get_plausible_tree_count() << " plausible trees at " << (
-                    static_cast<double>(batch.get_plausible_tree_count()) / static_cast<double>(batch.
-                        elapsed_wall_time()) * 1000.0)
-                << " (+- " << deviation * 1000.0 << ") trees per second." << std::endl;
-
-
-        // calculate mean of the individual inverse inference times
-        const auto ratio_mean = get_ratio_mean();
-        const auto ratio_std_deviation = get_ratio_deviation();
-
-        LOG_WORKER_TS(LogLevel::info) << "[" << this->name << "]: Adjusted Measurement: " <<
-                (1000.0 * ratio_mean) << " (+- " << ratio_std_deviation * 1000.0 <<
-                ") trees per second per worker. (" << (
-                    1000.0 * batch.get_num_workers() * ratio_mean) << " (+- " << ratio_std_deviation * 1000.0 * batch.
-                get_num_workers()
-                << ") trees per second) " << std::endl;
+        LOG_INFO_TS <<
+                "[" << this->name.c_str() << "]: Takes measurement: "
+                << batch.get_plausible_tree_count()
+                << " plausible trees in "
+                << static_cast<double>(batch.elapsed_wall_time()) / 1000.0
+                << " seconds ("
+                << static_cast<double>(batch.get_plausible_tree_count()) / static_cast<double>(batch.
+                    elapsed_wall_time()) * 1000.0
+                << " t/s). Updated mean: "
+                << this->get_throughput_mean() * 1000.0
+                << ", upper confidence: "
+                << this->get_upper_confidence(iterations_completed) * 1000.0
+                << std::endl;
     }
 
     void disable() {

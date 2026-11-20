@@ -158,7 +158,7 @@ public:
     void take_measurement(Bandit<Heuristic> &current_bandit, const TunedBatch &batch, const bool iteration_completed) {
         auto exclusive_lock = std::lock_guard(*selection_mutex);
 
-        current_bandit.take_measurement(batch);
+        current_bandit.take_measurement(batch, iterations_completed);
 
         // if the current bandit is not the best one, check if the best one has to be updated
         if (&current_bandit.get_parameters() != &this->bandits[best_known_bandit].get_parameters() && !std::isnan(
