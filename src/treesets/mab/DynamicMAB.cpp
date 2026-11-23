@@ -17,24 +17,29 @@ void DynamicMAB::register_new_arm(const std::string &name, const OuterArm &new_a
     this->guarded_register_new_arm(name, new_arm, exclusive);
 }
 
+template<class Heuristic>
+static void apply_policy(BanditPolicy policy, Bandit<Heuristic> &bandit) {
+    switch (policy) {
+        case BanditPolicy::normal:
+            bandit.with_normal_distribution();
+            break;
+        case BanditPolicy::ratio:
+            bandit.with_ratio_distribution();
+            break;
+        case BanditPolicy::greedy:
+            bandit.with_greedy_confidence();
+            break;
+    }
+}
+
 void DynamicMAB::guarded_register_new_arm(const std::string &name, const OuterArm &new_arm,
                                           std::lock_guard<std::shared_mutex> &exclusive) {
     const auto id = hierarchical_mab.emplace_back(name, new_arm, upper_bound);
-
-    switch (this->policy) {
-        case BanditPolicy::normal:
-            hierarchical_mab.get_bandit(id).with_normal_distribution();
-            break;
-        case BanditPolicy::ratio:
-            hierarchical_mab.get_bandit(id).with_ratio_distribution();
-            break;
-        case BanditPolicy::greedy:
-            hierarchical_mab.get_bandit(id).with_greedy_confidence();
-            break;
-    }
+    apply_policy(BanditPolicy::normal, hierarchical_mab.get_bandit(id));
 
     for (size_t inner_id = 0; inner_id < new_arm->num_bandits(); ++inner_id) {
         auto &parameters = new_arm->get_bandit(inner_id).get_parameters();
+        apply_policy(this->policy, new_arm->get_bandit(inner_id));
         register_mapping(outer_mapping, inner_mapping, parameters, id, inner_id, exclusive);
     }
 }
@@ -47,6 +52,7 @@ void DynamicMAB::add_bandit_to_arm(const Bandit<OuterArm> &arm, const size_t out
 
 void DynamicMAB::guarded_add_bandit_to_arm(const Bandit<OuterArm> &arm, size_t outer_id, MetaParameters &new_parameters, const std::string &name, std::lock_guard<std::shared_mutex> &exclusive) {
     const auto inner_id = arm.get_parameters()->emplace_back(name, new_parameters, upper_bound);
+    apply_policy(this->policy, arm.get_parameters()->get_bandit(inner_id));
     register_mapping(outer_mapping, inner_mapping, new_parameters, outer_id, inner_id, exclusive);
 }
 
