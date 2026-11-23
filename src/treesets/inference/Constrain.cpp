@@ -73,7 +73,14 @@ void Constrain::do_optimize(std::optional<TreeInfo> &tree, const unsigned int tr
     topology.reset_tip_ids(new_label_id_map);
     constraint->reset_tip_ids(new_label_id_map);
 
+    ModelMap target;
+    for (auto part_info : part_assignments->at(thread_id)) {
+        assign(target[part_info.part_id], *tree, part_info.part_id);
+    }
+
     tree.emplace(TreeInfo(opts, topology, *msa, new_tip_msa_map, part_assignments->at(thread_id)));
+    assign_models(*tree, target);
+
     tree->set_topology_constraint(*constraint);
     assert(constraint->compatible(tree->tree()));
 
