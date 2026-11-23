@@ -301,10 +301,10 @@ void TunedBatch::update_meta_parameters(const MetaParameters &new_parameters) {
     } else {
         this->heuristic = HeuristicFactory::extend_heuristic(new_parameters, this->meta_parameters,
                                                              std::move(this->heuristic), name, get_batch_size(),
-                                                             this->threads_per_worker, batch_start_trees,
-                                                             part_assignments,
+                                                             this->threads_per_worker, part_assignments,
                                                              initial_model,
-                                                             msa, tip_msa_idmap);
+                                                             msa,
+                                                             tip_msa_idmap);
     }
 
     this->meta_parameters = new_parameters;
