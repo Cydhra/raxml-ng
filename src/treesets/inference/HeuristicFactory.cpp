@@ -18,6 +18,10 @@ constexpr double GREEDY_MODEL_EPS = 1.0;
 
 constexpr unsigned int KEEP_TOPOL_NUM = 20;
 
+constexpr unsigned int MAX_FAST_RADIUS = 25;
+
+constexpr unsigned int MAX_SLOW_RADIUS = 14;
+
 /**
  * Decorate an existing partial InferenceHeuristic according to the rules of a meta-parameters instance.
  * This function codifies how meta-parameters are converted into a heuristic, and is used to create new
@@ -60,13 +64,13 @@ static std::unique_ptr<InferenceHeuristic> from_meta_parameters(const MetaParame
     if (meta_parameters.num_fast_spr > 0) {
         heuristic = std::make_unique<FixedSpr>(batch_name, std::move(heuristic), num_trees, threads_per_worker,
                                                meta_parameters.num_fast_spr, meta_parameters.keep_top_k_topol, false,
-                                               std::min(2 * meta_parameters.max_adaptive_radius, 25u));
+                                               std::min(2 * meta_parameters.max_adaptive_radius, MAX_FAST_RADIUS));
     }
 
     if (meta_parameters.num_slow_spr > 0) {
         heuristic = std::make_unique<FixedSpr>(batch_name, std::move(heuristic), num_trees, threads_per_worker,
                                                meta_parameters.num_slow_spr, KEEP_TOPOL_NUM, true,
-                                               std::min(1 * meta_parameters.max_adaptive_radius, 14u));
+                                               std::min(1 * meta_parameters.max_adaptive_radius, MAX_SLOW_RADIUS));
     }
 
     if (meta_parameters.dynamic_spr) {
