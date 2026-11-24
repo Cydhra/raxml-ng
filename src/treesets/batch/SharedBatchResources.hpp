@@ -32,7 +32,7 @@ public:
                          long seed,
                          const double pythia_score) : gate(make_shared<EbgGate>(opts, baseline_tree, initial_ml_trees)),
                                                       parsimony_source(make_shared<ParsimonySource>(seed)),
-                                                      parsimony_split_sampling(
+                                                      constrained_parsimony_sampling(
                                                           make_shared<ParsimonySamplerSource>(
                                                               parsimony_source, gate, seed, initial_ml_trees,
                                                               baseline_tree)),
@@ -51,7 +51,7 @@ public:
             screening_au_tests.emplace_back(msa, reference_logh_matrix, batch_loglh_dummy, AU_DEFAULT_SCALES,
                                             SHALLOW_REPS, seed);
             au_test_factors.emplace_back(DEFAULT_FACTOR);
-            initialized.emplace_back(false);
+             au_initialized.emplace_back(false);
         }
 
         // configure options for the raxml-fast optimizer
@@ -143,7 +143,7 @@ public:
      * @return An AuTest instance that is reserved for the caller TaskGroup. Call is_initialized() to find out whether
      * the reference tree bootstrap values have been generated already.
      */
-    AuTest &get_screening_test(const TaskGroup &context) {
+    AuTest &get_au_test(const TaskGroup &context) {
         return screening_au_tests.at(context.group_id());
     }
 
@@ -152,8 +152,8 @@ public:
      * @param context the parallel context for the calling batch leader
      * @return true, if the AuTest instance returned for the calling thread has been initialized before.
      */
-    [[nodiscard]] bool is_initialized(const TaskGroup &context) const {
-        return initialized.at(context.group_id()) > 0;
+    [[nodiscard]] bool is_au_initialized(const TaskGroup &context) const {
+        return au_initialized.at(context.group_id()) > 0;
     }
 
     /**
@@ -162,8 +162,8 @@ public:
      *
      * @param context the parallel context for the calling batch leader
      */
-    void set_initialized(const TaskGroup &context) {
-        this->initialized[context.group_id()] = 1;
+    void set_au_initialized(const TaskGroup &context) {
+        this->au_initialized[context.group_id()] = 1;
     }
 
     /**
@@ -180,12 +180,12 @@ public:
         this->au_test_factors[context.group_id()] = factor;
     }
 
-    [[nodiscard]] TreeSource &get_parsimony() const {
+    [[nodiscard]] TreeSource &get_parsimony_source() const {
         return *parsimony_source;
     }
 
     [[nodiscard]] ResampleSource &get_parsimony_resample_source() const {
-        return *parsimony_split_sampling;
+        return *constrained_parsimony_sampling;
     }
 
     [[nodiscard]] ResampleSource &get_greedy_split_source() const {
@@ -210,7 +210,7 @@ protected:
      * The flags are not atomic, because only the group leader of each batch is supposed to ask and only for its own
      * context.
      */
-    std::vector<uint8_t> initialized;
+    std::vector<uint8_t> au_initialized;
 
     /**
      * A copy of the CLI Options instance, with every option required to run raxml-fast forcibly enabled.
@@ -226,7 +226,7 @@ protected:
 
     /**
      * An instance of the kh stopping criterion used for raxml-fast. It is used in the optimizer but not owned by it,
-     * so we store it here.
+     * so we store it here. One for all workers is sufficient, RAxML-ng stores a single one in RaxmlInstance as well.
      */
     std::shared_ptr<KHStoppingTest> fast_stop;
 
@@ -264,9 +264,15 @@ protected:
      */
     shared_ptr<ParsimonySource> parsimony_source;
 
-    shared_ptr<ParsimonySamplerSource> parsimony_split_sampling;
+    /**
+     * Global source of parsimony trees built from a constrained and optimized with parsimony SPR.
+     */
+    shared_ptr<ParsimonySamplerSource> constrained_parsimony_sampling;
 
-    shared_ptr<SplitSamplerSource> greedy_split_sampling;
+    /**
+     * Global source of trees built from compatible splits from a set of reference trees.
+     */
+     shared_ptr<SplitSamplerSource> greedy_split_sampling;
 };
 
 #endif //RAXML_SHAREDBATCHRESOURCES_HPP_

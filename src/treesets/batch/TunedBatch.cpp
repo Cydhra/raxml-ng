@@ -24,7 +24,7 @@ void TunedBatch::generate_starting_trees(const RaxmlInstance &instance, SharedBa
     TreeSource *tree_source;
     switch (this->meta_parameters.treeSource) {
         case Parsimony:
-            tree_source = &resources.get_parsimony();
+            tree_source = &resources.get_parsimony_source();
             break;
         case SplitParsimony:
             tree_source = &resources.get_parsimony_resample_source();
@@ -90,10 +90,10 @@ void TunedBatch::optimize(const RaxmlInstance &instance, const Options &opts, Sh
                 std::endl;
     }
 
-    perform_plausibility_check(opts, resources, resources.is_initialized(context), context, worker_id, thread_id);
+    perform_plausibility_check(opts, resources, resources.is_au_initialized(context), context, worker_id, thread_id);
 
     if (context.is_group_leader(worker_id, thread_id)) {
-        resources.set_initialized(context);
+        resources.set_au_initialized(context);
 
         auto guard = std::lock_guard(*this->topology_access);
 
@@ -170,7 +170,7 @@ void TunedBatch::perform_plausibility_check(const Options &opts, SharedBatchReso
                                             bool initialized,
                                             const TaskGroup &context, const unsigned int worker_id,
                                             const unsigned int thread_id) {
-    auto &au_test = resources.get_screening_test(context);
+    auto &au_test = resources.get_au_test(context);
 
     // load the replication factor for the AU test
     const auto rep_factor = resources.get_au_factor(context);

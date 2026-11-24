@@ -172,11 +172,11 @@ BatchTask TreesetOptimizer::next_work_unit() {
 
 void TreesetOptimizer::initialize_resources(const SmartBarrier &global_barrier) {
     LOG_INFO_TS << "Generating " << NUM_DONOR_TREE << " parsimony trees upfront." << std::endl;
-    shared_batch_resources.get_parsimony().ensure(instance, global_barrier, 1, ParallelContext::local_group_id(),
+    shared_batch_resources.get_parsimony_source().ensure(instance, global_barrier, 1, ParallelContext::local_group_id(),
                                                   ParallelContext::local_thread_id(), NUM_DONOR_TREE);
 
     if (ParallelContext::local_group_id() + ParallelContext::local_thread_id() == 0) {
-        const auto throughput_bound = 1.0 / shared_batch_resources.get_parsimony().amortized_time(1);
+        const auto throughput_bound = 1.0 / shared_batch_resources.get_parsimony_source().amortized_time(1);
         LOG_INFO_TS << "The largest achievable throughput is " << throughput_bound << "tps" << std::endl;
 
         mab.set_upper_bound(throughput_bound);
