@@ -106,7 +106,7 @@ public:
     TreesetOptimizer(RaxmlInstance &instance,
                      Options &opts,
                      const std::shared_ptr<PartitionedMSA> &msa,
-                     const TreeList initial_ml_trees,
+                     const TreeList &initial_ml_trees,
                      const Tree &baseline_tree,
                      IDVector &tip_msa_idmap,
                      const std::vector<std::vector<doubleVector> > &persite_loglh,
