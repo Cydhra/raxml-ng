@@ -24,13 +24,17 @@ public:
                          const unsigned int workers_per_group,
                          const unsigned int total_threads,
                          const Options &opts,
-                         const TreeList& initial_ml_trees,
-                         const Tree& baseline_tree,
-                         const std::shared_ptr<PartitionedMSA>& msa,
-                         const std::vector<std::vector<doubleVector> > &reference_logh_matrix,
+                         const TreeList &initial_ml_trees,
+                         const Tree &baseline_tree,
+                         const std::shared_ptr<PartitionedMSA> &msa,
+                         const IDVector &tip_msa_idmap,
+                         const std::vector<std::vector<doubleVector> > &reference_persite_loglh,
                          const unsigned int batch_size,
-                         long seed,
-                         const double pythia_score) : gate(make_shared<EbgGate>(opts, baseline_tree, initial_ml_trees)),
+                         unsigned int seed,
+                         const double pythia_score) : msa(msa),
+                                                      tip_msa_idmap(make_shared<IDVector>(tip_msa_idmap)),
+                                                      reference_persite_loglh(make_shared<std::vector<std::vector<doubleVector>>>(reference_persite_loglh)),
+                                                      gate(make_shared<EbgGate>(opts, baseline_tree, initial_ml_trees)),
                                                       parsimony_source(make_shared<ParsimonySource>(seed)),
                                                       constrained_parsimony_sampling(
                                                           make_shared<ParsimonySamplerSource>(
@@ -44,14 +48,14 @@ public:
         // will be replaced by the TunedBatch instance before the AU test is called.
         std::vector<std::vector<doubleVector> > batch_loglh_dummy(batch_size);
         for (unsigned int i = 0; i < batch_size; ++i) {
-            batch_loglh_dummy[i] = std::vector<doubleVector>(reference_logh_matrix[0].size());
+            batch_loglh_dummy[i] = std::vector<doubleVector>(reference_persite_loglh[0].size());
         }
 
         for (unsigned int group = 0; group < num_task_groups; ++group) {
-            screening_au_tests.emplace_back(msa, reference_logh_matrix, batch_loglh_dummy, AU_DEFAULT_SCALES,
+            screening_au_tests.emplace_back(msa, reference_persite_loglh, batch_loglh_dummy, AU_DEFAULT_SCALES,
                                             SHALLOW_REPS, seed);
             au_test_factors.emplace_back(DEFAULT_FACTOR);
-             au_initialized.emplace_back(false);
+            au_initialized.emplace_back(false);
         }
 
         // configure options for the raxml-fast optimizer
@@ -86,7 +90,8 @@ public:
         checkpoint_manager->init_checkpoints(baseline_tree, msa->models(), num_task_groups * workers_per_group);
 
         adaptive_checkpoint_manager->pythia_score(pythia_score);
-        adaptive_checkpoint_manager->init_checkpoints(baseline_tree, msa->models(), num_task_groups * workers_per_group);
+        adaptive_checkpoint_manager->
+                init_checkpoints(baseline_tree, msa->models(), num_task_groups * workers_per_group);
     }
 
     /**
@@ -100,6 +105,28 @@ public:
      * How many of the reference trees should be plausible.
      */
     std::unique_ptr<atomic_int> expected_plausible_reference_trees = make_unique<atomic_int>(-1);
+
+    /**
+     * @return the current run's MSA
+     */
+    [[nodiscard]] PartitionedMSA &get_msa() const {
+        return *msa;
+    }
+
+    [[nodiscard]] std::shared_ptr<PartitionedMSA> share_msa() const {
+        return msa;
+    }
+
+    /**
+     * @return the current run's MSA's tip ID vector
+     */
+    [[nodiscard]] IDVector &get_tip_msa_idmap() const {
+        return *tip_msa_idmap;
+    }
+
+    [[nodiscard]] std::vector<std::vector<doubleVector>> get_reference_persite_loglh() const {
+        return *reference_persite_loglh;
+    }
 
     /**
      * @return An Optimizer instance pre-configured to run `RAxML-ng --fast` inference
@@ -193,6 +220,30 @@ public:
     }
 
 protected:
+    /* ***********************
+     * MSA and Input trees
+     * ***********************/
+
+    /**
+     * The input MSA for the tree inference.
+     */
+    std::shared_ptr<PartitionedMSA> msa;
+
+    /**
+     * Vector mapping sequence IDs to the MSA.
+     */
+    std::shared_ptr<IDVector> tip_msa_idmap;
+
+    /**
+     * Per-site log-likelihoods of the reference trees already inferred before the treeset heuristic kicked in.
+     * These cannot change, and constitute the first part of the AU test input.
+     */
+    std::shared_ptr<std::vector<std::vector<doubleVector> > > reference_persite_loglh;
+
+    /* ***********************
+     * AU TEST
+     * ***********************/
+
     /**
      * Shared AU test instances, one for each thread group. These are initialized with drastically reduced replication
      * counts to be able to be used for fast screening. If the implementation detects instability, the AU tests are
@@ -211,6 +262,10 @@ protected:
      * context.
      */
     std::vector<uint8_t> au_initialized;
+
+    /* ***********************
+     * Optimizer
+     * ***********************/
 
     /**
      * A copy of the CLI Options instance, with every option required to run raxml-fast forcibly enabled.
@@ -254,6 +309,10 @@ protected:
      */
     shared_ptr<CheckpointManager> adaptive_checkpoint_manager;
 
+    /* ***********************
+     * Tree sources
+     * ***********************/
+
     /**
      * EBG gate to reject this source if the generated trees do not approximate the expected distribution of splits.
      */
@@ -272,7 +331,7 @@ protected:
     /**
      * Global source of trees built from compatible splits from a set of reference trees.
      */
-     shared_ptr<SplitSamplerSource> greedy_split_sampling;
+    shared_ptr<SplitSamplerSource> greedy_split_sampling;
 };
 
 #endif //RAXML_SHAREDBATCHRESOURCES_HPP_

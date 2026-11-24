@@ -14,9 +14,9 @@ TunedBatch &BatchQueue::generate_batch(const unsigned int num_workers, const uns
     // place new batches at the end of the queue, it will be marked as unfinished and in-flight
     std::string batch_name = name_prefix + std::to_string(batch_name_index);
     this->batches.emplace_back(batch_name,
-                               msa,
-                               tip_msa_idmap,
-                               persite_loglh,
+                               resources,
+                               resources->get_msa(),
+                               resources->get_reference_persite_loglh().size(),
                                this->batch_size,
                                num_threads,
                                num_workers,
@@ -93,7 +93,8 @@ static unsigned int recount_unfinished_trees(std::deque<TunedBatch> &batches,
 void BatchQueue::finish_batch(TunedBatch &batch) {
     const std::lock_guard lock(batch_mutex);
 
-    if (batch.get_plausible_tree_count() > static_cast<unsigned int>(static_cast<double>(this->batch_size) * MINIMUM_SUCCESS_RATE)) {
+    if (batch.get_plausible_tree_count() > static_cast<unsigned int>(
+            static_cast<double>(this->batch_size) * MINIMUM_SUCCESS_RATE)) {
         this->finalize_batch(batch);
     }
 

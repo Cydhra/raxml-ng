@@ -6,9 +6,9 @@
 class NniRound : public InferenceHeuristic {
 
 public:
-    NniRound(std::string batch_name, std::unique_ptr<InferenceHeuristic> inner, const unsigned num_trees,
+    NniRound(std::string batch_name, std::unique_ptr<InferenceHeuristic> inner, std::shared_ptr<SharedBatchResources> resources, const unsigned num_trees,
         const unsigned threads_per_worker)
-        : InferenceHeuristic(std::move(batch_name), std::move(inner), num_trees, threads_per_worker) {
+        : InferenceHeuristic(std::move(batch_name), std::move(inner), std::move(resources), num_trees, threads_per_worker) {
     }
 
     NniRound(NniRound &&other) noexcept = default;

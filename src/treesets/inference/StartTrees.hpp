@@ -6,18 +6,20 @@
 
 class StartTrees : public InferenceHeuristic {
 public:
-    StartTrees(std::string batch_name, std::unique_ptr<InferenceHeuristic> inner, const unsigned num_trees,
-        const unsigned threads_per_worker, std::shared_ptr<TreeList> batch_start_trees,
-        std::shared_ptr<PartitionAssignmentList> part_assignments, std::shared_ptr<ModelMap> initial_model,
-        std::optional<std::string> model_override, std::shared_ptr<PartitionedMSA> msa,
-        std::shared_ptr<IDVector> tip_msa_idmap)
-        : InferenceHeuristic(std::move(batch_name), std::move(inner), num_trees, threads_per_worker),
+    StartTrees(std::string batch_name, std::unique_ptr<InferenceHeuristic> inner,
+               std::shared_ptr<SharedBatchResources> resources,
+               const unsigned num_trees,
+               const unsigned threads_per_worker,
+               std::shared_ptr<TreeList> batch_start_trees,
+               std::shared_ptr<PartitionAssignmentList> part_assignments,
+               std::shared_ptr<ModelMap> initial_model,
+               std::optional<std::string> model_override)
+        : InferenceHeuristic(std::move(batch_name), std::move(inner), std::move(resources), num_trees,
+                             threads_per_worker),
           batch_start_trees(std::move(batch_start_trees)),
           part_assignments(std::move(part_assignments)),
           initial_model(std::move(initial_model)),
-          model_override(std::move(model_override)),
-          msa(std::move(msa)),
-          tip_msa_idmap(std::move(tip_msa_idmap)) {
+          model_override(std::move(model_override)) {
     }
 
     StartTrees(StartTrees &&other) noexcept = default;
@@ -36,10 +38,6 @@ protected:
     std::shared_ptr<ModelMap> initial_model;
 
     std::optional<std::string> model_override;
-
-    std::shared_ptr<PartitionedMSA> msa;
-
-    std::shared_ptr<IDVector> tip_msa_idmap;
 };
 
 #endif //RAXML_PARSIMONY_HPP

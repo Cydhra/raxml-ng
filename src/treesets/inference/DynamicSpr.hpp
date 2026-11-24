@@ -4,12 +4,18 @@
 #include "Heuristic.hpp"
 
 class DynamicSpr : public InferenceHeuristic {
-
 public:
-    DynamicSpr(std::string batch_name, std::unique_ptr<InferenceHeuristic> inner, const unsigned num_trees,
-        const unsigned threads_per_worker, std::shared_ptr<PartitionAssignmentList> part_assignments,
-        const unsigned int keep_top_k_topol, const bool thorough, const unsigned int max_radius)
-        : InferenceHeuristic(std::move(batch_name), std::move(inner), num_trees, threads_per_worker),
+    DynamicSpr(std::string batch_name,
+               std::unique_ptr<InferenceHeuristic> inner,
+               std::shared_ptr<SharedBatchResources> resources,
+               const unsigned num_trees,
+               const unsigned threads_per_worker,
+               std::shared_ptr<PartitionAssignmentList> part_assignments,
+               const unsigned int keep_top_k_topol,
+               const bool thorough,
+               const unsigned int max_radius)
+        : InferenceHeuristic(std::move(batch_name), std::move(inner), std::move(resources), num_trees,
+                             threads_per_worker),
           part_assignments(std::move(part_assignments)),
           keep_top_k_topol(keep_top_k_topol),
           thorough(thorough),
@@ -18,9 +24,10 @@ public:
 
     DynamicSpr(DynamicSpr &&other) noexcept = default;
 
-    DynamicSpr & operator=(DynamicSpr &&other) noexcept = default;
+    DynamicSpr &operator=(DynamicSpr &&other) noexcept = default;
 
-    void do_optimize(std::optional<TreeInfo> &tree, unsigned int tree_id, const Options &opts, const TaskGroup &context, SharedBatchResources &resources,
+    void do_optimize(std::optional<TreeInfo> &tree, unsigned int tree_id, const Options &opts, const TaskGroup &context,
+                     SharedBatchResources &resources,
                      unsigned int worker_id, unsigned int thread_id) override;
 
 protected:
@@ -46,7 +53,7 @@ protected:
      *
      * @param opts parsed command line options with defaults and user-mandated search parameters
      */
-    spr_round_params auto_configure(const Options &opts) const {
+    [[nodiscard]] spr_round_params auto_configure(const Options &opts) const {
         spr_round_params spr_params{};
 
         // update options according to MetaParameters:

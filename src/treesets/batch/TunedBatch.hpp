@@ -27,19 +27,15 @@ constexpr double SIGNIFICANCE_LEVEL = 0.05;
 // forward declaration of RaxmlInstance
 struct RaxmlInstance;
 
-class BanditFailedException : public std::exception
-{
+class BanditFailedException : public std::exception {
 public:
-    explicit BanditFailedException(std::string  message)
-    : _message(std::move(message))
-    {
+    explicit BanditFailedException(std::string message)
+        : _message(std::move(message)) {
     }
 
-    const char* what() const noexcept override
-    { return message().c_str(); }
+    const char *what() const noexcept override { return message().c_str(); }
 
-    virtual const std::string& message() const
-    { return _message; };
+    virtual const std::string &message() const { return _message; };
 
 protected:
     mutable std::string _message;
@@ -48,24 +44,22 @@ protected:
 class TunedBatch final {
 public:
     TunedBatch(std::string name,
-               const std::shared_ptr<PartitionedMSA> &msa,
-               const std::shared_ptr<IDVector> &tip_msa_idmap,
-               const std::shared_ptr<std::vector<std::vector<doubleVector> > > &reference_persite_loglh,
+               std::shared_ptr<SharedBatchResources> resources,
+               PartitionedMSA &msa,
+               const unsigned int num_reference_trees,
                const unsigned int batch_size,
                const unsigned int num_threads,
                const unsigned int num_workers,
                LoadBalancer &thread_load_balancer)
         : name(std::move(name)),
-          reference_persite_loglh(reference_persite_loglh),
-          msa(msa),
+          resources(std::move(resources)),
           batch_start_trees(std::make_shared<TreeList>(batch_size)),
-          tip_msa_idmap(tip_msa_idmap),
           batch_persite_logh(std::vector<std::vector<doubleVector> >(batch_size)),
           batch_size(batch_size),
           num_workers(num_workers),
           threads_per_worker(num_threads / num_workers) {
         for (auto &tree_slh: batch_persite_logh) {
-            for (const auto &pinfo: msa->part_list())
+            for (const auto &pinfo: msa.part_list())
                 tree_slh.emplace_back(pinfo.msa().length());
         }
 
@@ -85,9 +79,9 @@ public:
 
         // load balance partitions for such tasks between threads
         PartitionAssignment part_sizes;
-        for (unsigned int i = 0; i < this->msa->part_list().size(); ++i) {
+        for (unsigned int i = 0; i < msa.part_list().size(); ++i) {
             /* init the list of partition sizes */
-            auto pinfo = &this->msa->part_list()[i];
+            auto pinfo = &msa.part_list()[i];
             part_sizes.assign_sites(i, 0, pinfo->length(), static_cast<double>(pinfo->model().clv_entry_size()));
         }
 
@@ -97,7 +91,7 @@ public:
         // load-balance work for AU test, where we have reference trees and trees assigned to one thread need to be
         // contiguous. This is only needed for the first instance of the AU test, afterward we can reuse the bootstrap
         // values for the reference trees and use the exclusive_tree_access assignment
-        const unsigned int total_trees_au = reference_persite_loglh->size() + batch_size;
+        const unsigned int total_trees_au = num_reference_trees + batch_size;
         CoarseAssignment au_tree_ids(total_trees_au);
         std::iota(au_tree_ids.begin(), au_tree_ids.end(), 0);
         this->au_assignment = std::make_shared<CoarseAssignmentList>(
@@ -128,12 +122,11 @@ public:
      *
      * @param instance Raxml instance, required for tree generation
      * @param opts command line options, required for parameter optimization
-     * @param resources resources shared between multiple batches, like the AU test instance.
      * @param context task group context
      * @param worker_id raxml-instance-local id of the worker. Within task groups, they need not start at 0.
      * @param thread_id worker-local id of the thread, thread numbering start at 0 for each worker.
      */
-    void optimize(const RaxmlInstance &instance, const Options &opts, SharedBatchResources &resources,
+    void optimize(const RaxmlInstance &instance, const Options &opts,
                   const TaskGroup &context,
                   unsigned int worker_id, unsigned int thread_id);
 
@@ -232,16 +225,7 @@ protected:
      */
     string name;
 
-    /**
-     * Per-site log-likelihoods of the reference trees already inferred before the treeset heuristic kicked in.
-     * These cannot change, and constitute the first part of the AU test input.
-     */
-    std::shared_ptr<std::vector<std::vector<doubleVector> > > reference_persite_loglh;
-
-    /**
-     * A reference to the MSA used in inference. We need it for the AU test.
-     */
-    std::shared_ptr<PartitionedMSA> msa;
+    std::shared_ptr<SharedBatchResources> resources;
 
     /**
      * The meta-heuristic parameters for inferring trees. These are not the model parameters, but settings of the
@@ -277,11 +261,6 @@ protected:
      * Fine-grained assignment of partitions to threads within workers (thread groups).
      */
     std::shared_ptr<PartitionAssignmentList> part_assignments;
-
-    /**
-     * Vector mapping sequence IDs to the MSA.
-     */
-    std::shared_ptr<IDVector> tip_msa_idmap;
 
     /**
      * Treeinfo objects for the trees inferred in this batch. These objects are updated by the inference algorithm.
@@ -368,7 +347,7 @@ protected:
      * to ensure consensus of all worker threads on its value.
      * Then, the AU Test rescaling is performed.
      */
-    unsigned int target_au_test_factor;
+    unsigned int target_au_test_factor = 0;
 
     /**
      * @return Whether all starting trees have been generated for this batch.
@@ -385,7 +364,7 @@ protected:
      * @param worker_id raxml-instance-local id of the worker. Within task groups, they need not start at 0.
      * @param thread_id worker-local id of the thread, thread numbering start at 0 for each worker.
      */
-    void generate_starting_trees(const RaxmlInstance &instance, SharedBatchResources &resources,
+    void generate_starting_trees(const RaxmlInstance &instance,
                                  const TaskGroup &context,
                                  unsigned int worker_id, unsigned int thread_id);
 
@@ -393,7 +372,6 @@ protected:
      * Perform the AU test on the trees in the batch, as well as the supplied reference trees,
      * but backup the model before, optimize the model fully, and then restore the original model.
      *
-     * @param resources au test instance and profiling, shared between batches
      * @param initialized if false, the au_test instance is not initialized and memory will be allocated, and the
      *                    reference trees included in the bootstrap. Otherwise, only the batch trees are included.
      * @param context task group context
@@ -402,7 +380,8 @@ protected:
      *
      * @return The number of plausible trees.
      */
-    void perform_plausibility_check(const Options &opts, SharedBatchResources &resources, bool initialized,
+    void perform_plausibility_check(const Options &opts,
+                                    bool initialized,
                                     const TaskGroup &context,
                                     unsigned int worker_id,
                                     unsigned int thread_id);

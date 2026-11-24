@@ -2,7 +2,7 @@
 #define RAXML_BATCHQUEUE_HPP_
 
 #include "TunedBatch.hpp"
-#include <atomic>
+#include "SharedBatchResources.hpp"
 
 // forward declaration of RaxmlInstance
 struct RaxmlInstance;
@@ -13,14 +13,10 @@ struct RaxmlInstance;
  */
 class BatchQueue {
 public:
-    BatchQueue(const std::shared_ptr<IDVector> &tip_msa_idmap,
+    BatchQueue(std::shared_ptr<SharedBatchResources> resources,
                LoadBalancer &load_balancer,
-               const std::shared_ptr<PartitionedMSA> &msa,
-               const std::shared_ptr<std::vector<std::vector<doubleVector> > > &persite_loglh,
-               const unsigned int batch_size) : tip_msa_idmap(tip_msa_idmap),
-                                                msa(msa),
+               const unsigned int batch_size) : resources(std::move(resources)),
                                                 load_balancer(load_balancer),
-                                                persite_loglh(persite_loglh),
                                                 batch_size(batch_size) {
     }
 
@@ -40,7 +36,8 @@ public:
      * @param lock proof that the calling thread is allowed to modify the batch list. Because this method does not
      * trigger any inference, it does not stall the queue.
      */
-    TunedBatch &generate_batch(unsigned int num_workers, unsigned int num_threads, const std::lock_guard<std::mutex> &lock);
+    TunedBatch &generate_batch(unsigned int num_workers, unsigned int num_threads,
+                               const std::lock_guard<std::mutex> &lock);
 
     /**
      * Select a TunedBatch instance for inference with the given parameters.
@@ -83,24 +80,14 @@ public:
 
 protected:
     /**
-     * Reference to the RAxML-ng instance's tip id-map which is used for starting tree generation.
+     * Access to shared resources required for each batch
      */
-    std::shared_ptr<IDVector> tip_msa_idmap;
-
-    /**
-     * Pointer to the partitioned msa instance of the current RAxML-ng run
-     */
-    std::shared_ptr<PartitionedMSA> msa;
+    std::shared_ptr<SharedBatchResources> resources;
 
     /**
      * Reference to the user-configured fine-grained load balancer used by the main RAxML instance.
      */
     LoadBalancer &load_balancer;
-
-    /**
-     * Pointer to the persite_loglh vector of the reference tree run
-     */
-    std::shared_ptr<std::vector<std::vector<doubleVector> > > persite_loglh;
 
     /**
      * List of all batches that are being inferred or were inferred by the optimizer. It is initialized with a

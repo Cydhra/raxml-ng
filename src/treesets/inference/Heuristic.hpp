@@ -24,15 +24,18 @@ public:
     /**
      * @param batch_name name of the batch that uses this heuristic
      * @param inner inner heuristic stage (which will be executed first)
+     * @param resources access to shared resources and hyperparameters.
      * @param num_trees number of trees inferred by this instance
      * @param threads_per_worker number of threads per task-group (which will call this strategy)
      */
     InferenceHeuristic(std::string batch_name, std::unique_ptr<InferenceHeuristic> inner,
+                       std::shared_ptr<SharedBatchResources> resources,
                        const unsigned int num_trees, const unsigned int threads_per_worker)
         : batch_name(std::move(batch_name)),
+          resources(std::move(resources)),
           inner(std::move(inner)),
           num_trees(num_trees),
-          passed(num_trees * threads_per_worker, 0){
+          passed(num_trees * threads_per_worker, 0) {
         for (unsigned int i = 0; i < num_trees; i++) {
             per_tree_wall_time.emplace_back(std::make_unique<std::atomic_uint>(0));
         }
@@ -104,6 +107,11 @@ protected:
      */
     std::string batch_name;
 
+    /**
+     * Access to shared resources and hyperparameters.
+     */
+    std::shared_ptr<SharedBatchResources> resources;
+
 private:
     /**
      * Wall-time spent on the current heuristic. This is cumulative across all trees, even if they were processed in
@@ -133,7 +141,7 @@ private:
     /**
      * Individual walltime measurements per tree inference
      */
-    std::vector<std::unique_ptr<std::atomic_uint>> per_tree_wall_time;
+    std::vector<std::unique_ptr<std::atomic_uint> > per_tree_wall_time;
 };
 
 #endif //RAXML_HEURISTIC_HPP_

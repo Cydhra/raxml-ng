@@ -1,5 +1,7 @@
 #include "Constrain.hpp"
 
+#include "../batch/SharedBatchResources.hpp"
+
 static std::optional<Tree> get_reverse_backbone(const TreeInfo &tree) {
     // obtain the topology with negative branch lengths to invert the order of branch lengths.
     Tree constraint = tree.tree();
@@ -51,19 +53,19 @@ void Constrain::do_optimize(std::optional<TreeInfo> &tree, const unsigned int tr
     // sort the tip ids so the constrained ids come first:
     NameIdMap new_label_id_map;
     IDVector new_tip_msa_map;
-    new_tip_msa_map.resize(msa->taxon_count());
+    new_tip_msa_map.resize(resources->get_msa().taxon_count());
     const auto cons_name_map = constraint->tip_ids();
     size_t seq_id = 0;
     size_t cons_tip_id = 0;
     size_t free_tip_id = constraint->num_tips();
-    for (const auto &tip_name: msa->taxon_names()) {
+    for (const auto &tip_name: resources->get_msa().taxon_names()) {
         const auto tip_id = cons_name_map.count(tip_name) ? cons_tip_id++ : free_tip_id++;
         new_label_id_map[tip_name] = tip_id;
         new_tip_msa_map[tip_id] = seq_id++;
     }
     assert(cons_tip_id == constraint->num_tips());
     assert(free_tip_id == new_tip_msa_map.size());
-    assert(new_label_id_map.size() == msa->taxon_count());
+    assert(new_label_id_map.size() == resources->get_msa().taxon_count());
 
     if (context.is_group_leader(worker_id, thread_id) && tree_id == 0) {
         LOG_INFO_TS << "Constraining " << cons_tip_id << " taxa for tree #" << tree_id << "." << std::endl;
@@ -78,7 +80,7 @@ void Constrain::do_optimize(std::optional<TreeInfo> &tree, const unsigned int tr
         assign(target[part_info.part_id], *tree, part_info.part_id);
     }
 
-    tree.emplace(TreeInfo(opts, topology, *msa, new_tip_msa_map, part_assignments->at(thread_id)));
+    tree.emplace(TreeInfo(opts, topology, resources->get_msa(), new_tip_msa_map, part_assignments->at(thread_id)));
     assign_models(*tree, target);
 
     tree->set_topology_constraint(*constraint);

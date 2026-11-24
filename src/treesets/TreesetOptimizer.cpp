@@ -6,12 +6,12 @@
 void TreesetOptimizer::initialize_bandits(const double maximum_success) {
     const auto starting_trees = make_shared<MultiArmedBandit<MetaParameters> >();
     starting_trees->emplace_back("Parsimony", MetaParameters(), maximum_success);
-    if (shared_batch_resources.get_parsimony_resample_source().total_trees() >= this->batch_queue.get_batch_size()) {
+    if (shared_batch_resources->get_parsimony_resample_source().total_trees() >= this->batch_queue.get_batch_size()) {
         starting_trees->emplace_back("Constrained-Parsimony",
                                      MetaParameters().with_treesource(SplitParsimony).with_final_model(false),
                                      maximum_success);
     }
-    if (shared_batch_resources.get_greedy_split_source().total_trees() >= this->batch_queue.get_batch_size()) {
+    if (shared_batch_resources->get_greedy_split_source().total_trees() >= this->batch_queue.get_batch_size()) {
         starting_trees->emplace_back("Split-Greedy",
                                      MetaParameters().with_treesource(SplitGreedy).with_final_model(false),
                                      maximum_success);
@@ -123,7 +123,7 @@ void TreesetOptimizer::initialize_bandits(const double maximum_success) {
 bool TreesetOptimizer::run_batch(TunedBatch &batch, const TaskGroup &context, const unsigned int worker_id,
                                  const unsigned int thread_id) {
     try {
-        batch.optimize(instance, opts, shared_batch_resources, context, worker_id, thread_id);
+        batch.optimize(instance, opts, context, worker_id, thread_id);
     } catch (BanditFailedException &e) {
         if (context.is_group_leader(worker_id, thread_id)) {
             LOG_INFO << "Batch " << batch.get_name() << " failed because: " << e.message() << ". Disabling bandit." <<
@@ -172,23 +172,23 @@ BatchTask TreesetOptimizer::next_work_unit() {
 
 void TreesetOptimizer::initialize_resources(const SmartBarrier &global_barrier) {
     LOG_INFO_TS << "Generating " << NUM_DONOR_TREE << " parsimony trees upfront." << std::endl;
-    shared_batch_resources.get_parsimony_source().ensure(instance, global_barrier, 1, ParallelContext::local_group_id(),
+    shared_batch_resources->get_parsimony_source().ensure(instance, global_barrier, 1, ParallelContext::local_group_id(),
                                                   ParallelContext::local_thread_id(), NUM_DONOR_TREE);
 
     if (ParallelContext::local_group_id() + ParallelContext::local_thread_id() == 0) {
-        const auto throughput_bound = 1.0 / shared_batch_resources.get_parsimony_source().amortized_time(1);
+        const auto throughput_bound = 1.0 / shared_batch_resources->get_parsimony_source().amortized_time(1);
         LOG_INFO_TS << "The largest achievable throughput is " << throughput_bound << "tps" << std::endl;
 
         mab.set_upper_bound(throughput_bound);
     }
 
     LOG_INFO_TS << "Generating " << target_tree_count << " split-informed parsimony trees." << std::endl;
-    shared_batch_resources.get_parsimony_resample_source().generate(instance, global_barrier,
+    shared_batch_resources->get_parsimony_resample_source().generate(instance, global_barrier,
                                                                  ParallelContext::num_groups(),
                                                                  ParallelContext::local_group_id(), target_tree_count);
 
     LOG_INFO_TS << "Generating " << target_tree_count << " split-greedy trees." << std::endl;
-    shared_batch_resources.get_greedy_split_source().generate(instance, global_barrier, ParallelContext::num_groups(),
+    shared_batch_resources->get_greedy_split_source().generate(instance, global_barrier, ParallelContext::num_groups(),
                                                               ParallelContext::local_group_id(), target_tree_count);
 }
 

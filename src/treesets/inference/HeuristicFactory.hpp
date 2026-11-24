@@ -16,8 +16,7 @@ public:
                                                                std::shared_ptr<PartitionAssignmentList> &
                                                                part_assignments,
                                                                std::shared_ptr<ModelMap> &initial_model,
-                                                               std::shared_ptr<PartitionedMSA> &partitioned_msa,
-                                                               std::shared_ptr<IDVector> &tip_msa_idmap);
+                                                               std::shared_ptr<SharedBatchResources> &resources);
 
     static std::unique_ptr<InferenceHeuristic> extend_heuristic(const MetaParameters &new_parameters,
                                                                 const MetaParameters &old_parameters,
@@ -27,8 +26,7 @@ public:
                                                                 unsigned int threads_per_worker,
                                                                 std::shared_ptr<PartitionAssignmentList> &part_assignments,
                                                                 std::shared_ptr<ModelMap> &initial_model,
-                                                                std::shared_ptr<PartitionedMSA> &partitioned_msa,
-                                                                std::shared_ptr<IDVector> &tip_msa_idmap);
+                                                                std::shared_ptr<SharedBatchResources> &resources);
 };
 
 

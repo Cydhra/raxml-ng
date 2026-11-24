@@ -5,10 +5,10 @@
 
 class ModelOpt : public InferenceHeuristic {
 public:
-    ModelOpt(std::string batch_name, std::unique_ptr<InferenceHeuristic> inner, const unsigned num_trees,
+    ModelOpt(std::string batch_name, std::unique_ptr<InferenceHeuristic> inner, std::shared_ptr<SharedBatchResources> resources, const unsigned num_trees,
              const unsigned threads_per_worker, const bool model, const bool branches, const double epsilon,
              const bool iterate = true)
-        : InferenceHeuristic(std::move(batch_name), std::move(inner), num_trees, threads_per_worker),
+        : InferenceHeuristic(std::move(batch_name), std::move(inner), std::move(resources), num_trees, threads_per_worker),
           model(model),
           branches(branches),
           iterate(iterate),

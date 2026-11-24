@@ -29,7 +29,7 @@ protected:
      * Resources shared between batches, either group-local or thread-safe resources that aren't specific to the batch
      * (like AU test instances that can be reused, or profiler that need to be shared).
      */
-    SharedBatchResources shared_batch_resources;
+    std::shared_ptr<SharedBatchResources> shared_batch_resources;
 
     /**
      * Reference to RaxmlInstance that we require for some of the optimization routines. We don't access or modify it,
@@ -107,7 +107,7 @@ public:
                      Options &opts,
                      const std::shared_ptr<PartitionedMSA> &msa,
                      const TreeList initial_ml_trees,
-                     const Tree &baseline_tree, // TODO we do not need the randomTree above then
+                     const Tree &baseline_tree,
                      IDVector &tip_msa_idmap,
                      const std::vector<std::vector<doubleVector> > &persite_loglh,
                      LoadBalancer &load_balancer,
@@ -118,7 +118,7 @@ public:
                                                                        return this->next_work_unit();
                                                                    }, opts.treeset_threads, opts.treeset_workers,
                                                                    opts.treeset_groups)),
-                                                               shared_batch_resources(
+                                                               shared_batch_resources(make_shared<SharedBatchResources>(
                                                                    opts.treeset_groups,
                                                                    opts.treeset_workers,
                                                                    opts.treeset_threads,
@@ -126,17 +126,16 @@ public:
                                                                    initial_ml_trees,
                                                                    baseline_tree,
                                                                    msa,
+                                                                   tip_msa_idmap,
                                                                    persite_loglh,
                                                                    DEFAULT_BATCH_SIZE,
                                                                    starting_seed,
-                                                                   pythia_score),
+                                                                   pythia_score)),
                                                                instance(instance),
                                                                opts(opts),
                                                                batch_queue(
-                                                                   make_shared<IDVector>(tip_msa_idmap),
-                                                                   load_balancer, msa,
-                                                                   make_shared<std::vector<std::vector<
-                                                                       doubleVector> > >(persite_loglh),
+                                                                   this->shared_batch_resources,
+                                                                   load_balancer,
                                                                    DEFAULT_BATCH_SIZE),
                                                                pythia_score(pythia_score),
                                                                target_tree_count(target_tree_count),

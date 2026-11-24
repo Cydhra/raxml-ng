@@ -5,10 +5,10 @@
 
 class FixedSpr : public InferenceHeuristic {
 public:
-    FixedSpr(std::string batch_name, std::unique_ptr<InferenceHeuristic> inner, const unsigned num_trees,
+    FixedSpr(std::string batch_name, std::unique_ptr<InferenceHeuristic> inner, std::shared_ptr<SharedBatchResources> resources, const unsigned num_trees,
         const unsigned threads_per_worker, const unsigned int num_spr, const unsigned int keep_top_k_topol,
         const bool thorough, const unsigned int max_radius)
-        : InferenceHeuristic(std::move(batch_name), std::move(inner), num_trees, threads_per_worker),
+        : InferenceHeuristic(std::move(batch_name), std::move(inner), std::move(resources), num_trees, threads_per_worker),
           num_spr(num_spr),
           keep_top_k_topol(keep_top_k_topol),
           thorough(thorough),
