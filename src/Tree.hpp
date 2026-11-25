@@ -135,6 +135,14 @@ public:
   void apply_partition_brlens(size_t partition_idx);
   void apply_avg_brlens(const doubleVector& partition_contributions);
 
+  /**
+   * Calculate the patristic distances for each pair of tips in a matrix.
+   * The matrix is indexed by row * tips + column.
+   * The diagonal elements contain the distance of each tip to the current virtual root.
+   * The method is not thread-safe.
+   */
+  doubleVector patristic_distances() const;
+
   void reset_tip_ids(const NameIdMap& label_id_map);
   void reroot(const NameList& outgroup_taxa, bool add_root_node = false);
   void remove_tips(const NameList& tips);

@@ -685,6 +685,13 @@ void Tree::apply_avg_brlens(const doubleVector& partition_contributions)
   }
 }
 
+doubleVector Tree::patristic_distances() const {
+  const auto tips = num_tips();
+  doubleVector result(tips * tips);
+  corax_utree_binary_patristic_distances(_pll_utree->vroot, tips, result.data());
+  return result;
+}
+
 void Tree::reroot(const NameList& outgroup_taxa, bool add_root_node)
 {
   // collect tip node indices
