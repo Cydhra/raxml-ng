@@ -37,7 +37,8 @@ public:
                                                       reference_persite_loglh(
                                                           make_shared<std::vector<std::vector<doubleVector> > >(
                                                               reference_persite_loglh)),
-                                                      gate(make_shared<EbgGate>(opts, baseline_tree, this->reference_ml_trees)),
+                                                      gate(make_shared<EbgGate>(
+                                                          opts, baseline_tree, this->reference_ml_trees)),
                                                       parsimony_source(make_shared<ParsimonySource>(seed)),
                                                       constrained_parsimony_sampling(
                                                           make_shared<ParsimonySamplerSource>(
@@ -95,6 +96,9 @@ public:
         adaptive_checkpoint_manager->pythia_score(pythia_score);
         adaptive_checkpoint_manager->
                 init_checkpoints(baseline_tree, msa->models(), num_task_groups * workers_per_group);
+
+        max_clade_diameter = find_constraint_diameter();
+        LOG_INFO << "Maximum Clade Diameter: " << max_clade_diameter << std::endl;
     }
 
     /**
@@ -222,6 +226,13 @@ public:
         return *greedy_split_sampling;
     }
 
+    /**
+     * Maximum diameter of clades that cannot be resolved. Estimated value.
+     */
+    [[nodiscard]] double get_clade_diameter() const {
+        return max_clade_diameter;
+    }
+
 protected:
     /* ***********************
      * MSA and Input trees
@@ -340,6 +351,114 @@ protected:
      * Global source of trees built from compatible splits from a set of reference trees.
      */
     shared_ptr<SplitSamplerSource> greedy_split_sampling;
+
+    /* ***********************
+     * Hyperparameters
+     * ***********************/
+
+    /**
+     * The maximum diameter of unresolvable clades.
+     */
+    double max_clade_diameter = 0.0;
+
+private:
+    [[nodiscard]] double find_constraint_diameter() const {
+        // generate patristic matrices of all reference trees
+        TreeList collapsed_trees;
+        doubleVector non_zero_branch_lengths;
+
+        for (auto &tree: *reference_ml_trees) {
+            for (auto len: tree.brlens()) {
+                if (len > CORAX_OPT_MIN_BRANCH_LEN)
+                    non_zero_branch_lengths.push_back(len);
+            }
+
+            collapsed_trees.push_back(tree);
+            collapsed_trees.back().collapse_short_branches(CORAX_OPT_MIN_BRANCH_LEN);
+        }
+
+        if (non_zero_branch_lengths.empty()) {
+            return 0.0;
+        }
+
+        // identify upper limit of clade diameter: median of non-minimal branch lengths
+        sort(non_zero_branch_lengths.begin(), non_zero_branch_lengths.end());
+        double diameter = non_zero_branch_lengths.at(non_zero_branch_lengths.size() / 2);
+
+        // calculate split sets
+        vector<corax_split_set_t *> split_sets;
+        for (size_t tree_id = 0; tree_id < reference_ml_trees->size(); tree_id++) {
+            auto &tree = collapsed_trees.at(tree_id);
+            const auto s_set = corax_utree_splitset_create(&tree.pll_utree());
+            split_sets.push_back(s_set);
+        }
+
+        // get the tip ids from a split. Set or unset side to get the 1 or 0 side.
+        auto split_ids = [](const corax_split_set_t *sset, const unsigned int id, const bool side) {
+            uintVector tips;
+            corax_split_t split = sset->splits[id];
+            for (size_t i = 0; i < sset->tip_count; ++i) {
+                const bool in = split[i / sset->split_size] & (1u << (i % sset->split_size));
+                if (in == side) tips.push_back(i);
+            }
+            return tips;
+        };
+
+        // get the diameter of a set of tips. Aborts when the maximum diameter exceeds limit.
+        auto clade_diameter = [](const uintVector &tip_ids, const size_t num_tips, const doubleVector &distances,
+                                 const double limit) {
+            auto diam = 0.0;
+            for (size_t x = 0; x < tip_ids.size(); x++) {
+                for (size_t y = x + 1; y < tip_ids.size(); y++) {
+                    diam = max(diam, distances[tip_ids[x] * num_tips + tip_ids[y]]);
+
+                    if (diam > limit) {
+                        return diam;
+                    }
+                }
+            }
+
+            return diam;
+        };
+
+        // for each split, take the smaller tree and test whether it disagrees with any other reference tree.
+        // If so, make the maximum diameter smaller (we take steps of MIN_BRANCH_LENGTH).
+        for (size_t tree_id = 0; tree_id < reference_ml_trees->size(); tree_id++) {
+            const auto s_set = split_sets.at(tree_id);
+            doubleVector patristic_matrix = reference_ml_trees->at(tree_id).patristic_distances();
+
+            for (size_t split_id = 0; split_id < s_set->split_count; split_id++) {
+                auto first_side = split_ids(s_set, split_id, true);
+                auto second_side = split_ids(s_set, split_id, false);
+
+                const auto clade_diam = min(
+                    clade_diameter(first_side, msa->taxon_count(), patristic_matrix, diameter),
+                    clade_diameter(second_side, msa->taxon_count(), patristic_matrix, diameter)
+                );
+
+                // if clade diameter is smaller or equal, check if it violates a split
+                if (diameter - clade_diam > -1E-9) {
+                    for (size_t other_tree = tree_id + 1; other_tree < split_sets.size(); other_tree++) {
+                        const auto other_set = split_sets.at(other_tree);
+
+                        for (size_t i = 0; i < other_set->split_count; i++) {
+                            if (!corax_utree_split_compatible(s_set->splits[split_id], other_set->splits[i],
+                                                              s_set->split_len, s_set->tip_count)) {
+                                LOG_DEBUG << "Reject Diameter " << diameter << std::endl;
+                                diameter = clade_diam - CORAX_OPT_MIN_BRANCH_LEN;
+                                // diameter must be smaller than this one
+                                goto break_check;
+                            }
+                        }
+                    }
+                }
+            break_check:
+                continue;
+            }
+        }
+
+        return diameter;
+    }
 };
 
 #endif //RAXML_SHAREDBATCHRESOURCES_HPP_
