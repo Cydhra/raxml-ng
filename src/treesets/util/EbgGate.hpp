@@ -41,9 +41,9 @@ struct RankedCandidate {
  */
 class EbgGate {
 public:
-    EbgGate(const Options &opts, Tree baseline_tree, TreeList initial_ml_trees)
+    EbgGate(const Options &opts, Tree baseline_tree, const std::shared_ptr<TreeList> &initial_ml_trees)
         : baseline_tree(std::move(baseline_tree)),
-          initial_ml_trees(std::move(initial_ml_trees)), mae_margin(opts.gate_margin) {
+          initial_ml_trees(initial_ml_trees), mae_margin(opts.gate_margin) {
     }
 
     /**
@@ -94,7 +94,7 @@ protected:
     /**
      * Set of reference ML trees
      */
-    TreeList initial_ml_trees;
+    std::shared_ptr<TreeList> initial_ml_trees;
 
     /**
      * Splits extracted from reference ML trees, projected onto a reference tree

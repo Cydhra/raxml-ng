@@ -56,7 +56,7 @@ void EbgGate::reset_gate(const RaxmlInstance &instance, const ConstTreeRange &su
         ebg_support = reference_support_tree->support();
 
         ml_frequency.assign(split_count, 0.0);
-        for (const auto &initial_ml_tree: initial_ml_trees) {
+        for (const auto &initial_ml_tree: *initial_ml_trees) {
             PllSplitSharedPtr initial_splits(
                 corax_utree_split_create(&initial_ml_tree.pll_utree_root(),
                                          initial_ml_tree.num_tips(), nullptr),
@@ -69,7 +69,7 @@ void EbgGate::reset_gate(const RaxmlInstance &instance, const ConstTreeRange &su
             }
         }
         for (auto &frequency: ml_frequency)
-            frequency /= static_cast<double>(initial_ml_trees.size());
+            frequency /= static_cast<double>(initial_ml_trees->size());
     }
 
     barrier.enter();
@@ -145,11 +145,11 @@ TreeList EbgGate::gate_and_rank(TreeList candidates) {
     }
 
     // rank splits using the promise score of splits (i.e. splits with higher frequency are chosen preferentially)
-    const auto promise_reference_count = std::min<std::size_t>(3, initial_ml_trees.size());
+    const auto promise_reference_count = std::min<std::size_t>(3, initial_ml_trees->size());
     std::vector<PllSplitSharedPtr> promise_splits;
     promise_splits.reserve(promise_reference_count);
     for (std::size_t reference_id = 0; reference_id < promise_reference_count; ++reference_id) {
-        const auto &reference = initial_ml_trees[reference_id];
+        const auto &reference = initial_ml_trees->at(reference_id);
         PllSplitSharedPtr splits(
             corax_utree_split_create(&reference.pll_utree_root(),
                                      reference.num_tips(),

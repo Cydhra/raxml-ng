@@ -33,8 +33,11 @@ public:
                          unsigned int seed,
                          const double pythia_score) : msa(msa),
                                                       tip_msa_idmap(make_shared<IDVector>(tip_msa_idmap)),
-                                                      reference_persite_loglh(make_shared<std::vector<std::vector<doubleVector>>>(reference_persite_loglh)),
-                                                      gate(make_shared<EbgGate>(opts, baseline_tree, initial_ml_trees)),
+                                                      reference_ml_trees(make_shared<TreeList>(initial_ml_trees)),
+                                                      reference_persite_loglh(
+                                                          make_shared<std::vector<std::vector<doubleVector> > >(
+                                                              reference_persite_loglh)),
+                                                      gate(make_shared<EbgGate>(opts, baseline_tree, this->reference_ml_trees)),
                                                       parsimony_source(make_shared<ParsimonySource>(seed)),
                                                       constrained_parsimony_sampling(
                                                           make_shared<ParsimonySamplerSource>(
@@ -124,7 +127,7 @@ public:
         return *tip_msa_idmap;
     }
 
-    [[nodiscard]] std::vector<std::vector<doubleVector>> get_reference_persite_loglh() const {
+    [[nodiscard]] std::vector<std::vector<doubleVector> > get_reference_persite_loglh() const {
         return *reference_persite_loglh;
     }
 
@@ -233,6 +236,11 @@ protected:
      * Vector mapping sequence IDs to the MSA.
      */
     std::shared_ptr<IDVector> tip_msa_idmap;
+
+    /**
+     * The set of reference ML trees inferred by the standard RAxML-ng pipeline.
+     */
+    std::shared_ptr<TreeList> reference_ml_trees;
 
     /**
      * Per-site log-likelihoods of the reference trees already inferred before the treeset heuristic kicked in.
