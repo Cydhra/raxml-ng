@@ -369,12 +369,12 @@ private:
 
         for (auto &tree: *reference_ml_trees) {
             for (auto len: tree.brlens()) {
-                if (len > CORAX_OPT_MIN_BRANCH_LEN)
+                if (len > RAXML_BRLEN_MIN)
                     non_zero_branch_lengths.push_back(len);
             }
 
             collapsed_trees.push_back(tree);
-            collapsed_trees.back().collapse_short_branches(CORAX_OPT_MIN_BRANCH_LEN);
+            collapsed_trees.back().collapse_short_branches(RAXML_BRLEN_MIN);
         }
 
         if (non_zero_branch_lengths.empty()) {
@@ -445,7 +445,7 @@ private:
                             if (!corax_utree_split_compatible(s_set->splits[split_id], other_set->splits[i],
                                                               s_set->split_len, s_set->tip_count)) {
                                 LOG_DEBUG << "Reject Diameter " << diameter << std::endl;
-                                diameter = clade_diam - CORAX_OPT_MIN_BRANCH_LEN;
+                                diameter = clade_diam - RAXML_BRLEN_MIN;
                                 // diameter must be smaller than this one
                                 goto break_check;
                             }
